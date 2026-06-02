@@ -191,13 +191,13 @@ function tryLogin(){
 function fmtFly(v){return v!=null?v.toFixed(2)+'s':'--';}
 function fmtBroad(v){if(v==null)return'--';return Math.floor(v/12)+"' "+Math.round(v%12)+'"';}
 function fmtVert(v){return v!=null?v.toFixed(3)+'"':'--';}
-function fmtPR(id,v){return id==='fly'?fmtFly(v):id==='broad'?fmtBroad(v):fmtVert(v);}
+function fmtPR(id,v){return id==='fly'||id==='fly510'?fmtFly(v):id==='broad'?fmtBroad(v):id==='rsi42'?parseFloat(v).toFixed(3):fmtVert(v);}
 function fmtDate(d){if(!d)return'';var p=d.split('-');if(p.length<3)return d;var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return m[parseInt(p[1])-1]+' '+parseInt(p[2])+', '+p[0];}
 function lastName(name){return(name||'').split(' ').pop();}
 function getPR(ath,id){
   var vals=state.entries.filter(function(e){return e.athlete===ath&&e.exercise===id;}).map(function(e){return id==='broad'?e.total:e.value;}).filter(function(v){return v!=null&&!isNaN(v);});
   if(!vals.length)return null;
-  return id==='fly'?Math.min.apply(null,vals):Math.max.apply(null,vals);
+  var lower=id==='fly'||id==='fly510';return lower?Math.min.apply(null,vals):Math.max.apply(null,vals);
 }
 function getPRWithDate(ath,id){
   var best=null,bestDate=null;
@@ -398,7 +398,7 @@ function renderRoster(){
   var cards=sorted.map(function(name){
     var p=state.profiles[name]||{};var inactive=p.inactive;var safe_name=name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     var school=(p.college||p.highSchool||'');var sub=[school,p.sports].filter(Boolean).join(' -- ');
-    var pills=EX_LIST.slice(0,3).map(function(e){var pr=getPR(name,e.id);if(pr==null)return'';var cls=e.id==='fly'?'pill-fly':e.id==='broad'?'pill-broad':'pill-vert';return'<span class="pr-pill '+cls+'" title="'+e.name+'">'+e.name.split(' ')[0]+': '+fmtPR(e.id,pr)+'</span>';}).join('');
+    var pills=EX_LIST.map(function(e){var pr=getPR(name,e.id);if(pr==null)return'';var cls=e.id==='fly'||e.id==='fly510'?'pill-fly':e.id==='broad'?'pill-broad':e.id==='rsi42'?'pill-vert':'pill-vert';var lbl=e.id==='fly510'?'5-10':e.id==='fly'?'10-10':e.id==='broad'?'Broad':e.id==='vert'?'Sky':'RSI';return'<span class="pr-pill '+cls+'" title="'+e.name+'">'+lbl+': '+fmtPR(e.id,pr)+'</span>';}).join('');
     return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button></div></div>';
   }).join('');
   return search+'<div class="panel"><div class="panel-title">Athletes ('+sorted.length+')</div>'+cards+'</div>';
