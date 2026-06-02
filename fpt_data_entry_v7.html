@@ -515,16 +515,16 @@ function genAthleteReport(name){
   var entries=state.entries||[];
   var EX_REPORT=[
     {id:'fly510',label:'5-10 Fly',unit:'s',lower:true},
-    {id:'fly1010',label:'10-10 Fly',unit:'s',lower:true},
+    {id:'fly',label:'10-10 Fly',unit:'s',lower:true},
     {id:'broad',label:'Broad Jump',unit:'in',lower:false},
-    {id:'sky',label:'Skyhook',unit:'in',lower:false},
-    {id:'rsi',label:'4/2 RSI',unit:'',lower:false},
+    {id:'vert',label:'Skyhook',unit:'in',lower:false},
+    {id:'rsi42',label:'4/2 RSI',unit:'',lower:false},
   ];
   function fmtR(ex,v){
     if(v===''||v===null||v===undefined)return'';
     if(ex.id==='broad'){return Math.floor(v/12)+"'"+(v%12)+'"';}
-    if(ex.id==='fly510'||ex.id==='fly1010')return parseFloat(v).toFixed(2)+'s';
-    if(ex.id==='sky')return parseFloat(v).toFixed(3)+'"';
+    if(ex.id==='fly510'||ex.id==='fly')return parseFloat(v).toFixed(2)+'s';
+    if(ex.id==='vert')return parseFloat(v).toFixed(3)+'"';
     return parseFloat(v).toFixed(3);
   }
   function fmtAvg(ex,v){return fmtR(ex,v);}
@@ -559,7 +559,7 @@ function genAthleteReport(name){
     }).join('');
   };
   var blockHtml=function(s){
-    var statsHtml=s.empty?'':('<td style="font-size:10px;color:#555">First: <strong>'+fmtR(s.ex,s.first)+'</strong></td><td style="font-size:10px;color:#555">PR: <strong>'+fmtR(s.ex,s.pr)+'</strong></td><td style="font-size:10px;color:#C8922A;font-weight:700">+'+s.pct+'% improvement</td>');
+    var statsHtml=s.empty?'':('<td style="font-size:10px;color:#fff">First: <strong>'+fmtR(s.ex,s.first)+'</strong></td><td style="font-size:10px;color:#fff">PR: <strong>'+fmtR(s.ex,s.pr)+'</strong></td><td style="font-size:10px;color:#C8922A;font-weight:700">+'+s.pct+'% improvement</td>');
     return '<div style="margin-bottom:14px">'+
       '<table style="width:100%;border-collapse:collapse;border:1px solid #ccc">'+
       '<thead><tr style="background:#1E3A5F">'+
