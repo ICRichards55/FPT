@@ -690,8 +690,8 @@ function endNowAch(id){
   saveData();render();
 }
 function renderSettings(){
-  var sections=['logolib','export','bulkedit','intake','history','backup','bulkimport'];
-  var labels=['Logo Library','Data Export','Bulk Profile Editor','Intake','History','Backup & Restore','Bulk Import'];
+  var sections=['logolib','export','bulkedit','intake','pendingintakes','history','backup','bulkimport'];
+  var labels=['Logo Library','Data Export','Bulk Profile Editor','Intake','Pending Intakes','History','Backup & Restore','Bulk Import'];
   var nav=sections.map(function(s,i){return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';bulkEdits={};render()">'+labels[i]+'</button>';}).join('');
   var content='';
   if(settingsSection==='logolib')content=renderLogoLib();
@@ -749,8 +749,8 @@ function renderBulkEditor(){
   var rows=athletes.map(function(name){
     var p=state.profiles[name]||{};var d=bulkEdits[name]||{};
     function v(key,fb){return d[key]!==undefined?d[key]:(p[key]!==undefined?p[key]:(fb||''));}
-    function inp(key,cls,type){return '<input class="bulk-inp'+(cls?' '+cls:'')+'" type="'+(type||'text')+'" value="'+String(v(key)).replace(/"/g,'&quot;')+'" oninput="be(_esc(name),key,this.value)"'+( type==='number'?' step=\'1\'':'')+'/>';}
-    function sel(key,opts){var cur=v(key);return '<select class="bulk-sel" onchange="be(_esc(name),key,this.value)">'+opts.map(function(o){return '<option value="'+o+'"'+(cur===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';}
+    function inp(key,cls,type){return '<input class="bulk-inp'+(cls?' '+cls:'')+'" type="'+(type||'text')+'" value="'+String(v(key)).replace(/"/g,'&quot;')+'" oninput="be(_esc(name),\''+key+'\',this.value)"'+( type==='number'?' step=\'1\'':'')+'/>';}
+    function sel(key,opts){var cur=v(key);return '<select class="bulk-sel" onchange="be(_esc(name),\''+key+'\',this.value)">'+opts.map(function(o){return '<option value="'+o+'"'+(cur===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';}
     var fn=name.split(' ')[0],ln=name.split(' ').slice(1).join(' ');
     return '<tr><td class="bulk-td">'+name+'</td><td class="bulk-td"><input class="bulk-inp narrow" value="'+String(d.firstName!==undefined?d.firstName:fn).replace(/"/g,'&quot;')+'" oninput="be(_esc(name),&apos;firstName&apos;,this.value)"/></td><td class="bulk-td"><input class="bulk-inp narrow" value="'+String(d.lastName!==undefined?d.lastName:ln).replace(/"/g,'&quot;')+'" oninput="be(_esc(name),&apos;lastName&apos;,this.value)"/></td><td class="bulk-td">'+sel('gender',['male','female'])+'</td><td class="bulk-td">'+sel('level',['k12','college','pro'])+'</td><td class="bulk-td">'+inp('highSchool','wide')+'</td><td class="bulk-td">'+inp('hsGradYear','narrow','number')+'</td><td class="bulk-td">'+inp('college','wide')+'</td><td class="bulk-td">'+inp('collegeGradYear','narrow','number')+'</td><td class="bulk-td">'+sel('collegeClass',['','FR','SO','JR','SR','Grad'])+'</td><td class="bulk-td" style="text-align:center"><input type="checkbox" '+(v('redshirt')?'checked':'')+' onchange="be(_esc(name),&apos;redshirt&apos;,this.checked)"/></td><td class="bulk-td">'+inp('fptMonth','narrow')+'</td><td class="bulk-td">'+inp('fptYear','narrow','number')+'</td><td class="bulk-td">'+inp('sports','wide')+'</td><td class="bulk-td">'+inp('positions')+'</td><td class="bulk-td">'+inp('instagram')+'</td><td class="bulk-td"><input class="bulk-inp wide" value="'+String(v('notes')).replace(/"/g,'&quot;')+'" oninput="be(_esc(name),&apos;notes&apos;,this.value)"/></td></tr>';
   }).join('');
@@ -944,7 +944,7 @@ function renderHist(){
   var EX_C={fly:'var(--fly)',broad:'var(--broad)',vert:'var(--vert)',fly510:'var(--muted)',rsi42:'var(--muted)'};
   return '<div class="panel"><div class="panel-title">Recent Entries (last 100)</div>'+recent.map(function(e){var ex=EX_LIST.filter(function(x){return x.id===e.exercise;})[0]||{name:e.exercise};var val=e.exercise==='broad'?fmtBroad(e.total):e.exercise==='fly'?fmtFly(e.value):fmtVert(e.value);return '<div class="hist-row"><span class="hist-date">'+e.date+'</span><span class="hist-ath">'+e.athlete+'</span><span class="hist-ex" style="color:'+(EX_C[e.exercise]||'var(--muted)')+'">'+ex.name.split(' ')[0]+'</span><span class="hist-val">'+val+'</span></div>';}).join('')+'</div>';
 }
-async function loadData(){var loaded=await _apiLoad();if(loaded){state=loaded;}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};render();}
+async async function loadData(){var loaded=await _apiLoad();if(loaded){state=loaded;}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};render();}
 function saveData(){
   // Auto-archive naturally expired achievements to profiles
   var now2=new Date();
