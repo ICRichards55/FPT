@@ -944,7 +944,7 @@ function renderHist(){
   var EX_C={fly:'var(--fly)',broad:'var(--broad)',vert:'var(--vert)',fly510:'var(--muted)',rsi42:'var(--muted)'};
   return '<div class="panel"><div class="panel-title">Recent Entries (last 100)</div>'+recent.map(function(e){var ex=EX_LIST.filter(function(x){return x.id===e.exercise;})[0]||{name:e.exercise};var val=e.exercise==='broad'?fmtBroad(e.total):e.exercise==='fly'?fmtFly(e.value):fmtVert(e.value);return '<div class="hist-row"><span class="hist-date">'+e.date+'</span><span class="hist-ath">'+e.athlete+'</span><span class="hist-ex" style="color:'+(EX_C[e.exercise]||'var(--muted)')+'">'+ex.name.split(' ')[0]+'</span><span class="hist-val">'+val+'</span></div>';}).join('')+'</div>';
 }
-async function loadData(){var loaded=await _apiLoad();if(loaded){state=loaded;}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};render();}
+async function loadData(){var loaded=await _apiLoad();if(loaded&&Array.isArray(loaded.athletes)){state=loaded;}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};render();}
 function saveData(){
   // Auto-archive naturally expired achievements to profiles
   var now2=new Date();
