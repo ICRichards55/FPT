@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>FPT — Athlete Intake Form</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--surface:#141414;--surface2:#1c1c1c;--border:#2a2a2a;
+  --text:#f0f0f0;--muted:#888;--accent:#e8c84a;--accent2:#c9a832;
+  --radius:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh;padding:0 0 60px}
+.header{background:var(--surface);border-bottom:2px solid var(--accent);padding:20px 24px;text-align:center}
+.header-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:4px}
+.header-title{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;color:var(--text);letter-spacing:1px}
+.header-sub{font-size:13px;color:var(--muted);margin-top:4px}
+.form-wrap{max-width:560px;margin:0 auto;padding:24px 16px}
+.section-head{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin:24px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px}
+.form-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px;color:var(--text);font-family:'Barlow',sans-serif;font-size:15px;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:var(--accent)}
+.form-input::placeholder{color:#444}
+.toggle-group{display:flex;gap:8px;flex-wrap:wrap}
+.tog{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 16px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.tog.on{background:var(--accent);border-color:var(--accent);color:#111}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.submit-btn{width:100%;background:var(--accent);color:#111;border:none;border-radius:var(--radius);padding:16px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;margin-top:28px;transition:background .2s}
+.submit-btn:hover{background:var(--accent2)}
+.submit-btn:disabled{opacity:0.5;cursor:not-allowed}
+#confirm-screen{display:none;text-align:center;padding:60px 24px}
+.confirm-icon{font-size:56px;margin-bottom:16px}
+.confirm-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:28px;color:var(--accent);margin-bottom:8px}
+.confirm-sub{font-size:15px;color:var(--muted);line-height:1.6}
+.err{color:#f87171;font-size:12px;margin-top:4px;display:none}
+select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M6 8L0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-label">Frye Performance Training</div>
+  <div class="header-title">Athlete Intake Form</div>
+  <div class="header-sub">Please complete all fields. A coach will review your submission.</div>
+</div>
+
+<div class="form-wrap">
+  <div id="form-screen">
+
+    <div class="section-head">Athlete Information</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <div class="form-label">First Name *</div>
+        <input class="form-input" id="in-first" placeholder="First" oninput="clearErr('err-name')"/>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Last Name *</div>
+        <input class="form-input" id="in-last" placeholder="Last" oninput="clearErr('err-name')"/>
+      </div>
+    </div>
+    <div class="err" id="err-name">First and last name are required.</div>
+
+    <div class="form-group">
+      <div class="form-label">Gender</div>
+      <div class="toggle-group">
+        <button class="tog on" id="tog-male" onclick="setGender('male')">Male</button>
+        <button class="tog" id="tog-female" onclick="setGender('female')">Female</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">Level</div>
+      <div class="toggle-group">
+        <button class="tog on" id="tog-k12" onclick="setLevel('k12')">K-12</button>
+        <button class="tog" id="tog-college" onclick="setLevel('college')">College</button>
+        <button class="tog" id="tog-pro" onclick="setLevel('pro')">Pro</button>
+      </div>
+    </div>
+
+    <div class="section-head">School Information</div>
+    <div class="form-group">
+      <div class="form-label">High School</div>
+      <input class="form-input" id="in-hs" placeholder="School name"/>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <div class="form-label">HS Grad Year</div>
+        <select class="form-input" id="in-hsgrad">
+          <option value="">-- Year --</option>
+          <option value="2024">2024</option>
+<option value="2025">2025</option>
+<option value="2026">2026</option>
+<option value="2027">2027</option>
+<option value="2028">2028</option>
+<option value="2029">2029</option>
+<option value="2030">2030</option>
+<option value="2031">2031</option>
+<option value="2032">2032</option>
+<option value="2033">2033</option>
+<option value="2034">2034</option>
+<option value="2035">2035</option>
+<option value="2036">2036</option>
+<option value="2037">2037</option>
+<option value="2038">2038</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Redshirt?</div>
+        <div class="toggle-group" style="margin-top:6px">
+          <button class="tog" id="tog-rs-yes" onclick="setRedshirt(true)">Yes</button>
+          <button class="tog on" id="tog-rs-no" onclick="setRedshirt(false)">No</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">College</div>
+      <input class="form-input" id="in-college" placeholder="School name"/>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <div class="form-label">College Grad Year</div>
+        <select class="form-input" id="in-colgrad">
+          <option value="">-- Year --</option>
+          <option value="2024">2024</option>
+<option value="2025">2025</option>
+<option value="2026">2026</option>
+<option value="2027">2027</option>
+<option value="2028">2028</option>
+<option value="2029">2029</option>
+<option value="2030">2030</option>
+<option value="2031">2031</option>
+<option value="2032">2032</option>
+<option value="2033">2033</option>
+<option value="2034">2034</option>
+<option value="2035">2035</option>
+<option value="2036">2036</option>
+<option value="2037">2037</option>
+<option value="2038">2038</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">College Class</div>
+        <select class="form-input" id="in-colclass">
+          <option value="">--</option>
+          <option>FR</option><option>SO</option><option>JR</option><option>SR</option><option>Grad</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-head">Training</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <div class="form-label">FPT Start Month</div>
+        <select class="form-input" id="in-fptmonth">
+          <option value="">--</option>
+          <option value="1">January</option>
+          <option value="2">February</option>
+          <option value="3">March</option>
+          <option value="4">April</option>
+          <option value="5">May</option>
+          <option value="6" selected>June</option>
+          <option value="7">July</option>
+          <option value="8">August</option>
+          <option value="9">September</option>
+          <option value="10">October</option>
+          <option value="11">November</option>
+          <option value="12">December</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">FPT Start Year</div>
+        <select class="form-input" id="in-fptyear">
+          <option value="">--</option>
+          <option value="2018">2018</option>
+<option value="2019">2019</option>
+<option value="2020">2020</option>
+<option value="2021">2021</option>
+<option value="2022">2022</option>
+<option value="2023">2023</option>
+<option value="2024">2024</option>
+<option value="2025">2025</option>
+<option value="2026" selected>2026</option>
+<option value="2027">2027</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="form-label">Sport(s)</div>
+      <input class="form-input" id="in-sports" placeholder="e.g. Football, Track"/>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Position(s)</div>
+      <input class="form-input" id="in-positions" placeholder="e.g. WR, CB"/>
+    </div>
+
+    <div class="section-head">Contact Information</div>
+    <div class="form-group">
+      <div class="form-label">Instagram Handle</div>
+      <input class="form-input" id="in-instagram" placeholder="@handle"/>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Athlete Email</div>
+      <input class="form-input" type="email" id="in-email" placeholder="athlete@email.com"/>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Parent / Guardian 1 Email</div>
+      <input class="form-input" type="email" id="in-p1email" placeholder="parent1@email.com"/>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Parent / Guardian 2 Email</div>
+      <input class="form-input" type="email" id="in-p2email" placeholder="parent2@email.com (optional)"/>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitIntakeForm()">Submit for Review</button>
+
+  </div><!-- /form-screen -->
+
+  <div id="confirm-screen">
+    <div class="confirm-icon">✅</div>
+    <div class="confirm-title">Submission Received!</div>
+    <div class="confirm-sub">Thank you — your intake form has been submitted for review.<br/><br/>A Frye Performance Training coach will review and add the athlete to the system shortly.</div>
+  </div>
+</div>
+
+<script>
+var API_URL='https://script.google.com/macros/s/AKfycbwirWQw0-hVSwIwVl6RCWcclgRNKia7awlfUzImilUiKjNKtSapuCueOaTwWgTlJ6Uk/exec';
+// Load API URL from parent portal if available, otherwise use stored value
+(function(){
+  var stored=localStorage.getItem('fpt_api_url');
+  if(stored)API_URL=stored;
+})();
+
+var gender='male';
+var level='k12';
+var redshirt=false;
+
+function setGender(g){
+  gender=g;
+  document.getElementById('tog-male').classList.toggle('on',g==='male');
+  document.getElementById('tog-female').classList.toggle('on',g==='female');
+}
+function setLevel(l){
+  level=l;
+  ['k12','college','pro'].forEach(function(v){
+    document.getElementById('tog-'+v).classList.toggle('on',v===l);
+  });
+}
+function setRedshirt(v){
+  redshirt=v;
+  document.getElementById('tog-rs-yes').classList.toggle('on',v===true);
+  document.getElementById('tog-rs-no').classList.toggle('on',v===false);
+}
+function clearErr(id){var e=document.getElementById(id);if(e)e.style.display='none';}
+
+function submitIntakeForm(){
+  var first=document.getElementById('in-first').value.trim();
+  var last=document.getElementById('in-last').value.trim();
+  if(!first||!last){
+    document.getElementById('err-name').style.display='block';
+    document.getElementById('in-first').focus();
+    return;
+  }
+
+  var btn=document.getElementById('submit-btn');
+  btn.disabled=true;
+  btn.textContent='Submitting...';
+
+  var payload={
+    action:'pendingIntake',
+    data:{
+      firstName:first,
+      lastName:last,
+      gender:gender,
+      level:level,
+      highSchool:document.getElementById('in-hs').value.trim(),
+      hsGradYear:document.getElementById('in-hsgrad').value,
+      college:document.getElementById('in-college').value.trim(),
+      collegeGradYear:document.getElementById('in-colgrad').value,
+      collegeClass:document.getElementById('in-colclass').value,
+      redshirt:redshirt,
+      fptMonth:document.getElementById('in-fptmonth').value,
+      fptYear:document.getElementById('in-fptyear').value,
+      sports:document.getElementById('in-sports').value.trim(),
+      positions:document.getElementById('in-positions').value.trim(),
+      instagram:document.getElementById('in-instagram').value.trim(),
+      email:document.getElementById('in-email').value.trim(),
+      parent1Email:document.getElementById('in-p1email').value.trim(),
+      parent2Email:document.getElementById('in-p2email').value.trim(),
+      submittedAt:new Date().toISOString()
+    }
+  };
+
+  if(!API_URL){
+    // No API URL available — show confirmation anyway
+    // (in production this should always be set)
+    showConfirm();
+    return;
+  }
+
+  fetch(API_URL,{method:'POST',body:JSON.stringify(payload)})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.ok){showConfirm();}
+      else{btn.disabled=false;btn.textContent='Submit for Review';alert('Submission failed. Please try again.');}
+    })
+    .catch(function(){
+      btn.disabled=false;btn.textContent='Submit for Review';
+      alert('Network error. Please check your connection and try again.');
+    });
+}
+
+function showConfirm(){
+  document.getElementById('form-screen').style.display='none';
+  document.getElementById('confirm-screen').style.display='block';
+}
+</script>
+</body>
+</html>
