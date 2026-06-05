@@ -136,8 +136,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
     <button class="tab" id="tab-today" data-tab="today">Today</button>
     <button class="tab" id="tab-roster" data-tab="roster">Roster</button>
     <button class="tab" id="tab-ach" data-tab="ach">Achievements</button>
-    <button class="tab" id="tab-media" data-tab="media">Media Upload</button>
-    <button class="tab" id="tab-settings" data-tab="settings">Settings<span id="pending-badge" style="display:none;margin-left:6px;background:#e8c84a;color:#111;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:900;vertical-align:middle"></span></button>
+    <button class="tab" id="tab-settings" data-tab="settings">Settings</button>
   </div>
 </div>
 <div class="main" id="app"></div>
@@ -280,8 +279,7 @@ function render(){
   else if(currentTab==='today')app.innerHTML=renderToday();
   else if(currentTab==='roster')app.innerHTML=renderRoster();
   else if(currentTab==='ach')app.innerHTML=renderAch();
-  else if(currentTab==='media'){app.innerHTML=renderMediaUpload();setTimeout(bindMediaEvents,50);}
-  else if(currentTab==='settings'){app.innerHTML=renderSettings();if(settingsSection==='bulkimport')setTimeout(_bindImportEvents,50);if(settingsSection==='bulkedit')setTimeout(function(){var b=document.getElementById('bulk-save-btn');if(b){b.addEventListener('click',saveBulkEdits);b.addEventListener('touchend',function(e){e.preventDefault();saveBulkEdits();});}},50);}
+  else if(currentTab==='settings'){app.innerHTML=renderSettings();if(settingsSection==='bulkimport')setTimeout(_bindImportEvents,50);}
 }
 function renderLog(){
   var ex=EX_LIST.filter(function(e){return e.id===logEx;})[0]||EX_LIST[0];
@@ -691,15 +689,13 @@ function endNowAch(id){
   saveData();render();
 }
 function renderSettings(){
-  var sections=['logolib','export','bulkedit','intake','pendingintakes','history','backup','bulkimport'];
-  var labels=['Logo Library','Data Export','Bulk Profile Editor','Intake','Pending Intakes','History','Backup & Restore','Bulk Import'];
+  var sections=['logolib','export','intake','history','backup','bulkimport'];
+  var labels=['Logo Library','Data Export','Intake','History','Backup & Restore','Bulk Import'];
   var nav=sections.map(function(s,i){return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';bulkEdits={};render()">'+labels[i]+'</button>';}).join('');
   var content='';
   if(settingsSection==='logolib')content=renderLogoLib();
   else if(settingsSection==='export')content=renderDataExport();
-  else if(settingsSection==='bulkedit')content=renderBulkEditor();
   else if(settingsSection==='intake')content=renderIntake();
-  else if(settingsSection==='pendingintakes')content=renderPendingIntakes();
   else if(settingsSection==='history')content=renderHist();
   else if(settingsSection==='backup')content=renderBackupRestore();
   else if(settingsSection==='bulkimport')content=renderBulkImport();
@@ -755,7 +751,7 @@ function renderBulkEditor(){
     var fn=name.split(' ')[0],ln=name.split(' ').slice(1).join(' ');
     return '<tr data-bname="'+_esc(name)+'"><td class="bulk-td">'+name+'</td><td class="bulk-td"><input class="bulk-inp narrow" value="'+String(d.firstName!==undefined?d.firstName:fn).replace(/"/g,'&quot;')+'" oninput="be(this.closest(\'tr\').dataset.bname,\'firstName\',this.value)"/></td><td class="bulk-td"><input class="bulk-inp narrow" value="'+String(d.lastName!==undefined?d.lastName:ln).replace(/"/g,'&quot;')+'" oninput="be(this.closest(\'tr\').dataset.bname,\'lastName\',this.value)"/></td><td class="bulk-td">'+sel('gender',['male','female'])+'</td><td class="bulk-td">'+sel('level',['k12','college','pro'])+'</td><td class="bulk-td">'+inp('highSchool','wide')+'</td><td class="bulk-td">'+inp('hsGradYear','narrow','number')+'</td><td class="bulk-td">'+inp('college','wide')+'</td><td class="bulk-td">'+inp('collegeGradYear','narrow','number')+'</td><td class="bulk-td">'+sel('collegeClass',['','FR','SO','JR','SR','Grad'])+'</td><td class="bulk-td" style="text-align:center"><input type="checkbox" '+(v('redshirt')?'checked':'')+' onchange="be(this.closest(\'tr\').dataset.bname,\'redshirt\',this.checked)"/></td><td class="bulk-td">'+inp('fptMonth','narrow')+'</td><td class="bulk-td">'+inp('fptYear','narrow','number')+'</td><td class="bulk-td">'+inp('sports','wide')+'</td><td class="bulk-td">'+inp('positions')+'</td><td class="bulk-td">'+inp('instagram')+'</td><td class="bulk-td"><input class="bulk-inp wide" value="'+String(v('notes')).replace(/"/g,'&quot;')+'" oninput="be(this.closest(\'tr\').dataset.bname,\'notes\',this.value)"/></td></tr>';
   }).join('');
-  return '<div class="panel"><div class="panel-title">Bulk Profile Editor</div><div style="margin-bottom:12px;display:flex;justify-content:flex-end"><button class="btn btn-accent" id="bulk-save-btn" onclick="saveBulkEdits()">Save All Changes</button></div><div class="bulk-wrap"><table class="bulk-tbl"><thead>'+headers+'</thead><tbody>'+rows+'</tbody></table></div></div>';
+  return '<div class="panel"><div class="panel-title">Bulk Profile Editor</div><div style="margin-bottom:12px;display:flex;justify-content:flex-end"><button class="btn btn-accent" id="bulk-save-btn">Save All Changes</button></div><div class="bulk-wrap"><table class="bulk-tbl"><thead>'+headers+'</thead><tbody>'+rows+'</tbody></table></div></div>';
 }
 function be(name,key,val){if(!bulkEdits[name])bulkEdits[name]={};bulkEdits[name][key]=val;}
 function saveBulkEdits(){
