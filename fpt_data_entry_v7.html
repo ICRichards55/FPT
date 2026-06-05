@@ -232,7 +232,7 @@ function tryLogin(){
   }
 }
 (function(){
-  if(_isAuthed()){document.getElementById('login-screen').style.display='none';document.getElementById('main-app').style.display='block';}
+  if(_isAuthed()){document.getElementById('login-screen').style.display='none';document.getElementById('main-app').style.display='block';loadData();}
   // Login button
   var lb=document.getElementById('login-btn');
   if(lb){
