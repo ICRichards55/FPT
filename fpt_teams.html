@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>FPT Team Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#07090B;--surface:#0F1215;--surface2:#171B20;--surface3:#1E242B;
+  --border:#252B33;--accent:#FFFFFF;--red:#FF5C35;--green:#2ECC71;
+  --fly:#FF5C35;--broad:#3B9EFF;--vert:#2ECC71;
+  --text:#F0F2F5;--muted:#7A8694;--muted2:#4A5260;
+  --team:#e8c84a;
+}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh}
+#login-screen{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px 32px;width:100%;max-width:400px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.login-logo{height:60px;mix-blend-mode:screen;margin-bottom:4px}
+.login-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted)}
+.login-sublabel{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--team);margin-top:-8px}
+.login-input{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:13px 14px;color:var(--text);font-family:'Barlow',sans-serif;font-size:16px;outline:none;text-align:center;letter-spacing:4px}
+.login-input:focus{border-color:var(--accent)}
+.login-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--team),#c9a832);color:#111;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;cursor:pointer;letter-spacing:1px;text-transform:uppercase}
+.login-error{color:var(--red);font-size:12px;display:none}
+.login-hint{font-size:11px;color:var(--muted2)}
+#main-app{display:none}
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 18px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo-wrap{display:flex;align-items:center;gap:10px}
+.logo-img{height:36px;mix-blend-mode:screen}
+.header-title{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--team)}
+.team-badge{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--team);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.team-badge.none{color:var(--muted2)}
+.tab-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:12px 12px 10px;cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+#app{padding:16px;max-width:640px;margin:0 auto;padding-bottom:80px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
+.panel-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+.form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.form-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.form-input{background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Barlow',sans-serif;font-size:15px;outline:none;width:100%;transition:border-color .15s}
+.form-input:focus{border-color:var(--accent)}
+.toggle-group{display:flex;flex-wrap:wrap;gap:6px}
+.tog{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:7px 14px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tog.on{background:var(--accent);border-color:var(--accent);color:#000}
+.tog.team-on{background:var(--team);border-color:var(--team);color:#111}
+.submit-btn{width:100%;padding:14px;background:var(--accent);color:#000;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:9px 16px;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border:none;transition:all .15s}
+.btn-accent{background:var(--accent);color:#000}
+.btn-team{background:var(--team);color:#111}
+.btn-ghost{background:var(--surface3);color:var(--text);border:1px solid var(--border)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-full{width:100%}
+.result-field{background:var(--surface3);border:1.5px solid var(--border);border-radius:8px;padding:16px 14px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:36px;font-weight:900;outline:none;text-align:center;width:100%;-moz-appearance:textfield}
+.result-field:focus{border-color:var(--accent)}
+.result-field::-webkit-outer-spin-button,.result-field::-webkit-inner-spin-button{-webkit-appearance:none}
+.ath-search-wrap{position:relative}
+.ath-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:200;max-height:200px;overflow-y:auto;margin-top:2px}
+.ath-dd-item{padding:10px 14px;font-size:14px;cursor:pointer;transition:background .1s}
+.ath-dd-item:hover{background:var(--surface3)}
+.ath-selected{background:var(--surface3);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between}
+.ath-name-disp{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800}
+.ath-clear{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 4px}
+.today-row{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:6px}
+.today-row-main{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.today-row-edit{background:var(--surface3);border-radius:7px;padding:12px;margin-top:8px;display:flex;flex-direction:column;gap:10px}
+.action-btn{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.roster-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:8px}
+.roster-name{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;letter-spacing:.5px}
+.roster-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.pr-pill{display:inline-block;padding:3px 8px;border-radius:4px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;margin:2px 2px 2px 0}
+.pill-fly{background:rgba(255,92,53,.15);color:var(--fly)}
+.pill-broad{background:rgba(59,158,255,.15);color:var(--broad)}
+.pill-vert{background:rgba(46,204,113,.15);color:var(--vert)}
+.sn-nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.sn-btn{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:7px 14px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.sn-btn.on{background:var(--team);border-color:var(--team);color:#111}
+.empty{color:var(--muted);font-size:14px;text-align:center;padding:24px 0}
+.row{display:flex;gap:12px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;opacity:0;transition:all .25s;pointer-events:none;z-index:9998;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.team-selector-wrap{background:var(--surface2);border:1px solid var(--team);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.team-selector-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--team);margin-bottom:8px}
+.team-chips{display:flex;flex-wrap:wrap;gap:6px}
+.team-chip{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:7px 14px;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.team-chip.active{background:var(--team);border-color:var(--team);color:#111}
+.pr-indicator{min-height:32px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;text-align:center}
+.section-divider{height:1px;background:var(--border);margin:16px 0}
+.copy-btn{background:rgba(232,200,74,.1);border:1px solid var(--team);border-radius:6px;padding:5px 10px;color:var(--team);font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.report-section{margin-bottom:20px}
+.report-section-title{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.stat-label{font-size:13px;color:var(--muted)}
+.stat-val{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800}
+canvas{max-width:100%;border-radius:8px;margin-top:8px}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-label">Frye Performance Training</div>
+    <div class="login-sublabel">Team Portal</div>
+    <input class="login-input" id="pass-input" type="password" placeholder="••••••••••" autocomplete="off"/>
+    <div class="login-error" id="login-error">Incorrect password</div>
+    <button class="login-btn" id="login-btn">Enter</button>
+    <div class="login-hint">Access persists for the rest of today</div>
+  </div>
+</div>
+
+<div id="main-app">
+  <div class="header">
+    <div class="logo-wrap">
+      <div class="header-title">FPT Teams</div>
+    </div>
+    <div class="team-badge none" id="header-team-badge">No Team Selected</div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab active" id="tab-log" data-tab="log">Log</button>
+    <button class="tab" id="tab-today" data-tab="today">Today</button>
+    <button class="tab" id="tab-roster" data-tab="roster">Roster</button>
+    <button class="tab" id="tab-ach" data-tab="ach">Achievements</button>
+    <button class="tab" id="tab-settings" data-tab="settings">Settings</button>
+  </div>
+  <div id="app"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+var API_URL = 'https://script.google.com/macros/s/AKfycbwirWQw0-hVSwIwVl6RCWcclgRNKia7awlfUzImilUiKjNKtSapuCueOaTwWgTlJ6Uk/exec';
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+var state = { teams:[], athletes:{}, profiles:{}, entries:[], achievements:[] };
+var currentTab = 'log';
+var currentTeam = '';
+var TODAY = (function(){
+  var d = new Date();
+  var et = new Date(d.toLocaleString('en-US',{timeZone:'America/New_York'}));
+  return et.getFullYear()+'-'+String(et.getMonth()+1).padStart(2,'0')+'-'+String(et.getDate()).padStart(2,'0');
+})();
+
+// Log tab state
+var logAthlete = '', logEx = 'fly', logDate = TODAY, logDdOpen = false;
+window._athQ = '';
+
+// Today tab state
+var todayEditId = null, todayEditData = {};
+
+// Roster state
+var rosterQ = '';
+
+// Achievements state
+var achAthlete = '', achAthQ = '', achDdOpen = false, achText = '', achWeeks = 4;
+var achEditId = null, achEditText = '', achEditWeeks = 4;
+
+// Settings state
+var settingsSection = 'teams';
+
+// Team exercises (subset of gym)
+var EX_LIST = [
+  {id:'fly',   name:'10-10 Fly',   unit:'seconds', lower:true,  color:'var(--fly)'},
+  {id:'broad', name:'Broad Jump',  unit:'ft + in', lower:false, color:'var(--broad)'},
+  {id:'vert',  name:'Skyhook',     unit:'inches',  lower:false, color:'var(--vert)'},
+];
+
+// ── AUTH ──────────────────────────────────────────────────────────────────
+function _checkPwd(v){ return v === 'FryeJump1!'; }
+function _isAuthed(){ return localStorage.getItem('fpt_teams_auth_date') === TODAY; }
+
+function tryLogin(){
+  var v = (document.getElementById('pass-input').value||'').trim();
+  if(_checkPwd(v)){
+    localStorage.setItem('fpt_teams_auth_date', TODAY);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    loadData();
+  } else {
+    var err = document.getElementById('login-error'); err.style.display = 'block';
+    var inp = document.getElementById('pass-input'); inp.style.borderColor = 'var(--red)'; inp.value = '';
+    setTimeout(function(){ err.style.display='none'; inp.style.borderColor=''; }, 2500);
+  }
+}
+
+// ── DELEGATED EVENTS ──────────────────────────────────────────────────────
+function _handleDelegatedClick(e, prevent){
+  if(!e.target) return;
+  var el = e.target, id = el.id;
+  if(id==='ach-save-edit-btn'){ if(prevent)e.preventDefault(); saveAchEdit(); }
+  else if(id==='team-save-btn'){ if(prevent)e.preventDefault(); saveNewTeam(); }
+  else if(id==='team-athlete-add-btn'){ if(prevent)e.preventDefault(); addAthleteToTeam(); }
+}
+document.addEventListener('click', function(e){ _handleDelegatedClick(e,false); });
+document.addEventListener('touchend', function(e){ _handleDelegatedClick(e,true); });
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+(function(){
+  if(_isAuthed()){
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    loadData();
+  }
+  var lb = document.getElementById('login-btn');
+  if(lb){
+    lb.addEventListener('click', tryLogin);
+    lb.addEventListener('touchend', function(e){ e.preventDefault(); tryLogin(); });
+  }
+  var pi = document.getElementById('pass-input');
+  if(pi){ pi.addEventListener('keydown', function(e){ if(e.key==='Enter') tryLogin(); }); }
+  document.querySelectorAll('[data-tab]').forEach(function(btn){
+    var tab = btn.dataset.tab;
+    btn.addEventListener('click', function(){ setTab(tab); });
+    btn.addEventListener('touchend', function(e){ e.preventDefault(); setTab(tab); });
+  });
+})();
+
+// ── DATA LOAD / SAVE ──────────────────────────────────────────────────────
+async function loadData(){
+  try {
+    var r = await fetch(API_URL + '?type=teams');
+    var json = await r.json();
+    if(json.ok && json.data){
+      state = json.data;
+      if(!state.teams) state.teams = [];
+      if(!state.athletes) state.athletes = {};
+      if(!state.profiles) state.profiles = {};
+      if(!state.entries) state.entries = [];
+      if(!state.achievements) state.achievements = [];
+    }
+  } catch(e){ console.error('Load failed', e); }
+  render();
+}
+
+function saveData(){
+  var payload = Object.assign({ type:'teams' }, state);
+  fetch(API_URL, { method:'POST', body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if(!d.ok) console.error('Save failed', d); })
+    .catch(function(e){ console.error('Save error', e); });
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────
+function _esc(s){ return String(s).replace(/'/g,"\\'"); }
+function fmtFly(v){ return v!=null ? v.toFixed(2)+'s' : '--'; }
+function fmtBroad(v){ if(v==null) return '--'; return Math.floor(v/12)+"' "+Math.round(v%12)+'"'; }
+function fmtVert(v){ return v!=null ? v.toFixed(3)+'"' : '--'; }
+function fmtPR(id,v){ return id==='fly'?fmtFly(v):id==='broad'?fmtBroad(v):fmtVert(v); }
+function fmtDate(d){ if(!d) return ''; var p=d.split('-'); var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return m[parseInt(p[1])-1]+' '+parseInt(p[2])+', '+p[0]; }
+function fmtShortDate(d){ if(!d) return ''; var p=d.split('-'); return p[1].replace(/^0/,'')+'/'+p[2].replace(/^0/,'')+'/'+p[0].slice(2); }
+function lastName(name){ return (name||'').split(' ').pop(); }
+
+function getTeamAthletes(){
+  if(!currentTeam) return [];
+  return (state.athletes[currentTeam]||[]).slice().sort(function(a,b){ return lastName(a).localeCompare(lastName(b)); });
+}
+
+function getPR(ath, id){
+  var vals = state.entries
+    .filter(function(e){ return e.athlete===ath && e.exercise===id; })
+    .map(function(e){ return id==='broad'?e.total:e.value; })
+    .filter(function(v){ return v!=null && !isNaN(v); });
+  if(!vals.length) return null;
+  var lower = id==='fly';
+  return lower ? Math.min.apply(null,vals) : Math.max.apply(null,vals);
+}
+
+function getPRWithDate(ath, id){
+  var best=null, bestDate=null;
+  state.entries.filter(function(e){ return e.athlete===ath && e.exercise===id; }).forEach(function(e){
+    var v = id==='broad'?e.total:e.value; if(v==null||isNaN(v)) return;
+    if(best==null||(id==='fly'?v<best:v>best)){ best=v; bestDate=e.date; }
+  });
+  return { pr:best, date:bestDate };
+}
+
+function showToast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2500);
+}
+
+function updateHeaderBadge(){
+  var el = document.getElementById('header-team-badge');
+  if(!el) return;
+  if(currentTeam){ el.textContent=currentTeam; el.className='team-badge'; }
+  else { el.textContent='No Team Selected'; el.className='team-badge none'; }
+}
+
+// ── TAB / RENDER ──────────────────────────────────────────────────────────
+function setTab(t){
+  currentTab = t;
+  document.querySelectorAll('.tab').forEach(function(b){ b.classList.remove('active'); });
+  var el = document.getElementById('tab-'+t); if(el) el.classList.add('active');
+  render();
+}
+
+function render(){
+  updateHeaderBadge();
+  var app = document.getElementById('app'); if(!app) return;
+  if(currentTab==='log') app.innerHTML = renderLog();
+  else if(currentTab==='today') app.innerHTML = renderToday();
+  else if(currentTab==='roster') app.innerHTML = renderRoster();
+  else if(currentTab==='ach') app.innerHTML = renderAch();
+  else if(currentTab==='settings') app.innerHTML = renderSettings();
+}
+
+// ── TEAM SELECTOR WIDGET ──────────────────────────────────────────────────
+function renderTeamSelector(){
+  if(!state.teams.length){
+    return '<div class="team-selector-wrap"><div class="team-selector-label">Team</div><div style="color:var(--muted);font-size:13px">No teams yet — add one in Settings.</div></div>';
+  }
+  var chips = state.teams.map(function(t){
+    return '<button class="team-chip'+(t===currentTeam?' active':'')+'" onclick="selectTeam(\''+_esc(t)+'\')">'+t+'</button>';
+  }).join('');
+  return '<div class="team-selector-wrap"><div class="team-selector-label">Team</div><div class="team-chips">'+chips+'</div></div>';
+}
+
+function selectTeam(name){
+  currentTeam = name;
+  logAthlete = ''; window._athQ = '';
+  render();
+}
+
+// ── LOG TAB ───────────────────────────────────────────────────────────────
+function renderLog(){
+  var teamSel = renderTeamSelector();
+  if(!currentTeam){
+    return teamSel + '<div class="panel"><div class="empty">Select a team above to start logging.</div></div>';
+  }
+
+  var athletes = getTeamAthletes();
+  var q = (window._athQ||'').toLowerCase();
+  var athHtml;
+  if(logAthlete){
+    athHtml = '<div class="ath-selected"><span class="ath-name-disp">'+logAthlete+'</span><button class="ath-clear" onclick="logAthlete=\'\';window._athQ=\'\';render()">&#x2715;</button></div>';
+  } else {
+    athHtml = '<div class="ath-search-wrap"><input class="form-input" id="ath-search" style="width:100%" placeholder="Search athlete..." value="'+q.replace(/"/g,'&quot;')+'" oninput="window._athQ=this.value;updateAthDropdown()" onfocus="logDdOpen=true;updateAthDropdown()" onblur="setTimeout(function(){closeAthDropdown();},200)" autocomplete="off"/><div class="ath-dropdown" id="ath-dropdown" style="display:'+(logDdOpen?'block':'none')+'"></div></div>';
+  }
+
+  var prPanel = '';
+  if(logAthlete){
+    var rows = EX_LIST.map(function(e){
+      var res = getPRWithDate(logAthlete, e.id);
+      var prTxt = res.pr!=null ? fmtPR(e.id,res.pr) : 'No entries yet';
+      var dateTxt = res.date ? ' — '+fmtShortDate(res.date) : '';
+      var isActive = e.id===logEx;
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:'+(isActive?'rgba(255,255,255,.06)':'var(--surface3)')+';border-left:3px solid '+(isActive?'var(--accent)':'var(--border)')+';border-radius:0 6px 6px 0"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:'+(isActive?'var(--accent)':'var(--muted)')+'">'+e.name+'</div><div style="text-align:right"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;font-weight:900;color:'+(isActive?'var(--accent)':'var(--text)')+'">'+prTxt+'</span>'+(dateTxt?'<span style="font-size:10px;color:var(--muted2);margin-left:8px">'+dateTxt+'</span>':'')+'</div></div>';
+    }).join('');
+    prPanel = '<div style="display:flex;flex-direction:column;gap:3px;margin-bottom:14px">'+rows+'</div>';
+  }
+
+  var exToggs = EX_LIST.map(function(e){
+    return '<button class="tog'+(e.id===logEx?' on':'')+'" data-ex="'+e.id+'" onclick="logEx=this.dataset.ex;render()">'+e.name+'</button>';
+  }).join('');
+
+  var resultHtml;
+  if(logEx==='broad'){
+    resultHtml = '<div style="display:flex;gap:8px;align-items:flex-end"><div style="flex:1"><div class="form-label">Feet</div><input class="result-field" id="res-ft" type="number" min="0" max="15" step="1" placeholder="6" oninput="checkPRLive()"/></div><div style="color:var(--muted);font-size:26px;padding-bottom:10px;font-weight:300">ft</div><div style="flex:1"><div class="form-label">Inches</div><input class="result-field" id="res-in" type="number" min="0" max="11" step="1" placeholder="9" oninput="checkPRLive()"/></div><div style="color:var(--muted);font-size:26px;padding-bottom:10px;font-weight:300">in</div></div>';
+  } else {
+    resultHtml = '<input class="result-field" id="res-val" type="number" step="0.01" min="0" placeholder="'+(logEx==='fly'?'1.25':'20.0')+'" oninput="checkPRLive()" style="width:100%"/>';
+  }
+
+  return teamSel +
+    '<div class="panel"><div class="panel-title">Log Result</div>' +
+    '<div style="display:flex;flex-direction:column;gap:14px">' +
+    '<div style="display:grid;grid-template-columns:1fr auto;gap:12px">' +
+    '<div class="form-group" style="min-width:0"><div class="form-label">Athlete</div>'+athHtml+'</div>' +
+    '<div class="form-group"><div class="form-label">Date</div><input class="form-input" type="date" value="'+logDate+'" onchange="logDate=this.value"/></div>' +
+    '</div>' +
+    (logAthlete ? prPanel : '') +
+    '<div class="form-group"><div class="form-label">Exercise</div><div class="toggle-group">'+exToggs+'</div></div>' +
+    '<div class="form-group"><div class="form-label">Result — '+EX_LIST.filter(function(e){return e.id===logEx;})[0].unit+'</div>'+resultHtml+'</div>' +
+    '<div class="pr-indicator" id="pr-indicator"></div>' +
+    '<button class="submit-btn" onclick="submitEntry()">Log Result</button>' +
+    '</div></div>';
+}
+
+function updateAthDropdown(){
+  var dd = document.getElementById('ath-dropdown'); if(!dd) return;
+  logDdOpen = true; dd.style.display = 'block';
+  var q = (window._athQ||'').toLowerCase();
+  var list = getTeamAthletes().filter(function(a){ return !q||a.toLowerCase().includes(q); });
+  dd.innerHTML = list.length
+    ? list.map(function(a){ var safe=a.replace(/&/g,'&amp;').replace(/"/g,'&quot;'); return '<div class="ath-dd-item" onmousedown="selectAth(\''+_esc(a)+'\')" data-n="'+safe+'">'+a+'</div>'; }).join('')
+    : '<div class="ath-dd-item" style="color:var(--muted)">No matches</div>';
+}
+
+function closeAthDropdown(){
+  logDdOpen = false;
+  var dd = document.getElementById('ath-dropdown'); if(dd) dd.style.display = 'none';
+}
+
+function selectAth(name){
+  logAthlete = name; window._athQ = ''; logDdOpen = false; render();
+}
+
+function checkPRLive(){
+  var ind = document.getElementById('pr-indicator'); if(!ind||!logAthlete) return;
+  var current = getPR(logAthlete, logEx);
+  var newVal;
+  if(logEx==='broad'){
+    var ft=parseFloat((document.getElementById('res-ft')||{}).value);
+    var inch=parseFloat((document.getElementById('res-in')||{}).value);
+    if(isNaN(ft)||isNaN(inch)){ind.textContent='';return;}
+    newVal = ft*12+inch;
+  } else {
+    newVal = parseFloat((document.getElementById('res-val')||{}).value);
+    if(isNaN(newVal)){ind.textContent='';return;}
+  }
+  if(current==null){
+    ind.innerHTML='<span style="color:var(--green)">✓ First entry for this exercise</span>';
+  } else {
+    var isPR = logEx==='fly' ? newVal<current : newVal>current;
+    if(isPR){
+      var diff = logEx==='fly' ? (current-newVal).toFixed(2)+'s' : logEx==='broad' ? (newVal-current).toFixed(1)+' in' : (newVal-current).toFixed(3)+'"';
+      ind.innerHTML='<span style="color:var(--green)">🏆 NEW PR! +'+diff+' improvement</span>';
+    } else {
+      ind.innerHTML='<span style="color:var(--muted)">Current PR: '+fmtPR(logEx,current)+'</span>';
+    }
+  }
+}
+
+function submitEntry(){
+  if(!logAthlete){ alert('Select an athlete.'); return; }
+  var entry = { id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), athlete:logAthlete, exercise:logEx, date:logDate };
+  if(logEx==='broad'){
+    var ft=parseFloat((document.getElementById('res-ft')||{}).value);
+    var inch=parseFloat((document.getElementById('res-in')||{}).value);
+    if(isNaN(ft)||isNaN(inch)){ alert('Enter feet and inches.'); return; }
+    entry.valueFt=Math.round(ft); entry.valueIn=Math.round(inch); entry.total=ft*12+inch;
+  } else {
+    var v=parseFloat((document.getElementById('res-val')||{}).value);
+    if(isNaN(v)){ alert('Enter a value.'); return; }
+    entry.value=v;
+  }
+  state.entries.push(entry);
+  saveData();
+  showToast('Logged!');
+  logAthlete=''; window._athQ='';
+  render();
+}
+
+// ── TODAY TAB ─────────────────────────────────────────────────────────────
+function renderToday(){
+  var teamSel = renderTeamSelector();
+  if(!currentTeam) return teamSel+'<div class="panel"><div class="empty">Select a team above.</div></div>';
+
+  var teamAthletes = getTeamAthletes();
+  var today = state.entries.filter(function(e){
+    return e.date===TODAY && teamAthletes.indexOf(e.athlete)>-1;
+  }).slice().reverse();
+
+  if(!today.length) return teamSel+'<div class="panel"><div class="empty">No entries logged today for '+currentTeam+' yet.</div></div>';
+
+  // Calculate attempt numbers per athlete+exercise
+  var attemptCount = {};
+  var todayForAttempts = state.entries.filter(function(e){
+    return e.date===TODAY && teamAthletes.indexOf(e.athlete)>-1;
+  });
+  var entryAttempt = {};
+  todayForAttempts.forEach(function(e){
+    var k = e.athlete+'|'+e.exercise;
+    attemptCount[k] = (attemptCount[k]||0)+1;
+    entryAttempt[e.id] = attemptCount[k];
+  });
+
+  var rows = today.map(function(e){
+    var ex = EX_LIST.filter(function(x){ return x.id===e.exercise; })[0]||{name:e.exercise};
+    var val = e.exercise==='broad'?fmtBroad(e.total):e.exercise==='fly'?fmtFly(e.value):fmtVert(e.value);
+    var attempt = entryAttempt[e.id]||1;
+    var isEditing = todayEditId===e.id;
+    var EX_C = {fly:'var(--fly)',broad:'var(--broad)',vert:'var(--vert)'};
+    var attemptLabel = '<span style="font-size:10px;color:var(--muted2);margin-left:6px">attempt '+attempt+'</span>';
+
+    var main = '<div class="today-row-main">'+
+      '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:16px">'+e.athlete+'</div>'+
+      '<div style="font-size:12px;color:'+(EX_C[e.exercise]||'var(--muted)')+'">'+ex.name+attemptLabel+'</div></div>'+
+      '<div style="display:flex;align-items:center;gap:8px">'+
+      '<span style="font-family:\'Barlow Condensed\',sans-serif;font-weight:900;font-size:20px">'+val+'</span>'+
+      '<button class="action-btn" onclick="startEditEntry(\''+e.id+'\')">Edit</button>'+
+      '<button class="action-btn" style="color:var(--red)" onclick="deleteEntry(\''+e.id+'\')">Delete</button>'+
+      '</div></div>';
+
+    var editForm = '';
+    if(isEditing){
+      var sfx = '-'+attempt;
+      var editVal = e.exercise==='broad'
+        ? '<div style="display:flex;gap:6px"><input class="result-field" id="ed-ft'+sfx+'" type="number" min="0" max="15" step="1" value="'+(todayEditData.valueFt||'')+'" style="flex:1;font-size:16px"/><input class="result-field" id="ed-in'+sfx+'" type="number" min="0" max="11" step="1" value="'+(todayEditData.valueIn||'')+'" style="flex:1;font-size:16px"/></div>'
+        : '<input class="result-field" id="ed-val'+sfx+'" type="number" step="0.01" value="'+(todayEditData.value||'')+'" style="width:100%;font-size:16px"/>';
+      editForm = '<div class="today-row-edit">'+
+        '<div class="row" style="gap:8px;align-items:flex-end">'+
+        '<div class="form-group" style="flex:1"><div class="form-label">Value</div>'+editVal+'</div>'+
+        '<div class="form-group"><div class="form-label">Date</div><input class="form-input" id="ed-date'+sfx+'" type="date" value="'+(todayEditData.date||TODAY)+'"/></div>'+
+        '</div>'+
+        '<div style="display:flex;gap:8px">'+
+        '<button class="btn btn-accent" onclick="saveEditEntry(\''+sfx+'\')">Save</button>'+
+        '<button class="btn btn-ghost" onclick="todayEditId=null;render()">Cancel</button>'+
+        '</div></div>';
+    }
+    return '<div class="today-row">'+main+editForm+'</div>';
+  }).join('');
+
+  return teamSel+'<div class="panel"><div class="panel-title">Today\'s Entries ('+today.length+')</div>'+rows+'</div>';
+}
+
+function startEditEntry(id){
+  var e = state.entries.filter(function(x){ return x.id===id; })[0]; if(!e) return;
+  todayEditId = id;
+  todayEditData = { athlete:e.athlete, exercise:e.exercise, date:e.date, value:e.value, valueFt:e.valueFt, valueIn:e.valueIn, total:e.total };
+  render();
+}
+
+function saveEditEntry(sfx){
+  var e = state.entries.filter(function(x){ return x.id===todayEditId; })[0]; if(!e) return;
+  var newDate = (document.getElementById('ed-date'+sfx)||{}).value||e.date; e.date=newDate;
+  if(e.exercise==='broad'){
+    var ft=parseFloat((document.getElementById('ed-ft'+sfx)||{}).value);
+    var inch=parseFloat((document.getElementById('ed-in'+sfx)||{}).value);
+    if(!isNaN(ft))e.valueFt=Math.round(ft); if(!isNaN(inch))e.valueIn=Math.round(inch);
+    if(!isNaN(ft)&&!isNaN(inch))e.total=ft*12+inch;
+  } else {
+    var v=parseFloat((document.getElementById('ed-val'+sfx)||{}).value);
+    if(!isNaN(v))e.value=v;
+  }
+  todayEditId=null; saveData(); showToast('Entry updated!'); render();
+}
+
+function deleteEntry(id){
+  if(!confirm('Delete this entry?')) return;
+  state.entries = state.entries.filter(function(e){ return e.id!==id; });
+  saveData(); showToast('Entry deleted.'); render();
+}
+
+// ── ROSTER TAB ────────────────────────────────────────────────────────────
+function renderRoster(){
+  var teamSel = renderTeamSelector();
+  if(!currentTeam) return teamSel+'<div class="panel"><div class="empty">Select a team above.</div></div>';
+
+  var athletes = getTeamAthletes();
+  var q = (rosterQ||'').toLowerCase();
+  if(q) athletes = athletes.filter(function(a){ return a.toLowerCase().includes(q); });
+
+  var search = '<div class="panel" style="margin-bottom:12px"><input class="form-input" style="width:100%" placeholder="Search athletes..." value="'+rosterQ.replace(/"/g,'&quot;')+'" oninput="rosterQ=this.value;render()"/></div>';
+
+  if(!athletes.length) return teamSel+search+'<div class="panel"><div class="empty">No athletes on this team yet.</div></div>';
+
+  var cards = athletes.map(function(name){
+    var p = state.profiles[name]||{};
+    var pills = EX_LIST.map(function(e){
+      var pr = getPR(name, e.id); if(pr==null) return '';
+      var cls = e.id==='fly'?'pill-fly':e.id==='broad'?'pill-broad':'pill-vert';
+      var lbl = e.id==='fly'?'10-10':e.id==='broad'?'Broad':'Sky';
+      return '<span class="pr-pill '+cls+'">'+lbl+': '+fmtPR(e.id,pr)+'</span>';
+    }).join('');
+    var entryCount = state.entries.filter(function(e){ return e.athlete===name; }).length;
+    return '<div class="roster-card">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+      '<div><div class="roster-name">'+name+'</div>'+
+      '<div class="roster-sub">'+(p.sports||'')+(p.sports&&entryCount?' · ':'')+entryCount+' entries</div>'+
+      (pills?'<div style="margin-top:8px">'+pills+'</div>':'')+'</div>'+
+      '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'+
+      '<button class="btn btn-ghost btn-sm" onclick="openReport(\''+_esc(name)+'\')">Report</button>'+
+      '<button class="copy-btn" onclick="copyToGym(\''+_esc(name)+'\')">Copy to Gym</button>'+
+      '</div></div></div>';
+  }).join('');
+
+  return teamSel+search+cards;
+}
+
+function openReport(name){
+  var win = window.open('','_blank');
+  var entries = state.entries.filter(function(e){ return e.athlete===name; });
+  if(!entries.length){ win.document.write('<p>No entries for '+name+'</p>'); return; }
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>'+name+' — FPT Report</title>';
+  html += '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;700;800;900&family=Barlow:wght@400;500&display=swap" rel="stylesheet"/>';
+  html += '<style>body{background:#07090B;color:#F0F2F5;font-family:Barlow,sans-serif;padding:32px;max-width:700px;margin:0 auto}';
+  html += 'h1{font-family:"Barlow Condensed",sans-serif;font-size:32px;font-weight:900;letter-spacing:1px;color:#fff;margin-bottom:4px}';
+  html += '.sub{color:#7A8694;font-size:14px;margin-bottom:32px}';
+  html += '.ex-section{margin-bottom:32px}';
+  html += '.ex-title{font-family:"Barlow Condensed",sans-serif;font-size:16px;font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #252B33}';
+  html += '.pr-val{font-family:"Barlow Condensed",sans-serif;font-size:36px;font-weight:900}';
+  html += '.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}';
+  html += '.stat-box{background:#0F1215;border:1px solid #252B33;border-radius:8px;padding:12px 16px}';
+  html += '.stat-lbl{font-size:11px;color:#7A8694;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}';
+  html += '.stat-num{font-family:"Barlow Condensed",sans-serif;font-size:24px;font-weight:900}';
+  html += 'table{width:100%;border-collapse:collapse;font-size:13px}';
+  html += 'th{text-align:left;color:#7A8694;font-weight:500;padding:6px 8px;border-bottom:1px solid #252B33}';
+  html += 'td{padding:6px 8px;border-bottom:1px solid #0F1215}';
+  html += '</style></head><body>';
+  html += '<h1>'+name+'</h1>';
+  html += '<div class="sub">FPT Team Training Report &nbsp;·&nbsp; Generated '+new Date().toLocaleDateString()+'</div>';
+
+  EX_LIST.forEach(function(ex){
+    var exEntries = entries.filter(function(e){ return e.exercise===ex.id; });
+    if(!exEntries.length) return;
+    var vals = exEntries.map(function(e){ return ex.id==='broad'?e.total:e.value; }).filter(function(v){ return v!=null&&!isNaN(v); });
+    var lower = ex.id==='fly';
+    var best = lower?Math.min.apply(null,vals):Math.max.apply(null,vals);
+    var avg = vals.reduce(function(a,b){return a+b;},0)/vals.length;
+    var sorted = exEntries.slice().sort(function(a,b){ return a.date.localeCompare(b.date); });
+    var colors = {fly:'#FF5C35',broad:'#3B9EFF',vert:'#2ECC71'};
+
+    html += '<div class="ex-section">';
+    html += '<div class="ex-title" style="color:'+colors[ex.id]+'">'+ex.name+'</div>';
+    html += '<div class="stat-grid">';
+    html += '<div class="stat-box"><div class="stat-lbl">Best</div><div class="stat-num" style="color:'+colors[ex.id]+'">'+fmtPR(ex.id,best)+'</div></div>';
+    html += '<div class="stat-box"><div class="stat-lbl">Average</div><div class="stat-num">'+fmtPR(ex.id,avg)+'</div></div>';
+    html += '<div class="stat-box"><div class="stat-lbl">Attempts</div><div class="stat-num">'+vals.length+'</div></div>';
+    html += '</div>';
+    html += '<table><thead><tr><th>Date</th><th>Result</th></tr></thead><tbody>';
+    sorted.forEach(function(e){
+      var v = ex.id==='broad'?e.total:e.value;
+      var isPR = v===best;
+      html += '<tr><td>'+fmtDate(e.date)+'</td><td style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:800'+(isPR?';color:'+colors[ex.id]:'')+'">'+fmtPR(ex.id,v)+(isPR?' ★':'')+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  });
+
+  html += '</body></html>';
+  win.document.write(html);
+  win.document.close();
+}
+
+function copyToGym(name){
+  if(!confirm('Copy '+name+' to the gym portal? This is a one-time snapshot — their current entries and profile will be added to the gym roster.')){return;}
+  fetch(API_URL, {
+    method:'POST',
+    body: JSON.stringify({ action:'copyAthleteToGym', athleteName:name })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if(d.ok){
+      showToast(name+' copied to gym ('+d.entriesCopied+' entries)');
+    } else {
+      alert('Copy failed: '+(d.error||'unknown error'));
+    }
+  })
+  .catch(function(){ alert('Network error. Try again.'); });
+}
+
+// ── ACHIEVEMENTS TAB ──────────────────────────────────────────────────────
+function renderAch(){
+  var teamSel = renderTeamSelector();
+  if(!currentTeam) return teamSel+'<div class="panel"><div class="empty">Select a team above.</div></div>';
+
+  var teamAthletes = getTeamAthletes();
+  var now = new Date();
+  function isExp(a){ var e=new Date(a.dateAdded+'T12:00:00');e.setDate(e.getDate()+a.durationWeeks*7);return e<=now; }
+  var active = (state.achievements||[]).filter(function(a){ return !a.archived&&!isExp(a)&&teamAthletes.indexOf(a.athlete)>-1; });
+  var expired = (state.achievements||[]).filter(function(a){ return !a.archived&&isExp(a)&&teamAthletes.indexOf(a.athlete)>-1; });
+
+  var wkToggs = [2,4,6,8].map(function(w){
+    return '<button class="tog'+(achWeeks===w?' on':'')+'" onclick="achWeeks='+w+';render()">'+w+' wks</button>';
+  }).join('');
+
+  var athOpts = teamAthletes.map(function(a){
+    return '<option value="'+a.replace(/"/g,'&quot;')+'"'+(achAthlete===a?' selected':'')+'>'+a+'</option>';
+  }).join('');
+
+  var html = '<div class="panel"><div class="panel-title">Add Achievement</div>'+
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+    '<div class="form-group"><div class="form-label">Athlete</div>'+
+    '<select class="form-input" onchange="achAthlete=this.value"><option value="">-- Select --</option>'+athOpts+'</select></div>'+
+    '<div class="form-group"><div class="form-label">Achievement</div>'+
+    '<input class="form-input" placeholder="e.g. Sub-1.20 10-10 Fly" value="'+achText.replace(/"/g,'&quot;')+'" oninput="achText=this.value"/></div>'+
+    '<div class="form-group"><div class="form-label">Duration</div><div class="toggle-group">'+wkToggs+'</div></div>'+
+    '<button class="btn btn-team btn-full" onclick="addAch()">Add Achievement</button>'+
+    '</div></div>';
+
+  if(active.length){
+    html += '<div class="panel"><div class="panel-title">Active ('+active.length+')</div>';
+    active.forEach(function(a){
+      var exp=new Date(a.dateAdded+'T12:00:00'); exp.setDate(exp.getDate()+a.durationWeeks*7);
+      var daysLeft=Math.ceil((exp-now)/(1000*60*60*24));
+      var isEditing = achEditId===a.id;
+      var editForm='';
+      if(isEditing){
+        var wkE=[2,4,6,8].map(function(w){return '<button class="tog'+(achEditWeeks===w?' on':'')+'" onclick="achEditWeeks='+w+';render()">'+w+' wks</button>';}).join('');
+        editForm='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:10px">'+
+          '<input class="form-input" value="'+achEditText.replace(/"/g,'&quot;')+'" oninput="achEditText=this.value"/>'+
+          '<div class="toggle-group">'+wkE+'</div>'+
+          '<div style="display:flex;gap:8px">'+
+          '<button class="btn btn-accent btn-sm" id="ach-save-edit-btn">Save</button>'+
+          '<button class="btn btn-ghost btn-sm" onclick="achEditId=null;render()">Cancel</button>'+
+          '</div></div>';
+      }
+      html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+        '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:15px">'+a.athlete+'</div>'+
+        '<div style="font-size:13px;color:var(--text);margin-top:2px">'+a.achievement+'</div>'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:4px">Expires in '+daysLeft+' day'+(daysLeft!==1?'s':'')+'</div></div>'+
+        '<div style="display:flex;gap:6px">'+
+        '<button class="action-btn" onclick="achEditId=\''+a.id+'\';achEditText=\''+_esc(a.achievement)+'\';achEditWeeks='+a.durationWeeks+';render()">Edit</button>'+
+        '<button class="action-btn" style="color:var(--red)" onclick="endNowAch(\''+a.id+'\')">End</button>'+
+        '</div></div>'+editForm+'</div>';
+    });
+    html+='</div>';
+  }
+
+  if(expired.length){
+    html+='<div class="panel"><div class="panel-title" style="color:var(--muted)">Expired ('+expired.length+')</div>';
+    expired.forEach(function(a){
+      html+='<div style="padding:10px 0;border-bottom:1px solid var(--border);opacity:.5">'+
+        '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800">'+a.athlete+'</div>'+
+        '<div style="font-size:13px">'+a.achievement+'</div>'+
+        '</div>';
+    });
+    html+='</div>';
+  }
+
+  if(!active.length&&!expired.length){
+    html+='<div class="panel"><div class="empty">No achievements yet for this team.</div></div>';
+  }
+
+  return teamSel+html;
+}
+
+function addAch(){
+  if(!achAthlete||!achText.trim()){ alert('Select an athlete and enter achievement.'); return; }
+  state.achievements = (state.achievements||[]).concat([{
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    athlete:achAthlete, achievement:achText,
+    dateAdded:new Date().toISOString().slice(0,10),
+    durationWeeks:achWeeks, archived:false
+  }]);
+  saveData(); showToast('Achievement added!'); achText=''; achAthlete=''; render();
+}
+
+function saveAchEdit(){
+  var a=(state.achievements||[]).filter(function(x){return x.id===achEditId;})[0]; if(!a) return;
+  a.achievement=achEditText; a.durationWeeks=achEditWeeks; achEditId=null;
+  saveData(); showToast('Achievement updated!'); render();
+}
+
+function endNowAch(id){
+  var a=(state.achievements||[]).filter(function(x){return x.id===id;})[0]; if(!a) return;
+  a.archived=true; saveData(); showToast('Achievement ended.'); render();
+}
+
+// ── SETTINGS TAB ──────────────────────────────────────────────────────────
+function renderSettings(){
+  var sections = ['teams','athletes','copytogym','backup'];
+  var labels   = ['Teams','Athletes','Copy to Gym','Backup'];
+  var nav = sections.map(function(s,i){
+    return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';render()">'+labels[i]+'</button>';
+  }).join('');
+  var content = '';
+  if(settingsSection==='teams') content = renderSettingsTeams();
+  else if(settingsSection==='athletes') content = renderSettingsAthletes();
+  else if(settingsSection==='copytogym') content = renderSettingsCopyToGym();
+  else if(settingsSection==='backup') content = renderSettingsBackup();
+  return '<div class="sn-nav">'+nav+'</div>'+content;
+}
+
+// Settings — Teams
+var newTeamName = '';
+function renderSettingsTeams(){
+  var html = '<div class="panel"><div class="panel-title">Manage Teams</div>';
+  html += '<div class="form-group"><div class="form-label">New Team Name</div>'+
+    '<input class="form-input" id="new-team-input" placeholder="e.g. West Allegheny Volleyball" value="'+newTeamName.replace(/"/g,'&quot;')+'" oninput="newTeamName=this.value"/>'+
+    '</div>'+
+    '<button class="btn btn-team" id="team-save-btn" style="width:100%;margin-top:4px">Add Team</button>';
+
+  if(state.teams.length){
+    html += '<div class="section-divider"></div>';
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
+    state.teams.forEach(function(t){
+      var count = (state.athletes[t]||[]).length;
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px">'+
+        '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:15px">'+t+'</div>'+
+        '<div style="font-size:12px;color:var(--muted)">'+count+' athlete'+(count!==1?'s':'')+'</div></div>'+
+        '<button class="action-btn" style="color:var(--red)" onclick="deleteTeam(\''+_esc(t)+'\')">Delete</button>'+
+        '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div class="empty" style="padding:16px 0">No teams yet.</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function saveNewTeam(){
+  var name = newTeamName.trim();
+  if(!name){ alert('Enter a team name.'); return; }
+  if(state.teams.indexOf(name)>-1){ alert('Team already exists.'); return; }
+  state.teams.push(name);
+  if(!state.athletes[name]) state.athletes[name] = [];
+  newTeamName = '';
+  saveData(); showToast('Team added!'); render();
+}
+
+function deleteTeam(name){
+  if(!confirm('Delete team "'+name+'"? Athletes and their entries will not be deleted.')){ return; }
+  state.teams = state.teams.filter(function(t){ return t!==name; });
+  if(currentTeam===name) currentTeam='';
+  saveData(); showToast('Team deleted.'); render();
+}
+
+// Settings — Athletes
+var newAthName = '', newAthTeam = '', newAthGender = 'male', newAthSports = '';
+function renderSettingsAthletes(){
+  var teamOpts = state.teams.map(function(t){
+    return '<option value="'+t.replace(/"/g,'&quot;')+'"'+(newAthTeam===t?' selected':'')+'>'+t+'</option>';
+  }).join('');
+
+  var html = '<div class="panel"><div class="panel-title">Add Athlete</div>'+
+    '<div class="form-group"><div class="form-label">Full Name</div><input class="form-input" id="new-ath-name" placeholder="First Last" value="'+newAthName.replace(/"/g,'&quot;')+'" oninput="newAthName=this.value"/></div>'+
+    '<div class="form-group"><div class="form-label">Team</div><select class="form-input" onchange="newAthTeam=this.value"><option value="">-- Select Team --</option>'+teamOpts+'</select></div>'+
+    '<div class="form-group"><div class="form-label">Gender</div><div class="toggle-group">'+
+    '<button class="tog'+(newAthGender==='male'?' on':'')+'" onclick="newAthGender=\'male\';render()">Male</button>'+
+    '<button class="tog'+(newAthGender==='female'?' on':'')+'" onclick="newAthGender=\'female\';render()">Female</button>'+
+    '</div></div>'+
+    '<div class="form-group"><div class="form-label">Sport(s)</div><input class="form-input" placeholder="e.g. Volleyball" value="'+newAthSports.replace(/"/g,'&quot;')+'" oninput="newAthSports=this.value"/></div>'+
+    '<button class="btn btn-team" id="team-athlete-add-btn" style="width:100%;margin-top:4px">Add Athlete</button></div>';
+
+  // Existing athletes by team
+  state.teams.forEach(function(t){
+    var athletes = (state.athletes[t]||[]).slice().sort(function(a,b){ return lastName(a).localeCompare(lastName(b)); });
+    if(!athletes.length) return;
+    html += '<div class="panel"><div class="panel-title" style="font-size:13px;color:var(--team)">'+t+'</div>';
+    athletes.forEach(function(name){
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:15px">'+name+'</div>'+
+        '<button class="action-btn" style="color:var(--red)" onclick="removeAthleteFromTeam(\''+_esc(t)+'\',\''+_esc(name)+'\')">Remove</button>'+
+        '</div>';
+    });
+    html += '</div>';
+  });
+
+  return html;
+}
+
+function addAthleteToTeam(){
+  var name = newAthName.trim();
+  if(!name||!newAthTeam){ alert('Enter athlete name and select a team.'); return; }
+  if(!state.athletes[newAthTeam]) state.athletes[newAthTeam]=[];
+  if(state.athletes[newAthTeam].indexOf(name)>-1){ alert('Athlete already on this team.'); return; }
+  state.athletes[newAthTeam].push(name);
+  if(!state.profiles[name]) state.profiles[name]={};
+  state.profiles[name].gender = newAthGender;
+  if(newAthSports) state.profiles[name].sports = newAthSports;
+  newAthName=''; newAthSports='';
+  saveData(); showToast(name+' added to '+newAthTeam+'!'); render();
+}
+
+function removeAthleteFromTeam(team, name){
+  if(!confirm('Remove '+name+' from '+team+'? Their entries will not be deleted.')){ return; }
+  state.athletes[team] = (state.athletes[team]||[]).filter(function(a){ return a!==name; });
+  saveData(); showToast('Removed from team.'); render();
+}
+
+// Settings — Copy to Gym
+function renderSettingsCopyToGym(){
+  var html = '<div class="panel"><div class="panel-title">Copy Athlete to Gym</div>';
+  html += '<p style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px">Promote a team athlete to the gym portal. This is a one-time snapshot — their profile and all entries are copied to the gym roster. The team record stays intact.</p>';
+
+  var allAthletes = [];
+  state.teams.forEach(function(t){
+    (state.athletes[t]||[]).forEach(function(name){
+      if(allAthletes.indexOf(name)===-1) allAthletes.push(name);
+    });
+  });
+  allAthletes.sort(function(a,b){ return lastName(a).localeCompare(lastName(b)); });
+
+  if(!allAthletes.length){
+    html += '<div class="empty">No athletes yet.</div>';
+  } else {
+    allAthletes.forEach(function(name){
+      var entryCount = state.entries.filter(function(e){ return e.athlete===name; }).length;
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">'+
+        '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:15px">'+name+'</div>'+
+        '<div style="font-size:12px;color:var(--muted)">'+entryCount+' entries</div></div>'+
+        '<button class="copy-btn" onclick="copyToGym(\''+_esc(name)+'\')">Copy to Gym</button>'+
+        '</div>';
+    });
+  }
+  html += '</div>';
+  return html;
+}
+
+// Settings — Backup
+function renderSettingsBackup(){
+  return '<div class="panel"><div class="panel-title">Backup & Restore</div>'+
+    '<div style="display:flex;flex-direction:column;gap:20px">'+
+    '<div><div class="form-label" style="margin-bottom:6px">Download Backup</div>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Exports all team data as a JSON file.</div>'+
+    '<button class="btn btn-team" onclick="downloadBackup()">Download Backup</button></div>'+
+    '<div style="border-top:1px solid var(--border);padding-top:16px">'+
+    '<div class="form-label" style="margin-bottom:6px">Restore from Backup</div>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Upload a backup JSON. <strong style="color:var(--red)">This overwrites all current team data.</strong></div>'+
+    '<label class="btn btn-ghost" style="cursor:pointer">Choose File<input type="file" accept=".json" style="display:none" onchange="restoreBackup(this)"/></label>'+
+    '</div></div></div>';
+}
+
+function downloadBackup(){
+  var blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'FPT_Teams_Backup_'+TODAY+'.json';
+  a.click();
+}
+
+function restoreBackup(input){
+  var file = input.files[0]; if(!file) return;
+  if(!confirm('Restore from this file? All current team data will be overwritten.')) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var data = JSON.parse(e.target.result);
+      if(!data.teams){ alert('Invalid backup file.'); return; }
+      state = data;
+      saveData(); showToast('Backup restored!'); render();
+    } catch(err){ alert('Could not parse backup file.'); }
+  };
+  reader.readAsText(file);
+}
+</script>
+</body>
+</html>

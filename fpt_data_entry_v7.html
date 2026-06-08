@@ -200,6 +200,7 @@ function _handleDelegatedClick(e, prevent){
   }
   if(id==='modal-save-btn'){if(prevent)e.preventDefault();saveModalEdit();}
   else if(id==='bulk-save-btn'){if(prevent)e.preventDefault();saveBulkEdits();}
+  else if(id==='ach-save-edit-btn'){if(prevent)e.preventDefault();saveAchEdit();}
   else if(id==='import-run-btn'){if(prevent)e.preventDefault();runBulkImport();}
   else if(id==='import-another-btn'){if(prevent)e.preventDefault();importDone=false;importReport=null;importJson='';importParsed=null;render();setTimeout(_bindImportEvents,50);}
   else if(id==='logo-save-btn'){if(prevent)e.preventDefault();saveLogo();}
@@ -414,15 +415,27 @@ function renderToday(){
   var today=state.entries.filter(function(e){return e.date===TODAY;}).slice().reverse();
   var EX_C={fly:'var(--fly)',broad:'var(--broad)',vert:'var(--vert)',fly510:'var(--muted)',rsi42:'var(--muted)'};
   if(!today.length)return '<div class="panel"><div class="empty">No entries logged today yet.<br><br>Use the Log tab to add some.</div></div>';
+  // Calculate attempt numbers per athlete+exercise for unique field IDs
+  var attemptCount={};
+  var allToday=state.entries.filter(function(e){return e.date===TODAY;});
+  var entryAttempt={};
+  allToday.forEach(function(e){
+    var k=e.athlete+'|'+e.exercise;
+    attemptCount[k]=(attemptCount[k]||0)+1;
+    entryAttempt[e.id]=attemptCount[k];
+  });
   var rows=today.map(function(e){
     var ex=EX_LIST.filter(function(x){return x.id===e.exercise;})[0]||{name:e.exercise};
     var val=e.exercise==='broad'?fmtBroad(e.total):e.exercise==='fly'?fmtFly(e.value):fmtVert(e.value);
     var isEditing=todayEditId===e.id;
-    var main='<div class="today-row-main"><div><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:16px">'+e.athlete+'</div><div style="font-size:12px;color:'+(EX_C[e.exercise]||'var(--muted)')+'">'+ex.name+'</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-family:\'Barlow Condensed\',sans-serif;font-weight:900;font-size:20px">'+val+'</span><button class="action-btn" onclick="startEditEntry(this.dataset.id)" data-id="'+e.id+'">Edit</button><button class="action-btn" style="color:var(--red)" onclick="deleteEntry(this.dataset.id)" data-id="'+e.id+'">Delete</button></div></div>';
+    var attempt=entryAttempt[e.id]||1;
+    var attemptLabel='<span style="font-size:10px;color:var(--muted2);margin-left:6px">attempt '+attempt+'</span>';
+    var main='<div class="today-row-main"><div><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:16px">'+e.athlete+'</div><div style="font-size:12px;color:'+(EX_C[e.exercise]||'var(--muted)')+'">'+ex.name+attemptLabel+'</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-family:\'Barlow Condensed\',sans-serif;font-weight:900;font-size:20px">'+val+'</span><button class="action-btn" onclick="startEditEntry(this.dataset.id)" data-id="'+e.id+'">Edit</button><button class="action-btn" style="color:var(--red)" onclick="deleteEntry(this.dataset.id)" data-id="'+e.id+'">Delete</button></div></div>';
     var editForm='';
     if(isEditing){
-      var editVal=e.exercise==='broad'?'<div style="display:flex;gap:6px"><input class="result-field" id="ed-ft" type="number" min="0" max="15" step="1" value="'+(todayEditData.valueFt||'')+'" style="flex:1;font-size:16px"/><input class="result-field" id="ed-in" type="number" min="0" max="11" step="1" value="'+(todayEditData.valueIn||'')+'" style="flex:1;font-size:16px"/></div>':'<input class="result-field" id="ed-val" type="number" step="0.01" value="'+(todayEditData.value||'')+'" style="width:100%;font-size:16px"/>';
-      editForm='<div class="today-row-edit"><div class="row" style="gap:8px;align-items:flex-end"><div class="form-group" style="flex:1"><div class="form-label">Value</div>'+editVal+'</div><div class="form-group"><div class="form-label">Date</div><input class="form-input" id="ed-date" type="date" value="'+(todayEditData.date||TODAY)+'"/></div></div><div style="display:flex;gap:8px"><button class="btn btn-accent" onclick="saveEditEntry()">Save</button><button class="btn btn-ghost" onclick="todayEditId=null;render()">Cancel</button></div></div>';
+      var sfx='-'+attempt;
+      var editVal=e.exercise==='broad'?'<div style="display:flex;gap:6px"><input class="result-field" id="ed-ft'+sfx+'" type="number" min="0" max="15" step="1" value="'+(todayEditData.valueFt||'')+'" style="flex:1;font-size:16px"/><input class="result-field" id="ed-in'+sfx+'" type="number" min="0" max="11" step="1" value="'+(todayEditData.valueIn||'')+'" style="flex:1;font-size:16px"/></div>':'<input class="result-field" id="ed-val'+sfx+'" type="number" step="0.01" value="'+(todayEditData.value||'')+'" style="width:100%;font-size:16px"/>';
+      editForm='<div class="today-row-edit"><div class="row" style="gap:8px;align-items:flex-end"><div class="form-group" style="flex:1"><div class="form-label">Value</div>'+editVal+'</div><div class="form-group"><div class="form-label">Date</div><input class="form-input" id="ed-date'+sfx+'" type="date" value="'+(todayEditData.date||TODAY)+'"/></div></div><div style="display:flex;gap:8px"><button class="btn btn-accent" onclick="saveEditEntry(\''+sfx+'\')">Save</button><button class="btn btn-ghost" onclick="todayEditId=null;render()">Cancel</button></div></div>';
     }
     return '<div class="today-row">'+main+editForm+'</div>';
   }).join('');
@@ -432,15 +445,15 @@ function startEditEntry(id){
   var e=state.entries.filter(function(x){return x.id===id;})[0];if(!e)return;
   todayEditId=id;todayEditData={athlete:e.athlete,exercise:e.exercise,date:e.date,value:e.value,valueFt:e.valueFt,valueIn:e.valueIn,total:e.total};render();
 }
-function saveEditEntry(){
+function saveEditEntry(sfx){
   var e=state.entries.filter(function(x){return x.id===todayEditId;})[0];if(!e)return;
-  var newDate=(document.getElementById('ed-date')||{}).value||e.date;e.date=newDate;
+  var newDate=(document.getElementById('ed-date'+sfx)||{}).value||e.date;e.date=newDate;
   if(e.exercise==='broad'){
-    var ft=parseFloat((document.getElementById('ed-ft')||{}).value);
-    var inch=parseFloat((document.getElementById('ed-in')||{}).value);
+    var ft=parseFloat((document.getElementById('ed-ft'+sfx)||{}).value);
+    var inch=parseFloat((document.getElementById('ed-in'+sfx)||{}).value);
     if(!isNaN(ft))e.valueFt=Math.round(ft);if(!isNaN(inch))e.valueIn=Math.round(inch);
     if(!isNaN(ft)&&!isNaN(inch))e.total=ft*12+inch;
-  }else{var v=parseFloat((document.getElementById('ed-val')||{}).value);if(!isNaN(v))e.value=v;}
+  }else{var v=parseFloat((document.getElementById('ed-val'+sfx)||{}).value);if(!isNaN(v))e.value=v;}
   todayEditId=null;saveData();showToast('Entry updated!');render();
 }
 function deleteEntry(id){
@@ -588,7 +601,7 @@ function achCard(a,now){
   var editForm='';
   if(isEditing){
     var wkE=[2,4,6,8].map(function(w){return '<button class="tog'+(achEditWeeks===w?' on':'')+'" data-wk="'+w+'" onclick="achEditWeeks=parseInt(this.dataset.wk);render()">'+w+' wks</button>';}).join('');
-    editForm='<div class="ach-edit-form"><div class="form-group"><div class="form-label">Achievement Text</div><input class="form-input" value="'+achEditText.replace(/"/g,'&quot;')+'" oninput="achEditText=this.value"/></div><div class="form-group"><div class="form-label">Duration</div><div class="toggle-group">'+wkE+'</div></div><div style="display:flex;gap:8px"><button class="btn btn-accent btn-sm" onclick="saveAchEdit()">Save</button><button class="btn btn-ghost btn-sm" onclick="achEditId=null;render()">Cancel</button></div></div>';
+    editForm='<div class="ach-edit-form"><div class="form-group"><div class="form-label">Achievement Text</div><input class="form-input" value="'+achEditText.replace(/"/g,'&quot;')+'" oninput="achEditText=this.value"/></div><div class="form-group"><div class="form-label">Duration</div><div class="toggle-group">'+wkE+'</div></div><div style="display:flex;gap:8px"><button class="btn btn-accent btn-sm" id="ach-save-edit-btn">Save</button><button class="btn btn-ghost btn-sm" onclick="achEditId=null;render()">Cancel</button></div></div>';
   }
   return '<div class="ach-item"><div class="ach-item-row"><div><div class="ach-name">'+a.athlete+'</div><div class="ach-detail">'+a.achievement+'</div><div class="ach-detail">'+(isExpired?'Expired':'Expires in '+daysLeft+' day'+(daysLeft!==1?'s':''))+'</div></div><div class="ach-btns"><button class="ach-btn" onclick="startAchEdit(this.dataset.id)" data-id="'+a.id+'">Edit</button><button class="ach-btn" style="color:var(--red)" onclick="endNowAch(this.dataset.id)" data-id="'+a.id+'">End Now</button></div></div>'+editForm+'</div>';
 }
@@ -689,8 +702,8 @@ function endNowAch(id){
   saveData();render();
 }
 function renderSettings(){
-  var sections=['logolib','export','intake','history','backup','bulkimport'];
-  var labels=['Logo Library','Data Export','Intake','History','Backup & Restore','Bulk Import'];
+  var sections=['logolib','export','intake','history','backup','bulkimport','bulkedit'];
+  var labels=['Logo Library','Data Export','Intake','History','Backup & Restore','Bulk Import','Bulk Editor'];
   var nav=sections.map(function(s,i){return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';bulkEdits={};render()">'+labels[i]+'</button>';}).join('');
   var content='';
   if(settingsSection==='logolib')content=renderLogoLib();
@@ -699,6 +712,7 @@ function renderSettings(){
   else if(settingsSection==='history')content=renderHist();
   else if(settingsSection==='backup')content=renderBackupRestore();
   else if(settingsSection==='bulkimport')content=renderBulkImport();
+  else if(settingsSection==='bulkedit')content=renderBulkEditor();
   return '<div class="sn-nav">'+nav+'</div>'+content;
 }
 function renderLogoLib(){

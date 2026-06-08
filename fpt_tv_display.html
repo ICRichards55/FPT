@@ -238,7 +238,7 @@ function buildLeaderboard(slideId,ex,gender,entries){
       <div class="lb-ex-name">${ex.name}</div>
       <div class="lb-columns">
         <div>
-          <div class="lb-col-head">${mon} PR</div>
+          <div class="lb-col-head">${mon} Leaderboard</div>
           ${lbRowsEx(monthly,ex.id)}
         </div>
         <div>
@@ -267,7 +267,7 @@ function buildMonthlyPRs(entries){
     ${blackBrush()}
     <img class="slide-logo logo-light" src="${LOGO}" alt="FPT"/>
     <div class="pr-body">
-      <div class="pr-title">${mon}<br>PRs</div>
+      <div class="pr-title">${mon}<br>Leaderboard</div>
       <div class="pr-cols">
         ${EX.map(ex=>`<div class="pr-col">
           <div class="pr-col-head">${ex.name}</div>
