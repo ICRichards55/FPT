@@ -201,6 +201,7 @@ function _handleDelegatedClick(e, prevent){
   if(id==='modal-save-btn'){if(prevent)e.preventDefault();saveModalEdit();}
   else if(id==='bulk-save-btn'){if(prevent)e.preventDefault();saveBulkEdits();}
   else if(id==='ach-save-edit-btn'){if(prevent)e.preventDefault();saveAchEdit();}
+  else if(id==='today-save-btn'){if(prevent)e.preventDefault();var sfx=e.target.dataset.sfx;saveEditEntry(sfx);}
   else if(id==='import-run-btn'){if(prevent)e.preventDefault();runBulkImport();}
   else if(id==='import-another-btn'){if(prevent)e.preventDefault();importDone=false;importReport=null;importJson='';importParsed=null;render();setTimeout(_bindImportEvents,50);}
   else if(id==='logo-save-btn'){if(prevent)e.preventDefault();saveLogo();}
@@ -350,7 +351,7 @@ function submitSession(){
   if(!sessionRows.length)return;
   sessionRows.forEach(function(r,i){
     var id=(r.athlete+sessionEx+sessionDate+i).replace(/\s/g,'').substring(0,24);
-    var entry={id:id,athlete:r.athlete,exercise:sessionEx,date:sessionDate};
+    var entry={id:id,athlete:r.athlete,exercise:sessionEx,date:sessionDate,loggedAt:new Date().toISOString()};
     if(sessionEx==='broad'){entry.valueFt=r.valueFt;entry.valueIn=r.valueIn;entry.total=r.total;}
     else{entry.value=r.value;}
     state.entries.push(entry);
@@ -405,6 +406,7 @@ function submitEntry(){
   }
   var same=state.entries.filter(function(e){return e.athlete===logAthlete&&e.exercise===logEx&&e.date===logDate;}).length;
   entry.id=(logAthlete+logEx+logDate+same).replace(/\s/g,'').substring(0,24);
+  entry.loggedAt=new Date().toISOString();
   state.entries.push(entry);
   saveData();showToast('Entry logged!');
   var el=document.getElementById('res-val')||document.getElementById('res-ft');if(el)el.value='';
@@ -412,12 +414,26 @@ function submitEntry(){
   document.getElementById('pr-indicator').style.display='none';render();
 }
 function renderToday(){
-  var today=state.entries.filter(function(e){return e.date===TODAY;}).slice().reverse();
+  // Filter on loggedAt date (when entered into system) not result date
+  // Entries without loggedAt (pre-fix) are excluded by design
+  var today=state.entries.filter(function(e){
+    if(!e.loggedAt) return false;
+    var d=new Date(e.loggedAt);
+    var et=new Date(d.toLocaleString('en-US',{timeZone:'America/New_York'}));
+    var ds=et.getFullYear()+'-'+String(et.getMonth()+1).padStart(2,'0')+'-'+String(et.getDate()).padStart(2,'0');
+    return ds===TODAY;
+  }).slice().reverse();
   var EX_C={fly:'var(--fly)',broad:'var(--broad)',vert:'var(--vert)',fly510:'var(--muted)',rsi42:'var(--muted)'};
   if(!today.length)return '<div class="panel"><div class="empty">No entries logged today yet.<br><br>Use the Log tab to add some.</div></div>';
   // Calculate attempt numbers per athlete+exercise for unique field IDs
   var attemptCount={};
-  var allToday=state.entries.filter(function(e){return e.date===TODAY;});
+  var allToday=state.entries.filter(function(e){
+    if(!e.loggedAt) return false;
+    var d=new Date(e.loggedAt);
+    var et=new Date(d.toLocaleString('en-US',{timeZone:'America/New_York'}));
+    var ds=et.getFullYear()+'-'+String(et.getMonth()+1).padStart(2,'0')+'-'+String(et.getDate()).padStart(2,'0');
+    return ds===TODAY;
+  });
   var entryAttempt={};
   allToday.forEach(function(e){
     var k=e.athlete+'|'+e.exercise;
@@ -435,7 +451,7 @@ function renderToday(){
     if(isEditing){
       var sfx='-'+attempt;
       var editVal=e.exercise==='broad'?'<div style="display:flex;gap:6px"><input class="result-field" id="ed-ft'+sfx+'" type="number" min="0" max="15" step="1" value="'+(todayEditData.valueFt||'')+'" style="flex:1;font-size:16px"/><input class="result-field" id="ed-in'+sfx+'" type="number" min="0" max="11" step="1" value="'+(todayEditData.valueIn||'')+'" style="flex:1;font-size:16px"/></div>':'<input class="result-field" id="ed-val'+sfx+'" type="number" step="0.01" value="'+(todayEditData.value||'')+'" style="width:100%;font-size:16px"/>';
-      editForm='<div class="today-row-edit"><div class="row" style="gap:8px;align-items:flex-end"><div class="form-group" style="flex:1"><div class="form-label">Value</div>'+editVal+'</div><div class="form-group"><div class="form-label">Date</div><input class="form-input" id="ed-date'+sfx+'" type="date" value="'+(todayEditData.date||TODAY)+'"/></div></div><div style="display:flex;gap:8px"><button class="btn btn-accent" onclick="saveEditEntry(\''+sfx+'\')">Save</button><button class="btn btn-ghost" onclick="todayEditId=null;render()">Cancel</button></div></div>';
+      editForm='<div class="today-row-edit"><div class="row" style="gap:8px;align-items:flex-end"><div class="form-group" style="flex:1"><div class="form-label">Value</div>'+editVal+'</div><div class="form-group"><div class="form-label">Date</div><input class="form-input" id="ed-date'+sfx+'" type="date" value="'+(todayEditData.date||TODAY)+'"/></div></div><div style="display:flex;gap:8px"><button class="btn btn-accent" id="today-save-btn" data-sfx="'+sfx+'">Save</button><button class="btn btn-ghost" onclick="todayEditId=null;render()">Cancel</button></div></div>';
     }
     return '<div class="today-row">'+main+editForm+'</div>';
   }).join('');
