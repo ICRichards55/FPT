@@ -412,11 +412,18 @@ function formatDisplayDate_(isoDate) {
 
 // ── DAILY REPORT ──────────────────────────────────────────────────────────
 // Trigger: every day ~9 PM ET (runs before midnight archive)
-// Today's entries are always in fpt_live.json — no need to read historical
+// Filters on loggedAt (when entered into system) not result date
+// so backdated entries still appear in the report for the day they were logged
 function sendDailyReport() {
   var live    = readLive_();
   var today   = getTodayET_();
-  var entries = (live.entries || []).filter(function(e) { return e.date === today; });
+  var entries = (live.entries || []).filter(function(e) {
+    if (!e.loggedAt) return e.date === today; // fallback for legacy entries
+    var d  = new Date(e.loggedAt);
+    var et = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    var ds = et.getFullYear() + '-' + String(et.getMonth()+1).padStart(2,'0') + '-' + String(et.getDate()).padStart(2,'0');
+    return ds === today;
+  });
 
   var displayDate = formatDisplayDate_(today);
   var subject     = 'FPT Daily Report — ' + displayDate;
