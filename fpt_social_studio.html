@@ -105,23 +105,26 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .modal-text{font-size:13px;color:var(--text)}
 
 /* ── FULLSCREEN STORY ── */
-.story-fs{position:fixed;inset:0;z-index:400;background:#000;display:none;align-items:center;justify-content:center;overflow:hidden;
-  /* iOS safe area support */
-  padding-top:env(safe-area-inset-top);
-  padding-bottom:env(safe-area-inset-bottom);
-}
+.story-fs{position:fixed;inset:0;z-index:400;background:#000;display:none;flex-direction:column;align-items:center;justify-content:flex-start;overflow:hidden;}
 .story-fs.open{display:flex}
+/* Controls bar sits ABOVE the story frame — not inside it */
+.story-fs-controls{
+  width:100%;display:flex;align-items:center;justify-content:space-between;
+  padding:max(12px,env(safe-area-inset-top,12px)) 16px 8px;
+  background:#000;flex-shrink:0;z-index:10;
+  transition:opacity .4s;
+}
+.story-fs-controls.hidden{opacity:0;pointer-events:none;}
 .story-fs-inner{
   position:relative;
-  /* Use 100dvh (dynamic viewport, hides with browser chrome) for iPhone */
-  height:100dvh;
-  height:100svh; /* fallback: small viewport — always excludes browser chrome */
-  aspect-ratio:9/16;
-  max-width:100vw;
-  max-height:100dvh;
+  flex:1;
+  width:100%;
+  max-width:calc(100vh * 9/16);
+  max-height:calc(100% - 80px);
+  margin:0 auto;
 }
 @supports not (height:100dvh){
-  .story-fs-inner{height:100vh;}
+  .story-fs-inner{max-height:calc(100vh - 80px);}
 }
 .story-fs-inner video,.story-fs-inner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .story-fs-overlay{position:absolute;inset:0}
@@ -134,26 +137,27 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .story-fs-ath{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
 .story-fs-prev{font-family:'Barlow Condensed',sans-serif;font-size:16px;color:rgba(255,255,255,.6);margin-top:6px;letter-spacing:.5px}
 .story-fs-close{
-  position:absolute;
-  top:max(20px, env(safe-area-inset-top, 20px));
-  right:max(16px, env(safe-area-inset-right, 16px));
-  background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.25);border-radius:8px;
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:8px;
   color:#fff;font-size:13px;font-family:'Barlow Condensed',sans-serif;font-weight:700;
-  letter-spacing:.5px;padding:10px 16px;cursor:pointer;text-transform:uppercase;z-index:10;
-  min-height:44px;display:flex;align-items:center; /* 44pt min touch target for iPhone */
+  letter-spacing:.5px;padding:10px 16px;cursor:pointer;text-transform:uppercase;
+  min-height:44px;display:flex;align-items:center;
 }
 .story-fs-rec{
-  position:absolute;
-  top:max(20px, env(safe-area-inset-top, 20px));
-  left:50%;transform:translateX(-50%);
   background:rgba(220,30,30,.9);border:none;border-radius:22px;
   color:#fff;font-size:14px;font-family:'Barlow Condensed',sans-serif;font-weight:800;
   letter-spacing:1px;padding:11px 22px;cursor:pointer;text-transform:uppercase;
-  z-index:10;display:flex;align-items:center;gap:7px;min-height:44px;
+  display:flex;align-items:center;gap:7px;min-height:44px;
   animation:pulse-rec 2s infinite;white-space:nowrap;
 }
 @keyframes pulse-rec{0%,100%{opacity:1}50%{opacity:.7}}
 .rec-dot{width:9px;height:9px;border-radius:50%;background:#fff}
+.tap-hint{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  color:rgba(255,255,255,.4);font-size:12px;font-family:'Barlow Condensed',sans-serif;
+  letter-spacing:1px;text-transform:uppercase;pointer-events:none;
+  transition:opacity .4s;text-align:center;line-height:1.6;
+}
+.tap-hint.hidden{opacity:0;}
 </style>
 </head>
 <body>
@@ -176,7 +180,11 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 </div>
 
 <!-- Fullscreen Story -->
-<div class="story-fs" id="story-fs">
+<div class="story-fs" id="story-fs" onclick="toggleFsControls()">
+  <div class="story-fs-controls" id="fs-controls">
+    <button class="story-fs-rec" onclick="openModal();event.stopPropagation()"><div class="rec-dot"></div>Screen Record</button>
+    <button class="story-fs-close" onclick="closeFS();event.stopPropagation()">✕ Exit</button>
+  </div>
   <div class="story-fs-inner" id="story-fs-inner">
     <div id="fs-media-wrap"></div>
     <div class="story-fs-overlay">
@@ -191,8 +199,6 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
         <div class="story-fs-prev" id="fs-prev"></div>
       </div>
     </div>
-    <button class="story-fs-rec" onclick="openModal()"><div class="rec-dot"></div>Screen Record</button>
-    <button class="story-fs-close" onclick="closeFS()">✕ Exit</button>
   </div>
 </div>
 
@@ -414,18 +420,36 @@ async function downloadFrame(){
   }catch(e){alert('Tip: Use the Fullscreen button then screen record for video content.');}
 }
 
+var _fsControlsTimer=null;
+function toggleFsControls(){
+  var ctrl=document.getElementById('fs-controls');
+  if(!ctrl)return;
+  if(ctrl.classList.contains('hidden')){
+    ctrl.classList.remove('hidden');
+    clearTimeout(_fsControlsTimer);
+    _fsControlsTimer=setTimeout(function(){ctrl.classList.add('hidden');},3000);
+  }else{
+    ctrl.classList.add('hidden');
+    clearTimeout(_fsControlsTimer);
+  }
+}
 function openFS(){
   renderStoryPreview();
   updateOverlay();
-  const fs=document.getElementById('story-fs');
+  var fs=document.getElementById('story-fs');
   fs.classList.add('open');
-  // iPhone Safari: scroll to remove browser chrome, then lock scroll
+  // Auto-hide controls after 3s so they don't appear in the recording
+  var ctrl=document.getElementById('fs-controls');
+  if(ctrl){
+    ctrl.classList.remove('hidden');
+    clearTimeout(_fsControlsTimer);
+    _fsControlsTimer=setTimeout(function(){ctrl.classList.add('hidden');},3000);
+  }
   window.scrollTo(0,1);
   document.body.style.overflow='hidden';
-  // Try fullscreen API (works on some iOS versions in standalone mode)
   try{
-    const el=document.documentElement;
-    if(el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+    var el=document.documentElement;
+    if(el.requestFullscreen) el.requestFullscreen().catch(function(){});
     else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
   }catch(e){}
 }
@@ -534,52 +558,94 @@ function renderStory(){
 // Spotlight tab (existing functionality + X format)
 let spotRefs={};
 
-function renderBarChart(entries, ath, exId, color, chartH, mode) {
-  const chartData = getChartPoints(entries, ath, exId, mode || spotChartMode);
-  const pr = getPRForSpot(ath, exId);
-  if(chartData.type === 'line' || !chartData.type) {
-    const pts = chartData.points;
-    if(!pts.length) return '';
-    const vals = pts.map(p=>p.v);
-    const mn=Math.min(...vals), mx=Math.max(...vals), rng=mx-mn||1;
-    return pts.map((p,i)=>{
-      const h = Math.round(((exId==='fly'?mn+rng-p.v+mn:p.v-mn)/rng)*(chartH-4))+4;
-      const isTop = exId==='fly'?p.v===Math.min(...vals):p.v===Math.max(...vals);
-      const isPR = pr!=null&&Math.abs(p.v-pr)<0.0001;
-      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px">'+
-        (isPR?'<div style="font-size:8px;color:#ffffff">'+(exId==='fly'?p.v.toFixed(2):exId==='broad'?(Math.floor(p.v/12)+"'"+Math.round(p.v%12)):p.v.toFixed(1))+'</div>':'')+
-        '<div style="width:calc(100% - 2px);max-width:28px;background:'+(isPR?color:color+'44')+';border-radius:2px 2px 0 0;min-height:3px;height:'+h+'px"></div>'+
-        '<div style="font-size:7px;color:#253040;white-space:nowrap">'+(i===0||i===pts.length-1?p.date.slice(5).replace('-','/'):'')+'</div>'+
-        '</div>';
-    }).join('');
-  } else {
-    // Scatter + avg line mode - use SVG
-    const scatter = chartData.scatter;
-    const avgLine = chartData.avgLine;
-    if(!scatter.length) return '';
-    const allVals = scatter.map(p=>p.v);
-    const mn=Math.min(...allVals), mx=Math.max(...allVals), rng=mx-mn||1;
-    const dates = [...new Set(scatter.map(p=>p.date))].sort();
-    const dIdx = {};dates.forEach((d,i)=>dIdx[d]=i);
-    const n = dates.length;
-    const w = 200, h = chartH;
-    const xScale = n>1?w/(n-1):w;
-    const yVal = v => h - Math.round((exId==='fly'?((mn+rng-v)/rng):(v-mn)/rng)*(h-8))-4;
-    const scatterDots = scatter.map(p=>{
-      const x = n>1?(dIdx[p.date]/(n-1))*w:w/2;
-      const y = yVal(p.v);
-      return '<circle cx="'+x+'" cy="'+y+'" r="3" fill="#ffffff66"/>';
-    }).join('');
-    const avgPts = avgLine.map((p,i)=>{
-      const x = n>1?(dIdx[p.date]/(n-1))*w:w/2;
-      const y = yVal(p.v);
-      return (i===0?'M':'L')+x+','+y;
-    }).join(' ');
-    return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:100%;overflow:visible">'+
-      scatterDots+
-      (avgLine.length>1?'<path d="'+avgPts+'" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>':'')+
-      '</svg>';
-  }
+function renderScatterChart(entries, ath, exId, color, chartH) {
+  // Get all entries for this athlete + exercise, sorted by date
+  const relevant = entries
+    .filter(e => e.athlete === ath && e.exercise === exId)
+    .map(e => ({ date: e.date, v: exId === 'broad' ? e.total : e.value }))
+    .filter(p => p.v != null && !isNaN(p.v))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (!relevant.length) return '';
+
+  // Group by date — session best per day
+  const byDate = {};
+  relevant.forEach(p => {
+    if (!byDate[p.date]) byDate[p.date] = [];
+    byDate[p.date].push(p.v);
+  });
+  const uniqueDates = Object.keys(byDate).sort();
+  const lower = exId === 'fly';
+  const bests = uniqueDates.map(d => lower ? Math.min(...byDate[d]) : Math.max(...byDate[d]));
+
+  // Y axis range — tight to data with minimum meaningful spread
+  const minSpread = exId === 'fly' ? 0.15 : exId === 'broad' ? 12 : 3;
+  const dataMin = Math.min(...bests);
+  const dataMax = Math.max(...bests);
+  const spread = Math.max(dataMax - dataMin, minSpread);
+  const pad = spread * 0.15;
+  const yMin = lower ? dataMin - pad : dataMin - pad;
+  const yMax = lower ? dataMax + pad : dataMax + pad;
+  const yRange = yMax - yMin;
+
+  // X axis labels — show all dates, year on year change
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const labels = uniqueDates.map((d, i) => {
+    const [y, m, day] = d.split('-').map(Number);
+    const prevYear = i > 0 ? uniqueDates[i-1].split('-')[0] : null;
+    if (i === 0 || (prevYear && prevYear !== String(y))) {
+      return MONTHS[m-1] + ' ' + day + " '" + String(y).slice(2);
+    }
+    return MONTHS[m-1] + ' ' + day;
+  });
+
+  const n = uniqueDates.length;
+  const w = 220, h = chartH;
+  const xStep = n > 1 ? w / (n - 1) : w / 2;
+
+  // Y coordinate (SVG: 0 at top)
+  const yCoord = v => h - Math.round(((v - yMin) / yRange) * (h - 8)) - 4;
+
+  // Build line path through session bests
+  const linePts = bests.map((v, i) => {
+    const x = n > 1 ? i * xStep : w / 2;
+    const y = yCoord(v);
+    return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+
+  // Dots on each session best
+  const dots = bests.map((v, i) => {
+    const x = n > 1 ? i * xStep : w / 2;
+    const y = yCoord(v);
+    return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3.5" fill="' + color + '"/>';
+  }).join('');
+
+  // X axis labels — show every label, rotate if many
+  const maxLabels = Math.min(n, 6);
+  const step = Math.ceil(n / maxLabels);
+  const xLabels = uniqueDates.map((d, i) => {
+    if (i % step !== 0 && i !== n - 1) return '';
+    const x = n > 1 ? i * xStep : w / 2;
+    return '<text x="' + x.toFixed(1) + '" y="' + (h + 14) + '" fill="#3a5060" font-size="7" text-anchor="middle" font-family="Barlow Condensed,sans-serif">' + labels[i] + '</text>';
+  }).join('');
+
+  // Y axis labels
+  const ySteps = 3;
+  const yLabels = Array.from({length: ySteps + 1}, (_, i) => {
+    const v = yMin + (yRange * i / ySteps);
+    const y = yCoord(v);
+    let lbl;
+    if (exId === 'fly') lbl = v.toFixed(2) + 's';
+    else if (exId === 'broad') { const f = Math.floor(v / 12); lbl = f + "'" + Math.round(v % 12) + '"'; }
+    else lbl = v.toFixed(1) + '"';
+    return '<text x="-4" y="' + (y + 3) + '" fill="#3a5060" font-size="7" text-anchor="end" font-family="Barlow Condensed,sans-serif">' + lbl + '</text>';
+  }).join('');
+
+  return '<svg viewBox="0 -4 ' + (w + 40) + ' ' + (h + 26) + '" style="width:100%;height:100%;overflow:visible" transform="translate(30,0)">' +
+    yLabels +
+    '<path d="' + linePts + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+    dots +
+    xLabels +
+    '</svg>';
 }
 
 function renderSpotlight(){
@@ -675,7 +741,7 @@ function renderIGCards(athEntries,availEx){
         </div>
       </div>
     </div>
-    <svg style="position:absolute;top:287px;left:0;width:100%;z-index:2" height="40" viewBox="0 0 540 40" preserveAspectRatio="none"><path d="M0,18 L16,10 L31,22 L46,9 L61,21 L77,9 L92,20 L107,8 L122,21 L137,11 L152,22 L167,8 L182,20 L197,10 L212,23 L228,9 L243,20 L258,8 L273,19 L288,12 L303,22 L318,8 L333,20 L348,9 L363,21 L378,11 L393,22 L408,8 L423,20 L438,10 L453,21 L468,8 L483,19 L498,11 L513,22 L528,12 L540,19 L540,40 L0,40 Z" fill="#0c0c0c"/></svg>
+
     <div style="position:absolute;bottom:0;left:0;right:0;height:260px;background:#080808;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;padding:0 17px 17px">
       <div style="display:flex;align-items:flex-end;gap:14px;flex:1">
           <div style="line-height:.88;flex:1"><div style="color:#fff;font-size:${nsize}px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.9">${fn}</div>${ln?`<div style="color:#fff;font-size:${ln.length>9?48:nsize-4}px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.92;margin-top:4px">${ln}</div>`:''}</div>
@@ -702,7 +768,7 @@ function renderIGCards(athEntries,availEx){
           <div style="text-align:right"><div style="color:#273040;font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">Session PR Avg</div><div style="color:#ffffff;font-size:50px;font-weight:900;line-height:1;letter-spacing:-2px">${fmt(ex.id,prv)}</div>${impPct!=null?`<div style="margin-top:5px;display:inline-flex;align-items:center;gap:5px;background:#ffffff18;border:1px solid #ffffff44;border-radius:3px;padding:3px 10px"><span style="color:#ffffff;font-size:13px;font-weight:800">${ex.lower?'↓':'↑'} ${Math.abs(impPct).toFixed(1)}%</span><span style="color:#3a5060;font-size:10px">improvement</span></div>`:''}</div>
         </div>
         <div style="position:relative;height:330px;padding:8px 12px 4px;display:flex;align-items:flex-end;gap:2px">
-          ${renderBarChart(state.entries,spotAthlete,ex.id,ex.color,100,spotChartMode)}
+          ${renderScatterChart(state.entries,spotAthlete,ex.id,ex.color,220)}
         </div>
         <div style="position:absolute;bottom:0;left:0;right:0;padding:8px 22px 12px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #0d1420">
           <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#2a4055">${spotAthlete} · ${data.length} sessions</div>
@@ -753,7 +819,7 @@ function renderXCards(athEntries,availEx){
         </div>
         <div class="x-chart-body">
           <div style="display:flex;align-items:flex-end;gap:3px;height:100%">
-            ${renderBarChart(athEntries,spotAthlete,ex.id,ex.color,240,spotChartMode)}
+            ${renderScatterChart(athEntries,spotAthlete,ex.id,ex.color,160)}
           </div>
         </div>
         <div class="x-chart-footer"><span class="x-chart-ath">${spotAthlete}</span><img class="x-logo-sm" src="${LOGO}"/></div>
