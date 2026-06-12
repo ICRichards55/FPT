@@ -201,6 +201,7 @@ function _handleDelegatedClick(e, prevent){
   if(id==='modal-save-btn'){if(prevent)e.preventDefault();saveModalEdit();}
   else if(id==='bulk-save-btn'){if(prevent)e.preventDefault();saveBulkEdits();}
   else if(id==='ach-save-edit-btn'){if(prevent)e.preventDefault();saveAchEdit();}
+  else if(id==='add-ach-btn'){if(prevent)e.preventDefault();addAch();}
   else if(id==='today-save-btn'){if(prevent)e.preventDefault();var sfx=e.target.dataset.sfx;saveEditEntry(sfx);}
   else if(id==='import-run-btn'){if(prevent)e.preventDefault();runBulkImport();}
   else if(id==='import-another-btn'){if(prevent)e.preventDefault();importDone=false;importReport=null;importJson='';importParsed=null;render();setTimeout(_bindImportEvents,50);}
@@ -247,7 +248,7 @@ function tryLogin(){
     btn.addEventListener('touchend',function(e){e.preventDefault();setTab(tab);});
   });
 })();
-function fmtFly(v){return v!=null?v.toFixed(2)+'s':'--';}
+function fmtFly(v){return v!=null?v.toFixed(3)+'s':'--';}
 function fmtBroad(v){if(v==null)return'--';return Math.floor(v/12)+"' "+Math.round(v%12)+'"';}
 function fmtVert(v){return v!=null?v.toFixed(3)+'"':'--';}
 function fmtPR(id,v){return id==='fly'||id==='fly510'?fmtFly(v):id==='broad'?fmtBroad(v):id==='rsi42'?parseFloat(v).toFixed(3):fmtVert(v);}
@@ -294,7 +295,7 @@ function renderLog(){
   }
   var prPanel='';
   if(logAthlete){
-    var rows=EX_LIST.slice(0,3).map(function(e){
+    var rows=EX_LIST.map(function(e){
       var res=getPRWithDate(logAthlete,e.id);
       var prTxt=res.pr!=null?fmtPR(e.id,res.pr):'No entries yet';
       var dateTxt=res.date?' -- '+fmtShortDate(res.date):'';
@@ -303,21 +304,21 @@ function renderLog(){
     }).join('');
     prPanel='<div style="display:flex;flex-direction:column;gap:3px">'+rows+'</div>';
   }
-  var exToggs=EX_LIST.slice(0,3).map(function(e){return '<button class="tog'+(e.id===logEx?' on':'')+'" data-ex="'+e.id+'" onclick="logEx=this.dataset.ex;render()">'+e.name+'</button>';}).join('');
+  var exToggs=EX_LIST.map(function(e){return '<button class="tog'+(e.id===logEx?' on':'')+'" data-ex="'+e.id+'" onclick="logEx=this.dataset.ex;render()">'+e.name+'</button>';}).join('');
   var resultHtml;
   if(logEx==='broad'){
     resultHtml='<div style="display:flex;gap:8px;align-items:flex-end"><div style="flex:1"><div class="form-label">Feet</div><input class="result-field" id="res-ft" type="number" min="0" max="15" step="1" placeholder="6" oninput="checkPRLive()"/></div><div style="color:var(--muted);font-size:26px;padding-bottom:10px;font-weight:300">ft</div><div style="flex:1"><div class="form-label">Inches</div><input class="result-field" id="res-in" type="number" min="0" max="11" step="1" placeholder="9" oninput="checkPRLive()"/></div><div style="color:var(--muted);font-size:26px;padding-bottom:10px;font-weight:300">in</div></div>';
   }else{
-    resultHtml='<input class="result-field" id="res-val" type="number" step="0.01" min="0" placeholder="'+(logEx==='fly'?'1.25':'20')+'" oninput="checkPRLive()" style="width:100%"/>';
+    resultHtml='<input class="result-field" id="res-val" type="number" step="0.001" min="0" placeholder="'+(logEx==='fly'?'1.250':logEx==='rsi42'?'2.00':'20')+'" oninput="checkPRLive()" style="width:100%"/>';
   }
   var sessTog='<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="tog'+(sessionMode?' on':'')+'" onclick="sessionMode=!sessionMode;if(!sessionMode)sessionRows=[];render()">Session Mode</button></div>';
   if(sessionMode){return sessTog+renderSessionMode();}
   return sessTog+'<div class="panel"><div class="panel-title">Log Single Result</div><div style="display:flex;flex-direction:column;gap:14px"><div style="display:grid;grid-template-columns:1fr auto;gap:12px"><div class="form-group" style="min-width:0"><div class="form-label">Athlete</div>'+athHtml+'</div><div class="form-group"><div class="form-label">Date</div><input class="form-input" type="date" value="'+logDate+'" onchange="logDate=this.value"/></div></div>'+(logAthlete?prPanel+'<div style="height:2px"></div>':'')+'<div class="form-group"><div class="form-label">Exercise</div><div class="toggle-group">'+exToggs+'</div></div><div class="form-group"><div class="form-label">Result -- '+ex.unit+'</div>'+resultHtml+'</div><div class="pr-indicator" id="pr-indicator"></div><button class="submit-btn" onclick="submitEntry()">Log Result</button><button class="btn btn-ghost" style="width:100%;margin-top:4px" onclick="editLastEntry()">Edit Last Entry</button></div></div>';
 }
 function renderSessionMode(){
-  var exToggs=EX_LIST.slice(0,3).map(function(e){return '<button class="tog'+(e.id===sessionEx?' on':'')+'" data-ex="'+e.id+'" onclick="sessionEx=this.dataset.ex;render()">'+e.name+'</button>';}).join('');
+  var exToggs=EX_LIST.map(function(e){return '<button class="tog'+(e.id===sessionEx?' on':'')+'" data-ex="'+e.id+'" onclick="sessionEx=this.dataset.ex;render()">'+e.name+'</button>';}).join('');
   var rows=sessionRows.map(function(r,i){return '<div class="sess-row"><span style="font-family:\'Barlow Condensed\',sans-serif;font-weight:700;flex:1">'+r.athlete+'</span><span style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;min-width:80px;text-align:right">'+(sessionEx==='broad'?fmtBroad(r.total):sessionEx==='fly'?fmtFly(r.value):fmtVert(r.value))+'</span><button class="action-btn" onclick="sessionRows.splice('+i+',1);render()">x</button></div>';}).join('');
-  var valInp=sessionEx==='broad'?'<div style="display:flex;gap:6px"><input class="result-field" id="s-ft" type="number" min="0" max="15" step="1" placeholder="Ft" style="flex:1;font-size:16px"/><input class="result-field" id="s-in" type="number" min="0" max="11" step="1" placeholder="In" style="flex:1;font-size:16px"/></div>':'<input class="result-field" id="s-val" type="number" step="0.01" min="0" placeholder="Value" style="width:100%;font-size:16px"/>';
+  var valInp=sessionEx==='broad'?'<div style="display:flex;gap:6px"><input class="result-field" id="s-ft" type="number" min="0" max="15" step="1" placeholder="Ft" style="flex:1;font-size:16px"/><input class="result-field" id="s-in" type="number" min="0" max="11" step="1" placeholder="In" style="flex:1;font-size:16px"/></div>':'<input class="result-field" id="s-val" type="number" step="0.001" min="0" placeholder="Value" style="width:100%;font-size:16px"/>';
   return '<div class="panel"><div class="panel-title">Session Mode</div><div style="display:flex;flex-direction:column;gap:12px"><div class="row" style="gap:10px"><div class="form-group" style="flex:1"><div class="form-label">Exercise</div><div class="toggle-group">'+exToggs+'</div></div><div class="form-group"><div class="form-label">Date</div><input class="form-input" type="date" value="'+sessionDate+'" onchange="sessionDate=this.value"/></div></div><div id="sess-ath-wrap">'+renderSessAthInput()+'</div>'+valInp+'<button class="btn btn-ghost" style="width:100%" onclick="addSessionRow()">+ Add Row</button>'+(rows?'<div class="panel" style="margin:0;padding:10px"><div class="panel-title">Queued ('+sessionRows.length+')</div>'+rows+'</div>':'')+(sessionRows.length?'<button class="submit-btn" onclick="submitSession()">Submit Session ('+sessionRows.length+')</button>':'')+'</div></div>';
 }
 function renderSessAthInput(){
@@ -350,7 +351,7 @@ function addSessionRow(){
 function submitSession(){
   if(!sessionRows.length)return;
   sessionRows.forEach(function(r,i){
-    var id=(r.athlete+sessionEx+sessionDate+i).replace(/\s/g,'').substring(0,24);
+    var id=Date.now().toString(36)+Math.random().toString(36).slice(2,6)+i;
     var entry={id:id,athlete:r.athlete,exercise:sessionEx,date:sessionDate,loggedAt:new Date().toISOString()};
     if(sessionEx==='broad'){entry.valueFt=r.valueFt;entry.valueIn=r.valueIn;entry.total=r.total;}
     else{entry.value=r.value;}
@@ -389,7 +390,7 @@ function checkPRLive(){
   var isFirst=pr==null,isPR=isFirst||(logEx==='fly'?val<pr:val>pr);
   ind.style.display='block';
   if(isPR){ind.className='pr-indicator pr-new';ind.textContent=isFirst?'First entry for this exercise!':'POTENTIAL NEW ALL-TIME PR!';}
-  else{ind.className='pr-indicator pr-info';var diff=Math.abs(val-pr);ind.textContent=(logEx==='fly'?'+'+diff.toFixed(2)+'s':diff.toFixed(3)+'" ')+'off PR (PR: '+fmtPR(logEx,pr)+')';}
+  else{ind.className='pr-indicator pr-info';var diff=Math.abs(val-pr);ind.textContent=(logEx==='fly'?'+'+diff.toFixed(3)+'s':diff.toFixed(3)+'" ')+'off PR (PR: '+fmtPR(logEx,pr)+')';}
 }
 function submitEntry(){
   if(!logAthlete){alert('Select an athlete.');return;}
@@ -404,8 +405,7 @@ function submitEntry(){
     if(isNaN(v)){alert('Enter a value.');return;}
     entry.value=v;
   }
-  var same=state.entries.filter(function(e){return e.athlete===logAthlete&&e.exercise===logEx&&e.date===logDate;}).length;
-  entry.id=(logAthlete+logEx+logDate+same).replace(/\s/g,'').substring(0,24);
+  entry.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   entry.loggedAt=new Date().toISOString();
   state.entries.push(entry);
   saveData();showToast('Entry logged!');
@@ -450,7 +450,7 @@ function renderToday(){
     var editForm='';
     if(isEditing){
       var sfx='-'+attempt;
-      var editVal=e.exercise==='broad'?'<div style="display:flex;gap:6px"><input class="result-field" id="ed-ft'+sfx+'" type="number" min="0" max="15" step="1" value="'+(todayEditData.valueFt||'')+'" style="flex:1;font-size:16px"/><input class="result-field" id="ed-in'+sfx+'" type="number" min="0" max="11" step="1" value="'+(todayEditData.valueIn||'')+'" style="flex:1;font-size:16px"/></div>':'<input class="result-field" id="ed-val'+sfx+'" type="number" step="0.01" value="'+(todayEditData.value||'')+'" style="width:100%;font-size:16px"/>';
+      var editVal=e.exercise==='broad'?'<div style="display:flex;gap:6px"><input class="result-field" id="ed-ft'+sfx+'" type="number" min="0" max="15" step="1" value="'+(todayEditData.valueFt||'')+'" style="flex:1;font-size:16px"/><input class="result-field" id="ed-in'+sfx+'" type="number" min="0" max="11" step="1" value="'+(todayEditData.valueIn||'')+'" style="flex:1;font-size:16px"/></div>':'<input class="result-field" id="ed-val'+sfx+'" type="number" step="0.001" value="'+(todayEditData.value||'')+'" style="width:100%;font-size:16px"/>';
       editForm='<div class="today-row-edit"><div class="row" style="gap:8px;align-items:flex-end"><div class="form-group" style="flex:1"><div class="form-label">Value</div>'+editVal+'</div><div class="form-group"><div class="form-label">Date</div><input class="form-input" id="ed-date'+sfx+'" type="date" value="'+(todayEditData.date||TODAY)+'"/></div></div><div style="display:flex;gap:8px"><button class="btn btn-accent" id="today-save-btn" data-sfx="'+sfx+'">Save</button><button class="btn btn-ghost" onclick="todayEditId=null;render()">Cancel</button></div></div>';
     }
     return '<div class="today-row">'+main+editForm+'</div>';
@@ -590,7 +590,7 @@ function renderAch(){
   if(achAthlete){achAthHtml=sourceToggle+'<div class="ath-selected"><span class="ath-name-disp">'+achAthlete+'</span><button class="ath-clear" onclick="clearAchAthlete()">&#x2715;</button></div>';}
   else{achAthHtml=sourceToggle+'<div class="ath-search-wrap"><input class="form-input" id="ach-ath-search" style="width:100%" placeholder="'+placeholder+'" value="'+q.replace(/"/g,'&quot;')+'" oninput="achAthQ=this.value;updateAchDropdown()" onfocus="achDdOpen=true;updateAchDropdown()" onblur="setTimeout(function(){closeAchDropdown();},200)" autocomplete="off"/><div class="ath-dropdown" id="ach-dropdown" style="display:'+(achDdOpen?'block':'none')+'"></div></div>';}
   var wkToggs=[2,4,6,8].map(function(w){return '<button class="tog'+(achWeeks===w?' on':'')+'" data-wk="'+w+'" onclick="achWeeks=parseInt(this.dataset.wk);render()">'+w+' wks</button>';}).join('');
-  var html='<div class="panel"><div class="panel-title">Add Achievement</div><div class="row" style="gap:12px"><div class="form-group" style="flex:1;min-width:140px"><div class="form-label">Person</div>'+achAthHtml+'</div><div class="form-group" style="flex:2;min-width:180px"><div class="form-label">Achievement</div><input class="form-input" placeholder="e.g. Sub-1.20 10-10 Fly" value="'+achText.replace(/"/g,'&quot;')+'" oninput="achText=this.value"/></div><div class="form-group"><div class="form-label">Display Duration</div><div class="toggle-group">'+wkToggs+'</div></div></div><button class="btn btn-accent" style="margin-top:12px" onclick="addAch()">Add Achievement</button></div>';
+  var html='<div class="panel"><div class="panel-title">Add Achievement</div><div class="row" style="gap:12px"><div class="form-group" style="flex:1;min-width:140px"><div class="form-label">Person</div>'+achAthHtml+'</div><div class="form-group" style="flex:2;min-width:180px"><div class="form-label">Achievement</div><input class="form-input" placeholder="e.g. Sub-1.20 10-10 Fly" value="'+achText.replace(/"/g,'&quot;')+'" oninput="achText=this.value"/></div><div class="form-group"><div class="form-label">Display Duration</div><div class="toggle-group">'+wkToggs+'</div></div></div><button class="btn btn-accent" id="add-ach-btn" style="margin-top:12px">Add Achievement</button></div>';
   if(active.length)html+='<div class="panel"><div class="panel-title">Active ('+active.length+')</div>'+active.map(function(a){return achCard(a,now);}).join('')+'</div>';
   if(expired.length)html+='<div class="panel"><div class="panel-title">Pending Archive ('+expired.length+')</div>'+expired.map(function(a){return achCard(a,now);}).join('')+'</div>';
   return html;
@@ -641,7 +641,7 @@ function genAthleteReport(name){
   function fmtR(ex,v){
     if(v===''||v===null||v===undefined)return'';
     if(ex.id==='broad'){return Math.floor(v/12)+"'"+(v%12)+'"';}
-    if(ex.id==='fly510'||ex.id==='fly')return parseFloat(v).toFixed(2)+'s';
+    if(ex.id==='fly510'||ex.id==='fly')return parseFloat(v).toFixed(3)+'s';
     if(ex.id==='vert')return parseFloat(v).toFixed(3)+'"';
     return parseFloat(v).toFixed(3);
   }
