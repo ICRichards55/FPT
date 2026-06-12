@@ -623,6 +623,8 @@ function achCard(a,now){
   return '<div class="ach-item"><div class="ach-item-row"><div><div class="ach-name">'+a.athlete+'</div><div class="ach-detail">'+a.achievement+'</div><div class="ach-detail">'+(isExpired?'Expired':'Expires in '+daysLeft+' day'+(daysLeft!==1?'s':''))+'</div></div><div class="ach-btns"><button class="ach-btn" onclick="startAchEdit(this.dataset.id)" data-id="'+a.id+'">Edit</button><button class="ach-btn" style="color:var(--red)" onclick="endNowAch(this.dataset.id)" data-id="'+a.id+'">End Now</button></div></div>'+editForm+'</div>';
 }
 function addAch(){
+  // Sync achText from DOM in case input delegation didn't fire (iPad Safari timing)
+  var _achEl=document.getElementById('ach-text-input');if(_achEl&&_achEl.value.trim())achText=_achEl.value;
   // If adult mode and name typed but not formally selected, auto-commit it
   if(!achAthlete&&achIsGuest&&achAthQ.trim()){addAndSelectGuest(achAthQ.trim());return;}
   if(!achAthlete||!achText.trim()){alert('Select a person and enter achievement.');return;}state.achievements=state.achievements.concat([{id:Date.now().toString(36),athlete:achAthlete,achievement:achText,dateAdded:new Date().toISOString().slice(0,10),durationWeeks:achWeeks,archived:false}]);saveData();showToast('Achievement added!');achText='';achAthlete='';achAthQ='';render();}
