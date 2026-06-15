@@ -44,6 +44,8 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .btn{border:none;border-radius:7px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;padding:10px 18px;cursor:pointer;transition:.15s;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px}
 .btn-accent{background:var(--accent);color:#000}
 .btn-ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
+.btn-danger{background:#ff4b3a;color:#fff}
+.btn-danger:hover{background:#e23a2a}
 .btn-sm{padding:6px 12px;font-size:11px}
 .result-field{width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;padding:12px 14px;color:var(--text);font-family:'Barlow',sans-serif;font-size:22px;font-weight:700;outline:none;text-align:center}
 .result-field:focus{border-color:var(--accent)}
@@ -74,6 +76,8 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .pill-vert{background:rgba(46,204,113,.12);color:var(--vert)}
 .ath-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap}
 .action-btn{background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;padding:5px 10px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.5px}
+.action-btn-danger{color:#ff6b5c;border-color:rgba(255,107,92,.4)}
+.action-btn-danger:hover{background:rgba(255,107,92,.12)}
 .inactive-badge{font-family:'Barlow Condensed',sans-serif;font-size:10px;background:var(--surface3);color:var(--muted2);padding:2px 7px;border-radius:3px;letter-spacing:1px;text-transform:uppercase}
 .intake-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ach-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px}
@@ -167,6 +171,7 @@ var sessionMode=false,sessionEx='fly',sessionDate=TODAY,sessionRows=[];
 var _sessAthQ='',_sessAth='',_sessDdOpen=false;
 var todayEditId=null,todayEditData={};
 var rosterQ='';
+var delAthName='';
 var achAthlete='',achAthQ='',achDdOpen=false,achText='',achWeeks=4,achIsGuest=false;
 var achEditId=null,achEditText='',achEditWeeks=4;
 var settingsSection='logolib';
@@ -198,6 +203,11 @@ function _handleDelegatedClick(e, prevent){
     if(prevent)e.preventDefault();
     deleteLogo(el.dataset.school);return;
   }
+  // Roster: open delete-athlete modal
+  if(el.dataset.delAth!==undefined){
+    if(prevent)e.preventDefault();
+    openDeleteAthlete(el.dataset.delAth);return;
+  }
   if(id==='modal-save-btn'){if(prevent)e.preventDefault();saveModalEdit();}
   else if(id==='bulk-save-btn'){if(prevent)e.preventDefault();saveBulkEdits();}
   else if(id==='ach-save-edit-btn'){if(prevent)e.preventDefault();saveAchEdit();}
@@ -207,10 +217,11 @@ function _handleDelegatedClick(e, prevent){
   else if(id==='import-another-btn'){if(prevent)e.preventDefault();importDone=false;importReport=null;importJson='';importParsed=null;render();setTimeout(_bindImportEvents,50);}
   else if(id==='logo-save-btn'){if(prevent)e.preventDefault();saveLogo();}
   else if(id==='intake-submit-btn'){if(prevent)e.preventDefault();submitIntake();}
+  else if(id==='del-ath-confirm-btn'){if(prevent)e.preventDefault();confirmDeleteAthlete();}
 }
 document.addEventListener('click',function(e){_handleDelegatedClick(e,false);});
 document.addEventListener('touchend',function(e){_handleDelegatedClick(e,true);});
-document.addEventListener('input',function(e){if(e.target&&e.target.id==='ach-text-input'){achText=e.target.value;}});
+document.addEventListener('input',function(e){if(e.target&&e.target.id==='ach-text-input'){achText=e.target.value;}if(e.target&&e.target.id==='del-ath-input'){_updateDelConfirmState();}});
 var intakeData={firstName:'',lastName:'',gender:'male',highSchool:'',hsGradYear:'',college:'',collegeGradYear:'',collegeClass:'',redshirt:false,level:'k12',fptMonth:'',fptYear:'',sports:'',positions:'',instagram:'',email:'',parent1Email:'',parent2Email:''};
 const EX_LIST=[
   {id:'fly',  name:'10-10 Fly',          unit:'seconds', lower:true,  color:'var(--fly)'},
@@ -352,7 +363,7 @@ function addSessionRow(){
 function submitSession(){
   if(!sessionRows.length)return;
   sessionRows.forEach(function(r,i){
-    var id=Date.now().toString(36)+Math.random().toString(36).slice(2,6)+i;
+    var id=_uid();
     var entry={id:id,athlete:r.athlete,exercise:sessionEx,date:sessionDate,loggedAt:new Date().toISOString()};
     if(sessionEx==='broad'){entry.valueFt=r.valueFt;entry.valueIn=r.valueIn;entry.total=r.total;}
     else{entry.value=r.value;}
@@ -406,7 +417,7 @@ function submitEntry(){
     if(isNaN(v)){alert('Enter a value.');return;}
     entry.value=v;
   }
-  entry.id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  entry.id=_uid();
   entry.loggedAt=new Date().toISOString();
   state.entries.push(entry);
   saveData();showToast('Entry logged!');
@@ -478,19 +489,78 @@ function deleteEntry(id){
   state.entries=state.entries.filter(function(e){return e.id!==id;});
   saveData();showToast('Entry deleted.');render();
 }
+function _rosterCardHtml(name,inactive,safe_name,sub,pills){
+  return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
+}
+function _firstNameOf(n){return String(n||'').trim().split(/\s+/)[0]||'';}
+function openDeleteAthlete(name){
+  delAthName=name;
+  var first=_firstNameOf(name);
+  var safeName=name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  var safeFirst=first.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  var html='<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:700;color:var(--text);margin-bottom:6px">Delete Athlete</div>'+
+    '<div style="font-size:14px;color:var(--muted);margin-bottom:4px">This permanently deletes <b style="color:var(--text)">'+safeName+'</b> and all of their logged results. This cannot be undone.</div>'+
+    '<div style="font-size:13px;color:var(--muted);margin:14px 0 6px">Type <b style="color:#ff6b5c">'+safeFirst+'</b> to confirm:</div>'+
+    '<input class="form-input" id="del-ath-input" style="width:100%" placeholder="'+safeFirst+'" autocomplete="off"/>'+
+    '<div style="display:flex;gap:8px;margin-top:16px">'+
+      '<button class="btn btn-ghost" style="flex:1" onclick="closeModal()">Cancel</button>'+
+      '<button class="btn btn-danger" id="del-ath-confirm-btn" style="flex:1;opacity:.5;pointer-events:none">Delete</button>'+
+    '</div>';
+  showModal(html);
+}
+function _updateDelConfirmState(){
+  var inp=document.getElementById('del-ath-input');
+  var btn=document.getElementById('del-ath-confirm-btn');
+  if(!inp||!btn)return;
+  var match=inp.value.trim().toLowerCase()===_firstNameOf(delAthName).toLowerCase()&&inp.value.trim()!=='';
+  btn.style.opacity=match?'1':'.5';
+  btn.style.pointerEvents=match?'auto':'none';
+}
+async function confirmDeleteAthlete(){
+  var inp=document.getElementById('del-ath-input');
+  if(!inp||inp.value.trim().toLowerCase()!==_firstNameOf(delAthName).toLowerCase())return;
+  var name=delAthName;
+  // Remove from roster, profile, guests, and all their entries (normalized match)
+  function nameEq(a,b){return String(a==null?'':a).trim().toLowerCase()===String(b==null?'':b).trim().toLowerCase();}
+  state.athletes=(state.athletes||[]).filter(function(a){return !nameEq(a,name);});
+  if(state.profiles){Object.keys(state.profiles).forEach(function(k){if(nameEq(k,name))delete state.profiles[k];});}
+  state.guests=(state.guests||[]).filter(function(g){return !nameEq(g,name);});
+  state.entries=(state.entries||[]).filter(function(e){return !nameEq(e.athlete,name);});
+  closeModal();
+  render();
+  var ok=await _saveNowConfirmed(state);
+  if(ok){showToast('Athlete deleted');}else{showToast('Delete failed to save \u2014 retry');}
+}
 function renderRoster(){
   var sorted=(state.athletes||[]).slice().sort(function(a,b){return lastName(a).localeCompare(lastName(b));});
   var q=(rosterQ||'').toLowerCase();
   if(q)sorted=sorted.filter(function(a){return a.toLowerCase().includes(q);});
-  var search='<div class="panel" style="margin-bottom:12px"><input class="form-input" style="width:100%" placeholder="Search athletes..." value="'+rosterQ.replace(/"/g,'&quot;')+'" oninput="rosterQ=this.value;if(window._rosterSearchTimer)clearTimeout(window._rosterSearchTimer);window._rosterSearchTimer=setTimeout(function(){render();},300);"/></div>';
+  var search='<div class="panel" style="margin-bottom:12px"><input class="form-input" id="roster-search-input" style="width:100%" placeholder="Search athletes..." value="'+rosterQ.replace(/"/g,'&quot;')+'" oninput="rosterQ=this.value;updateRosterList();"/></div>';
   if(!sorted.length)return search+'<div class="panel"><div class="empty">No athletes match.</div></div>';
   var cards=sorted.map(function(name){
     var p=state.profiles[name]||{};var inactive=p.inactive;var safe_name=name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     var school=getAthleteSchool(name);var sub=[school,p.sports].filter(Boolean).join(' -- ');
     var pills=EX_LIST.map(function(e){var pr=getPR(name,e.id);if(pr==null)return'';var cls=e.id==='fly'||e.id==='fly510'?'pill-fly':e.id==='broad'?'pill-broad':e.id==='rsi42'?'pill-vert':'pill-vert';var lbl=e.id==='fly510'?'5-10':e.id==='fly'?'10-10':e.id==='broad'?'Broad':e.id==='vert'?'Sky':'RSI';return'<span class="pr-pill '+cls+'" title="'+e.name+'">'+lbl+': '+fmtPR(e.id,pr)+'</span>';}).join('');
-    return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button></div></div>';
+    return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
   }).join('');
-  return search+'<div class="panel"><div class="panel-title">Athletes ('+sorted.length+')</div>'+cards+'</div>';
+  return search+'<div id="roster-list-wrap">'+_rosterListHtml()+'</div>';
+}
+function _rosterListHtml(){
+  var sorted=(state.athletes||[]).slice().sort(function(a,b){return lastName(a).localeCompare(lastName(b));});
+  var q=(rosterQ||'').toLowerCase();
+  if(q)sorted=sorted.filter(function(a){return a.toLowerCase().includes(q);});
+  if(!sorted.length)return '<div class="panel"><div class="empty">No athletes match.</div></div>';
+  var cards=sorted.map(function(name){
+    var p=state.profiles[name]||{};var inactive=p.inactive;var safe_name=name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    var school=getAthleteSchool(name);var sub=[school,p.sports].filter(Boolean).join(' -- ');
+    var pills=EX_LIST.map(function(e){var pr=getPR(name,e.id);if(pr==null)return'';var cls=e.id==='fly'||e.id==='fly510'?'pill-fly':e.id==='broad'?'pill-broad':e.id==='rsi42'?'pill-vert':'pill-vert';var lbl=e.id==='fly510'?'5-10':e.id==='fly'?'10-10':e.id==='broad'?'Broad':e.id==='vert'?'Sky':'RSI';return'<span class="pr-pill '+cls+'" title="'+e.name+'">'+lbl+': '+fmtPR(e.id,pr)+'</span>';}).join('');
+    return _rosterCardHtml(name,inactive,safe_name,sub,pills);
+  }).join('');
+  return '<div class="panel"><div class="panel-title">Athletes ('+sorted.length+')</div>'+cards+'</div>';
+}
+function updateRosterList(){
+  var w=document.getElementById('roster-list-wrap');
+  if(w)w.innerHTML=_rosterListHtml();
 }
 function exportAthlete(name){
   var entries=state.entries.filter(function(e){return e.athlete===name;});
@@ -579,9 +649,9 @@ function saveModalEdit(){
 }
 function showModal(html){var m=document.getElementById('profile-modal');document.getElementById('modal-inner').innerHTML=html;m.style.display='flex';}
 function closeModal(){document.getElementById('profile-modal').style.display='none';}
+function isExp(a){var e=new Date(a.dateAdded+'T12:00:00');e.setDate(e.getDate()+a.durationWeeks*7);return e<=new Date();}
 function renderAch(){
   var now=new Date();
-  function isExp(a){var e=new Date(a.dateAdded+'T12:00:00');e.setDate(e.getDate()+a.durationWeeks*7);return e<=now;}
   var active=(state.achievements||[]).filter(function(a){return !a.archived&&!isExp(a);});
   var expired=(state.achievements||[]).filter(function(a){return !a.archived&&isExp(a);});
   var q=achAthQ||'';
@@ -661,8 +731,9 @@ function genAthleteReport(name){
     var last4=dates.slice(-4);
     var allVals=dates.reduce(function(a,d){return a.concat(byDate[d]);},[]); 
     var firstAvg=byDate[dates[0]].reduce(function(a,b){return a+b;},0)/byDate[dates[0]].length;
+    var firstBest=ex.lower?Math.min.apply(null,byDate[dates[0]]):Math.max.apply(null,byDate[dates[0]]);
     var pr=ex.lower?Math.min.apply(null,allVals):Math.max.apply(null,allVals);
-    var pct=ex.lower?((firstAvg-pr)/firstAvg*100).toFixed(1):((pr-firstAvg)/firstAvg*100).toFixed(1);
+    var pct=ex.lower?((firstBest-pr)/firstBest*100).toFixed(1):((pr-firstBest)/firstBest*100).toFixed(1);
     var rows=last4.map(function(d){
       var vals=byDate[d];var padded=vals.concat(['','','','']).slice(0,4);
       var avg=vals.reduce(function(a,b){return a+b;},0)/vals.length;
@@ -740,8 +811,8 @@ function renderLogoLib(){
   var rows=schools.map(function(s){return '<div class="logo-lib-row"><img class="logo-preview" src="'+logos[s]+'" onerror="this.style.display=\'none\'"/><span style="flex:1;font-family:\'Barlow Condensed\',sans-serif;font-weight:700">'+s+'</span><span style="font-size:11px;color:var(--muted2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+logos[s]+'</span><button class="action-btn" style="color:var(--red)" data-school="'+_esc(s)+'">Remove</button></div>';}).join('');
   return '<div class="panel"><div class="panel-title">Logo Library</div><div class="row" style="gap:10px;margin-bottom:12px"><div class="form-group" style="flex:1"><div class="form-label">School Name</div><input class="form-input" id="logo-school" placeholder="Medina High School" value="'+logoSchool.replace(/"/g,'&quot;')+'" oninput="logoSchool=this.value" onkeydown="if(event.key===\'Enter\')saveLogo()"/></div><div class="form-group" style="flex:2"><div class="form-label">Logo URL</div><input class="form-input" id="logo-url" placeholder="https://example.com/logo.png" value="'+logoUrl.replace(/"/g,'&quot;')+'" oninput="logoUrl=this.value" onkeydown="if(event.key===\'Enter\')saveLogo()"/></div>'+(previewUrl?'<div class="form-group" style="justify-content:flex-end"><img src="'+previewUrl+'" style="height:48px;max-width:120px;object-fit:contain;background:var(--surface3);border-radius:6px;padding:4px" onerror="this.style.display=\'none\'"/></div>':'')+'</div><button class="btn btn-accent btn-sm" id="logo-save-btn">Add Logo</button>'+(schools.length?'<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">'+rows+'</div>':'<div class="empty">No logos added yet</div>')+'</div>';
 }
-function saveLogo(){var s=logoSchool.trim(),u=logoUrl.trim();if(!s||!u){alert('Enter school name and URL.');return;}if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];state.schoolLogos[s]=u;logoSchool='';logoUrl='';saveData();showToast('Logo saved!');render();}
-function deleteLogo(school){delete state.schoolLogos[school];saveData();render();}
+async function saveLogo(){var s=logoSchool.trim(),u=logoUrl.trim();if(!s||!u){alert('Enter school name and URL.');return;}if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];state.schoolLogos[s]=u;logoSchool='';logoUrl='';render();var ok=await _saveNowConfirmed(state);if(ok){showToast('Logo saved!');}else{showToast('Save failed — check connection and retry');}}
+async function deleteLogo(school){delete state.schoolLogos[school];render();var ok=await _saveNowConfirmed(state);if(!ok){showToast('Delete failed to save — retry');}}
 function renderDataExport(){
   var athletes=[...new Set((state.entries||[]).map(function(e){return e.athlete;}))].sort();
   var athChecks=athletes.map(function(a){var checked=exportAllAths||exportSelAths.includes(a);var safe_a=a.replace(/&/g,'&amp;').replace(/"/g,'&quot;');return '<label class="exp-chk"><input type="checkbox" data-n="'+safe_a+'" '+(checked?'checked':'')+' onchange="toggleExpAth(this.dataset.n,this.checked)"/> '+a+'</label>';}).join('');
@@ -864,7 +935,7 @@ function runBulkImport(){
     var mappedName=nameMap[e.athlete]||e.athlete;
     var key=mappedName+'|'+e.exercise+'|'+e.date+'|'+(e.value||e.total);
     if(existingKeys.has(key)){skipped.push(e);return;}
-    var entry={id:mappedName.replace(/\s/g,'')+e.exercise+e.date+Date.now().toString(36),athlete:mappedName,exercise:e.exercise,date:e.date};
+    var entry={id:_uid(),athlete:mappedName,exercise:e.exercise,date:e.date};
     if(e.exercise==='broad'){entry.valueFt=e.valueFt;entry.valueIn=e.valueIn;entry.total=e.total;}
     else{entry.value=e.value;}
     state.entries.push(entry);
@@ -975,6 +1046,7 @@ function renderHist(){
   return '<div class="panel"><div class="panel-title">Recent Entries (last 100)</div>'+recent.map(function(e){var ex=EX_LIST.filter(function(x){return x.id===e.exercise;})[0]||{name:e.exercise};var val=e.exercise==='broad'?fmtBroad(e.total):e.exercise==='fly'?fmtFly(e.value):fmtVert(e.value);return '<div class="hist-row"><span class="hist-date">'+fmtShortDate(e.date)+'</span><span class="hist-ath">'+e.athlete+'</span><span class="hist-ex" style="color:'+(EX_C[e.exercise]||'var(--muted)')+'">'+ex.name.split(' ')[0]+'</span><span class="hist-val">'+val+'</span></div>';}).join('')+'</div>';
 }
 async function loadData(){var loaded=await _apiLoad();if(loaded&&Array.isArray(loaded.athletes)){state=loaded;}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];render();}
+function _uid(){try{if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();}catch(e){}return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)+'-'+Math.random().toString(36).slice(2,10);}
 function saveData(){
   // Auto-archive naturally expired achievements to profiles
   var now2=new Date();
@@ -995,8 +1067,9 @@ function saveData(){
 var _saveTimer=null;
 function _getApiUrl(){return window._API_URL||localStorage.getItem('fpt_api_url')||'';}
 async function _apiLoad(){var url=_getApiUrl();if(!url)return null;try{var r=await fetch(url+'?t='+Date.now(),{cache:'no-store'});var j=await r.json();return j.ok?j.data:null;}catch(e){console.warn('FPT load:',e);return null;}}
-async function _apiSave(s){var url=_getApiUrl();if(!url)return;try{await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(s),mode:'cors'});}catch(e){console.warn('FPT save:',e);}}
+async function _apiSave(s){var url=_getApiUrl();if(!url)return false;try{var r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(s),mode:'cors'});try{var j=await r.json();return !!(j&&j.ok);}catch(e2){return r&&r.ok;}}catch(e){console.warn('FPT save:',e);return false;}}
 function _debounceSave(s){if(_saveTimer)clearTimeout(_saveTimer);_saveTimer=setTimeout(function(){_apiSave(s);},800);}
+async function _saveNowConfirmed(s){if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}var ok=await _apiSave(s);if(!ok){ok=await _apiSave(s);}return ok;}
 setInterval(loadData,300000);
 if(_isAuthed())loadData();
 
