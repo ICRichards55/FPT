@@ -484,10 +484,13 @@ function saveEditEntry(sfx){
   }else{var v=parseFloat((document.getElementById('ed-val'+sfx)||{}).value);if(!isNaN(v))e.value=v;}
   todayEditId=null;saveData();showToast('Entry updated!');render();
 }
-function deleteEntry(id){
+async function deleteEntry(id){
   if(!confirm('Delete this entry?'))return;
   state.entries=state.entries.filter(function(e){return e.id!==id;});
-  saveData();showToast('Entry deleted.');render();
+  if(_pendingDeletes.indexOf(id)===-1)_pendingDeletes.push(id);
+  render();
+  var ok=await _saveWithDeletes();
+  showToast(ok?'Entry deleted.':'Delete failed to save — retry');
 }
 function _rosterCardHtml(name,inactive,safe_name,sub,pills){
   return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
@@ -525,10 +528,12 @@ async function confirmDeleteAthlete(){
   state.athletes=(state.athletes||[]).filter(function(a){return !nameEq(a,name);});
   if(state.profiles){Object.keys(state.profiles).forEach(function(k){if(nameEq(k,name))delete state.profiles[k];});}
   state.guests=(state.guests||[]).filter(function(g){return !nameEq(g,name);});
+  var _delIds=(state.entries||[]).filter(function(e){return nameEq(e.athlete,name);}).map(function(e){return e.id;});
+  _delIds.forEach(function(id){if(id!=null&&_pendingDeletes.indexOf(id)===-1)_pendingDeletes.push(id);});
   state.entries=(state.entries||[]).filter(function(e){return !nameEq(e.athlete,name);});
   closeModal();
   render();
-  var ok=await _saveNowConfirmed(state);
+  var ok=await _saveWithDeletes();
   if(ok){showToast('Athlete deleted');}else{showToast('Delete failed to save \u2014 retry');}
 }
 function renderRoster(){
@@ -1070,6 +1075,8 @@ async function _apiLoad(){var url=_getApiUrl();if(!url)return null;try{var r=awa
 async function _apiSave(s){var url=_getApiUrl();if(!url)return false;try{var r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(s),mode:'cors'});try{var j=await r.json();return !!(j&&j.ok);}catch(e2){return r&&r.ok;}}catch(e){console.warn('FPT save:',e);return false;}}
 function _debounceSave(s){if(_saveTimer)clearTimeout(_saveTimer);_saveTimer=setTimeout(function(){_apiSave(s);},800);}
 async function _saveNowConfirmed(s){if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}var ok=await _apiSave(s);if(!ok){ok=await _apiSave(s);}return ok;}
+var _pendingDeletes=[];
+async function _saveWithDeletes(){var payload=Object.assign({},state,{deletedIds:_pendingDeletes.slice()});var ok=await _saveNowConfirmed(payload);if(ok)_pendingDeletes=[];return ok;}
 setInterval(loadData,300000);
 if(_isAuthed())loadData();
 
