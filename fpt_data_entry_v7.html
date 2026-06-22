@@ -811,11 +811,11 @@ function endNowAch(id){
 function renderSettings(){
   var sections=['logolib','export','intake','history','backup','bulkimport','bulkedit'];
   var labels=['Logo Library','Data Export','Intake','History','Backup & Restore','Bulk Import','Bulk Editor'];
-  var nav=sections.map(function(s,i){return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';bulkEdits={};render()">'+labels[i]+'</button>';}).join('');
+  var nav=sections.map(function(s,i){return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';bulkEdits={};render()">'+labels[i]+(s==='intake'?'<span id="pending-badge" style="display:none;margin-left:6px;background:var(--accent);color:#111;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700"></span>':'')+'</button>';}).join('');
   var content='';
   if(settingsSection==='logolib')content=renderLogoLib();
   else if(settingsSection==='export')content=renderDataExport();
-  else if(settingsSection==='intake')content=renderIntake();
+  else if(settingsSection==='intake')content=renderPendingIntakes()+renderIntake();
   else if(settingsSection==='history')content=renderHist();
   else if(settingsSection==='backup')content=renderBackupRestore();
   else if(settingsSection==='bulkimport')content=renderBulkImport();
