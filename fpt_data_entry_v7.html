@@ -847,6 +847,16 @@ function removeAdult(name){
   saveData();showToast(name+' removed.');render();
 }
 
+function _pad2(n){return String(n).padStart(2,'0');}
+function _daysInMonth(mm){var m=parseInt(mm,10);if(m===2)return 29;if([4,6,9,11].indexOf(m)>=0)return 30;return 31;}
+function _mmddParts(dob){if(!dob)return['',''];var p=String(dob).split('-');if(p.length===3)return[p[1],p[2]];if(p.length===2)return[p[0],p[1]];return['',''];}
+function _monthOpts(sel){var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var o='<option value="">Mo</option>';for(var i=1;i<=12;i++){var v=_pad2(i);o+='<option value="'+v+'"'+(sel===v?' selected':'')+'>'+MN[i-1]+'</option>';}return o;}
+function _dayOpts(sel,mm){var max=mm?_daysInMonth(mm):31;var o='<option value="">Day</option>';for(var i=1;i<=max;i++){var v=_pad2(i);o+='<option value="'+v+'"'+(sel===v?' selected':'')+'>'+i+'</option>';}return o;}
+function setAdultMonth(name,mm){if(!state.adults)state.adults={};if(!state.adults[name])state.adults[name]={};var dd=_mmddParts(state.adults[name].dob)[1];if(dd&&mm){var max=_daysInMonth(mm);if(parseInt(dd,10)>max)dd=_pad2(max);}state.adults[name].dob=(mm||'')+'-'+(dd||'');saveData();render();}
+function setAdultDay(name,dd){if(!state.adults)state.adults={};if(!state.adults[name])state.adults[name]={};var mm=_mmddParts(state.adults[name].dob)[0];state.adults[name].dob=(mm||'')+'-'+(dd||'');saveData();showToast('Saved.');}
+function setNewAdultMonth(mm){var dd=_mmddParts(newAdultDob)[1];if(dd&&mm){var max=_daysInMonth(mm);if(parseInt(dd,10)>max)dd=_pad2(max);}newAdultDob=(mm||'')+'-'+(dd||'');render();}
+function setNewAdultDay(dd){var mm=_mmddParts(newAdultDob)[0];newAdultDob=(mm||'')+'-'+(dd||'');render();}
+
 function renderAdults(){
   var sub=['roster','challenge'],lbls=['Roster','Monthly Challenge'];
   var nav=sub.map(function(s,i){return '<button class="sn-btn'+(adultSection===s?' on':'')+'" onclick="setAdultSection(\''+s+'\')">'+lbls[i]+'</button>';}).join('');
@@ -859,9 +869,10 @@ function renderAdultRoster(){
   var rows=list.map(function(n){
     var dob=(state.adults[n]&&state.adults[n].dob)||'';
     var en=_esc(n);
+    var pp=_mmddParts(dob);
     return '<div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">'
       +'<div style="flex:1;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:16px">'+n+'</div>'
-      +'<input class="form-input" type="date" value="'+dob+'" data-adult="'+en+'" onchange="setAdultDob(this.dataset.adult,this.value)" style="width:175px"/>'
+      +'<div style="display:flex;gap:6px"><select class="form-input" data-adult="'+en+'" onchange="setAdultMonth(this.dataset.adult,this.value)" style="width:90px">'+_monthOpts(pp[0])+'</select><select class="form-input" data-adult="'+en+'" onchange="setAdultDay(this.dataset.adult,this.value)" style="width:84px">'+_dayOpts(pp[1],pp[0])+'</select></div>'
       +'<button class="action-btn" style="color:var(--red)" data-adult="'+en+'" onclick="removeAdult(this.dataset.adult)">Remove</button>'
       +'</div>';
   }).join('');
@@ -869,7 +880,7 @@ function renderAdultRoster(){
     +'<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Adults (coaches, members) tracked for birthdays and the monthly challenge. Lightweight: name + date of birth.</div>'
     +'<div class="row" style="gap:10px;margin-bottom:14px;align-items:flex-end">'
     +'<div class="form-group" style="flex:1"><div class="form-label">Name</div><input class="form-input" value="'+newAdultName.replace(/"/g,'&quot;')+'" oninput="newAdultName=this.value" onkeydown="if(event.key===\'Enter\')addAdult()"/></div>'
-    +'<div class="form-group"><div class="form-label">Date of Birth</div><input class="form-input" type="date" value="'+newAdultDob+'" oninput="newAdultDob=this.value"/></div>'
+    +'<div class="form-group"><div class="form-label">Birthday</div><div style="display:flex;gap:6px"><select class="form-input" onchange="setNewAdultMonth(this.value)" style="width:90px">'+_monthOpts(_mmddParts(newAdultDob)[0])+'</select><select class="form-input" onchange="setNewAdultDay(this.value)" style="width:84px">'+_dayOpts(_mmddParts(newAdultDob)[1],_mmddParts(newAdultDob)[0])+'</select></div></div>'
     +'<button class="btn btn-accent btn-sm" onclick="addAdult()">Add Adult</button></div>'
     +(rows||'<div class="empty">No adults yet</div>')+'</div>';
 }

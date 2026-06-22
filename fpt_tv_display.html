@@ -365,6 +365,7 @@ function buildCongrats(){
 
 // ── BIRTHDAYS + CHALLENGE (dynamic, self-suppressing) ────────────
 function _etNow(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));}
+function _isLeap(y){return (y%4===0&&y%100!==0)||y%400===0;}
 function round3(v){return Math.round(v*1000)/1000;}
 function weekRangeMonSun(){
   var now=_etNow();
@@ -383,11 +384,19 @@ function birthdaysThisWeek(){
   var out=[],seen={};
   cands.forEach(function(c){
     if(seen[c.name])return;
-    var parts=String(c.dob).split('-'); if(parts.length!==3)return;
-    var bm=+parts[1],bd=+parts[2];
+    var parts=String(c.dob).split('-');
+    var bm,bd;
+    if(parts.length===3){bm=+parts[1];bd=+parts[2];}       // athlete: YYYY-MM-DD
+    else if(parts.length===2){bm=+parts[0];bd=+parts[1];}  // adult: MM-DD
+    else return;
+    if(!bm||!bd||isNaN(bm)||isNaN(bd))return;
     for(var i=0;i<7;i++){
       var d=new Date(r.mon.getFullYear(),r.mon.getMonth(),r.mon.getDate()+i);
-      if(d.getMonth()+1===bm&&d.getDate()===bd){
+      var dm=d.getMonth()+1, dd=d.getDate();
+      var match=(dm===bm&&dd===bd);
+      // Feb 29 birthday in a non-leap year -> surface on Feb 28 (display stays Feb 29)
+      if(!match && bm===2 && bd===29 && dm===2 && dd===28 && !_isLeap(d.getFullYear())) match=true;
+      if(match){
         var isToday=(r.today.getMonth()===d.getMonth()&&r.today.getDate()===d.getDate());
         out.push({name:c.name,bm:bm,bd:bd,dayIndex:i,isToday:isToday});
         seen[c.name]=1;break;
