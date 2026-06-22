@@ -734,7 +734,7 @@ function buildMPRCanvas(ex, athletes, year, month) {
   try {
     const logoImg = document.querySelector('img.logo-img') || new Image();
     if (logoImg.complete && logoImg.naturalWidth > 0) {
-      const lh = 96; const lw = lh * (logoImg.naturalWidth / logoImg.naturalHeight);
+      const lh = 192; const lw = lh * (logoImg.naturalWidth / logoImg.naturalHeight);
       ctx.drawImage(logoImg, 1048 - lw, 1060 - lh, lw, lh);
     } else {
       ctx.fillText('FPT', 1048, 1060);

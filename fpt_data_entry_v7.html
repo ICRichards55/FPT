@@ -222,7 +222,7 @@ function _handleDelegatedClick(e, prevent){
 document.addEventListener('click',function(e){_handleDelegatedClick(e,false);});
 document.addEventListener('touchend',function(e){_handleDelegatedClick(e,true);});
 document.addEventListener('input',function(e){if(e.target&&e.target.id==='ach-text-input'){achText=e.target.value;}if(e.target&&e.target.id==='del-ath-input'){_updateDelConfirmState();}});
-var intakeData={firstName:'',lastName:'',gender:'male',highSchool:'',hsGradYear:'',college:'',collegeGradYear:'',collegeClass:'',redshirt:false,level:'k12',fptMonth:'',fptYear:'',sports:'',positions:'',instagram:'',email:'',parent1Email:'',parent2Email:''};
+var intakeData={firstName:'',lastName:'',dob:'',gender:'male',highSchool:'',hsGradYear:'',college:'',collegeGradYear:'',collegeClass:'',redshirt:false,level:'k12',fptMonth:'',fptYear:'',sports:'',positions:'',instagram:'',email:'',parent1Email:'',parent2Email:''};
 const EX_LIST=[
   {id:'fly',  name:'10-10 Fly',          unit:'seconds', lower:true,  color:'var(--fly)'},
   {id:'broad',name:'Broad Jump',          unit:'ft + in', lower:false, color:'var(--broad)'},
@@ -575,12 +575,22 @@ function exportAthlete(name){
   dlCSV(rows,'FPT_'+name.replace(/\s/g,'_')+'_'+TODAY+'.csv');
 }
 function toggleActive(name){if(!state.profiles[name])state.profiles[name]={};state.profiles[name].inactive=!state.profiles[name].inactive;saveData();render();}
+function dobStr(dob){
+  if(!dob)return '';
+  var parts=String(dob).split('-'); if(parts.length!==3)return dob;
+  var y=+parts[0],m=+parts[1],dd=+parts[2];
+  var months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var pretty=(months[m-1]||'')+' '+dd+', '+y;
+  var t=new Date(),age=t.getFullYear()-y,mo=(t.getMonth()+1)-m;
+  if(mo<0||(mo===0&&t.getDate()<dd))age--;
+  return pretty+(age>=0&&age<130?' (age '+age+')':'');
+}
 function openViewModal(name){
   var p=state.profiles[name]||{};
   var hs=(p.highSchool||p.school||'')+(p.hsGradYear?' (Class of '+p.hsGradYear+')':'');
   var col=(p.college||'')+(p.collegeGradYear?' (Class of '+p.collegeGradYear+')':'');
   function row(label,val){if(!val)return'';return'<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)"><div style="min-width:140px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">'+label+'</div><div style="font-size:14px">'+val+'</div></div>';}
-  var html='<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:900;margin-bottom:16px">'+name+'</div>'+row('Gender',p.gender)+row('Level',(p.level||'').toUpperCase())+row('High School',hs)+row('College',col)+(p.collegeClass?row('College Class',p.collegeClass):'')+(p.redshirt?row('Redshirt','Yes'):'')+row('FPT Start',p.fptMonth&&p.fptYear?p.fptMonth+'/'+p.fptYear:'')+row('Sport(s)',p.sports)+row('Position(s)',p.positions)+row('Instagram',p.instagram?'@'+p.instagram.replace('@',''): '')+row('Athlete Email',p.email)+row('Parent 1 Email',p.parent1Email)+row('Parent 2 Email',p.parent2Email)+(p.notes?row('Notes',p.notes):'')+
+  var html='<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:900;margin-bottom:16px">'+name+'</div>'+row('Gender',p.gender)+row('Date of Birth',dobStr(p.dob))+row('Level',(p.level||'').toUpperCase())+row('High School',hs)+row('College',col)+(p.collegeClass?row('College Class',p.collegeClass):'')+(p.redshirt?row('Redshirt','Yes'):'')+row('FPT Start',p.fptMonth&&p.fptYear?p.fptMonth+'/'+p.fptYear:'')+row('Sport(s)',p.sports)+row('Position(s)',p.positions)+row('Instagram',p.instagram?'@'+p.instagram.replace('@',''): '')+row('Athlete Email',p.email)+row('Parent 1 Email',p.parent1Email)+row('Parent 2 Email',p.parent2Email)+(p.notes?row('Notes',p.notes):'')+
     '<button class="btn btn-ghost" style="margin-top:16px" onclick="closeModal()">Close</button>';
   // Achievement history
   var hist=(state.profiles[name]&&state.profiles[name].achievementHistory)||[];
@@ -594,7 +604,7 @@ function openViewModal(name){
 }
 function openEditModal(name){
   var p=state.profiles[name]||{};modalMode='edit';modalAthlete=name;
-  modalEditData={firstName:(name.split(' ')[0]||''),lastName:(name.split(' ').slice(1).join(' ')||''),gender:p.gender||'male',level:p.level||'k12',highSchool:p.highSchool||p.school||'',hsGradYear:p.hsGradYear||'',college:p.college||'',collegeGradYear:p.collegeGradYear||'',collegeClass:p.collegeClass||'',redshirt:p.redshirt||false,fptMonth:p.fptMonth||'',fptYear:p.fptYear||'',sports:p.sports||'',positions:p.positions||'',instagram:p.instagram||'',notes:p.notes||''};
+  modalEditData={firstName:(name.split(' ')[0]||''),lastName:(name.split(' ').slice(1).join(' ')||''),gender:p.gender||'male',level:p.level||'k12',highSchool:p.highSchool||p.school||'',hsGradYear:p.hsGradYear||'',college:p.college||'',collegeGradYear:p.collegeGradYear||'',collegeClass:p.collegeClass||'',redshirt:p.redshirt||false,fptMonth:p.fptMonth||'',fptYear:p.fptYear||'',sports:p.sports||'',positions:p.positions||'',instagram:p.instagram||'',notes:p.notes||'',dob:p.dob||''};
   renderModal();
 }
 function renderModal(){
@@ -608,6 +618,7 @@ function renderModal(){
     '<div class="intake-grid">'+
     '<div class="form-group"><div class="form-label">First Name</div><input class="form-input modal-inp" data-field="firstName" value="'+d.firstName.replace(/"/g,'&quot;')+'"/></div>'+
     '<div class="form-group"><div class="form-label">Last Name</div><input class="form-input modal-inp" data-field="lastName" value="'+d.lastName.replace(/"/g,'&quot;')+'"/></div>'+
+    '<div class="form-group"><div class="form-label">Date of Birth</div><input class="form-input modal-inp" type="date" data-field="dob" value="'+(d.dob||'')+'"/></div>'+
     '<div class="form-group"><div class="form-label">Gender</div><div class="toggle-group">'+gBtns+'</div></div>'+
     '<div class="form-group"><div class="form-label">Level</div><div class="toggle-group">'+lvlBtns+'</div></div>'+
     '<div class="form-group"><div class="form-label">High School</div><input class="form-input modal-inp" data-field="highSchool" value="'+d.highSchool.replace(/"/g,'&quot;')+'"/></div>'+
@@ -650,7 +661,7 @@ function saveModalEdit(){
   }
   if(!state.profiles[newName])state.profiles[newName]={};
   var p=state.profiles[newName];
-  p.gender=d.gender;p.level=d.level;p.highSchool=d.highSchool;p.hsGradYear=d.hsGradYear;p.college=d.college;p.collegeGradYear=d.collegeGradYear;p.collegeClass=d.collegeClass;p.redshirt=d.redshirt;p.fptMonth=d.fptMonth;p.fptYear=d.fptYear;p.sports=d.sports;p.positions=d.positions;p.instagram=d.instagram;p.notes=d.notes;
+  p.gender=d.gender;p.level=d.level;p.highSchool=d.highSchool;p.hsGradYear=d.hsGradYear;p.college=d.college;p.collegeGradYear=d.collegeGradYear;p.collegeClass=d.collegeClass;p.redshirt=d.redshirt;p.fptMonth=d.fptMonth;p.fptYear=d.fptYear;p.sports=d.sports;p.positions=d.positions;p.instagram=d.instagram;p.notes=d.notes;p.dob=d.dob;
   saveData();closeModal();showToast('Profile saved!');render();
 }
 function showModal(html){var m=document.getElementById('profile-modal');document.getElementById('modal-inner').innerHTML=html;m.style.display='flex';}
@@ -851,7 +862,7 @@ function runExport(fmt){
 function renderBulkEditor(){
   var athletes=(state.athletes||[]).slice().sort(function(a,b){return lastName(a).localeCompare(lastName(b));});
   if(!athletes.length)return '<div class="panel"><div class="empty">No athletes on roster yet.</div></div>';
-  var cols=['First','Last','Gender','Level','High School','HS Grad Yr','College','Col Grad Yr','Col Class','Redshirt','FPT Mo','FPT Yr','Sports','Positions','Instagram','Notes'];
+  var cols=['First','Last','DOB','Gender','Level','High School','HS Grad Yr','College','Col Grad Yr','Col Class','Redshirt','FPT Mo','FPT Yr','Sports','Positions','Instagram','Notes'];
   var headers='<tr><th class="bulk-th" style="position:sticky;left:0;z-index:6;background:var(--surface2)">Athlete</th>'+cols.map(function(c){return '<th class="bulk-th">'+c+'</th>';}).join('')+'</tr>';
   var rows=athletes.map(function(name){
     var p=state.profiles[name]||{};var d=bulkEdits[name]||{};
@@ -859,7 +870,7 @@ function renderBulkEditor(){
     function inp(key,cls,type){return '<input class="bulk-inp'+(cls?' '+cls:'')+'" type="'+(type||'text')+'" value="'+String(v(key)).replace(/"/g,'&quot;')+'" data-key="'+key+'" oninput="be(this.closest(\'tr\').dataset.bname,this.dataset.key,this.value)"'+( type==='number'?' step=\'1\'':'')+'/>';}
     function sel(key,opts){var cur=v(key);return '<select class="bulk-sel" data-key="'+key+'" onchange="be(this.closest(\'tr\').dataset.bname,this.dataset.key,this.value)">'+opts.map(function(o){return '<option value="'+o+'"'+(cur===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';}
     var fn=name.split(' ')[0],ln=name.split(' ').slice(1).join(' ');
-    return '<tr data-bname="'+_esc(name)+'"><td class="bulk-td">'+name+'</td><td class="bulk-td"><input class="bulk-inp narrow" value="'+String(d.firstName!==undefined?d.firstName:fn).replace(/"/g,'&quot;')+'" oninput="be(this.closest(\'tr\').dataset.bname,\'firstName\',this.value)"/></td><td class="bulk-td"><input class="bulk-inp narrow" value="'+String(d.lastName!==undefined?d.lastName:ln).replace(/"/g,'&quot;')+'" oninput="be(this.closest(\'tr\').dataset.bname,\'lastName\',this.value)"/></td><td class="bulk-td">'+sel('gender',['male','female'])+'</td><td class="bulk-td">'+sel('level',['k12','college','pro'])+'</td><td class="bulk-td">'+inp('highSchool','wide')+'</td><td class="bulk-td">'+inp('hsGradYear','narrow','number')+'</td><td class="bulk-td">'+inp('college','wide')+'</td><td class="bulk-td">'+inp('collegeGradYear','narrow','number')+'</td><td class="bulk-td">'+sel('collegeClass',['','FR','SO','JR','SR','Grad'])+'</td><td class="bulk-td" style="text-align:center"><input type="checkbox" '+(v('redshirt')?'checked':'')+' onchange="be(this.closest(\'tr\').dataset.bname,\'redshirt\',this.checked)"/></td><td class="bulk-td">'+inp('fptMonth','narrow')+'</td><td class="bulk-td">'+inp('fptYear','narrow','number')+'</td><td class="bulk-td">'+inp('sports','wide')+'</td><td class="bulk-td">'+inp('positions')+'</td><td class="bulk-td">'+inp('instagram')+'</td><td class="bulk-td"><input class="bulk-inp wide" value="'+String(v('notes')).replace(/"/g,'&quot;')+'" oninput="be(this.closest(\'tr\').dataset.bname,\'notes\',this.value)"/></td></tr>';
+    return '<tr data-bname="'+_esc(name)+'"><td class="bulk-td">'+name+'</td><td class="bulk-td"><input class="bulk-inp narrow" value="'+String(d.firstName!==undefined?d.firstName:fn).replace(/"/g,'&quot;')+'" oninput="be(this.closest(\'tr\').dataset.bname,\'firstName\',this.value)"/></td><td class="bulk-td"><input class="bulk-inp narrow" value="'+String(d.lastName!==undefined?d.lastName:ln).replace(/"/g,'&quot;')+'" oninput="be(this.closest(\'tr\').dataset.bname,\'lastName\',this.value)"/></td><td class="bulk-td">'+inp('dob','wide','date')+'</td><td class="bulk-td">'+sel('gender',['male','female'])+'</td><td class="bulk-td">'+sel('level',['k12','college','pro'])+'</td><td class="bulk-td">'+inp('highSchool','wide')+'</td><td class="bulk-td">'+inp('hsGradYear','narrow','number')+'</td><td class="bulk-td">'+inp('college','wide')+'</td><td class="bulk-td">'+inp('collegeGradYear','narrow','number')+'</td><td class="bulk-td">'+sel('collegeClass',['','FR','SO','JR','SR','Grad'])+'</td><td class="bulk-td" style="text-align:center"><input type="checkbox" '+(v('redshirt')?'checked':'')+' onchange="be(this.closest(\'tr\').dataset.bname,\'redshirt\',this.checked)"/></td><td class="bulk-td">'+inp('fptMonth','narrow')+'</td><td class="bulk-td">'+inp('fptYear','narrow','number')+'</td><td class="bulk-td">'+inp('sports','wide')+'</td><td class="bulk-td">'+inp('positions')+'</td><td class="bulk-td">'+inp('instagram')+'</td><td class="bulk-td"><input class="bulk-inp wide" value="'+String(v('notes')).replace(/"/g,'&quot;')+'" oninput="be(this.closest(\'tr\').dataset.bname,\'notes\',this.value)"/></td></tr>';
   }).join('');
   return '<div class="panel"><div class="panel-title">Bulk Profile Editor</div><div style="margin-bottom:12px;display:flex;justify-content:flex-end"><button class="btn btn-accent" id="bulk-save-btn">Save All Changes</button></div><div class="bulk-wrap"><table class="bulk-tbl"><thead>'+headers+'</thead><tbody>'+rows+'</tbody></table></div></div>';
 }
@@ -897,7 +908,7 @@ function renderIntake(){
   var lvlBtns=['k12','college','pro'].map(function(l){var lbl=l==='k12'?'K-12':l.charAt(0).toUpperCase()+l.slice(1);return '<button class="tog'+(d.level===l?' on':'')+'" data-lv="'+l+'" onclick="intakeData.level=this.dataset.lv;render()">'+lbl+'</button>';}).join('');
   var cBtns=['FR','SO','JR','SR','Grad'].map(function(c){return '<button class="tog'+(d.collegeClass===c?' on':'')+'" data-cc="'+c+'" onclick="intakeData.collegeClass=this.dataset.cc;render()">'+c+'</button>';}).join('');
   var rBtns=['Yes','No'].map(function(r){var isY=r==='Yes';return '<button class="tog'+((d.redshirt&&isY)||(!d.redshirt&&!isY)?' on':'')+'" onclick="intakeData.redshirt='+isY+';render()">'+r+'</button>';}).join('');
-  return '<div class="panel"><div class="panel-title">Add New Athlete</div><div class="intake-grid"><div class="form-group"><div class="form-label">First Name</div><input class="form-input" value="'+d.firstName+'" oninput="intakeData.firstName=this.value"/></div><div class="form-group"><div class="form-label">Last Name</div><input class="form-input" value="'+d.lastName+'" oninput="intakeData.lastName=this.value"/></div><div class="form-group"><div class="form-label">Gender</div><div class="toggle-group">'+gBtns+'</div></div><div class="form-group"><div class="form-label">Level</div><div class="toggle-group">'+lvlBtns+'</div></div><div class="form-group"><div class="form-label">High School</div><input class="form-input" placeholder="School name" value="'+d.highSchool+'" oninput="intakeData.highSchool=this.value"/></div><div class="form-group"><div class="form-label">HS Grad Year</div>'+buildGradYearSelect(d.hsGradYear,'intakeData.hsGradYear')+'</div><div class="form-group"><div class="form-label">College</div><input class="form-input" placeholder="School name" value="'+d.college+'" oninput="intakeData.college=this.value"/></div><div class="form-group"><div class="form-label">College Grad Year</div><input class="form-input" type="number" placeholder="2030" value="'+d.collegeGradYear+'" oninput="intakeData.collegeGradYear=this.value"/></div></div><div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="form-group"><div class="form-label">College Class</div><div class="toggle-group">'+cBtns+'</div></div><div class="form-group"><div class="form-label">Redshirt</div><div class="toggle-group">'+rBtns+'</div></div><div class="form-group"><div class="form-label">FPT Start Month</div><input class="form-input" placeholder="1-12" value="'+d.fptMonth+'" oninput="intakeData.fptMonth=this.value"/></div><div class="form-group"><div class="form-label">FPT Start Year</div><input class="form-input" placeholder="2024" value="'+d.fptYear+'" oninput="intakeData.fptYear=this.value"/></div><div class="form-group"><div class="form-label">Sport(s)</div><input class="form-input" placeholder="Football, Track" value="'+d.sports+'" oninput="intakeData.sports=this.value"/></div><div class="form-group"><div class="form-label">Position(s)</div><input class="form-input" placeholder="WR, CB" value="'+d.positions+'" oninput="intakeData.positions=this.value"/></div><div class="form-group"><div class="form-label">Instagram</div><input class="form-input" placeholder="@handle" value="'+d.instagram+'" oninput="intakeData.instagram=this.value"/></div></div><div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Contact Information</div><div class="intake-grid"><div class="form-group"><div class="form-label">Athlete Email</div><input class="form-input" type="email" placeholder="athlete@email.com" value="'+(d.email||'')+'" oninput="intakeData.email=this.value"/></div><div class="form-group"><div class="form-label">Parent / Guardian 1 Email</div><input class="form-input" type="email" placeholder="parent1@email.com" value="'+(d.parent1Email||'')+'" oninput="intakeData.parent1Email=this.value"/></div><div class="form-group"><div class="form-label">Parent / Guardian 2 Email</div><input class="form-input" type="email" placeholder="parent2@email.com" value="'+(d.parent2Email||'')+'" oninput="intakeData.parent2Email=this.value"/></div></div></div>'+
+  return '<div class="panel"><div class="panel-title">Add New Athlete</div><div class="intake-grid"><div class="form-group"><div class="form-label">First Name</div><input class="form-input" value="'+d.firstName+'" oninput="intakeData.firstName=this.value"/></div><div class="form-group"><div class="form-label">Last Name</div><input class="form-input" value="'+d.lastName+'" oninput="intakeData.lastName=this.value"/></div><div class="form-group"><div class="form-label">Date of Birth</div><input class="form-input" type="date" value="'+(d.dob||'')+'" oninput="intakeData.dob=this.value"/></div><div class="form-group"><div class="form-label">Gender</div><div class="toggle-group">'+gBtns+'</div></div><div class="form-group"><div class="form-label">Level</div><div class="toggle-group">'+lvlBtns+'</div></div><div class="form-group"><div class="form-label">High School</div><input class="form-input" placeholder="School name" value="'+d.highSchool+'" oninput="intakeData.highSchool=this.value"/></div><div class="form-group"><div class="form-label">HS Grad Year</div>'+buildGradYearSelect(d.hsGradYear,'intakeData.hsGradYear')+'</div><div class="form-group"><div class="form-label">College</div><input class="form-input" placeholder="School name" value="'+d.college+'" oninput="intakeData.college=this.value"/></div><div class="form-group"><div class="form-label">College Grad Year</div><input class="form-input" type="number" placeholder="2030" value="'+d.collegeGradYear+'" oninput="intakeData.collegeGradYear=this.value"/></div></div><div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="form-group"><div class="form-label">College Class</div><div class="toggle-group">'+cBtns+'</div></div><div class="form-group"><div class="form-label">Redshirt</div><div class="toggle-group">'+rBtns+'</div></div><div class="form-group"><div class="form-label">FPT Start Month</div><input class="form-input" placeholder="1-12" value="'+d.fptMonth+'" oninput="intakeData.fptMonth=this.value"/></div><div class="form-group"><div class="form-label">FPT Start Year</div><input class="form-input" placeholder="2024" value="'+d.fptYear+'" oninput="intakeData.fptYear=this.value"/></div><div class="form-group"><div class="form-label">Sport(s)</div><input class="form-input" placeholder="Football, Track" value="'+d.sports+'" oninput="intakeData.sports=this.value"/></div><div class="form-group"><div class="form-label">Position(s)</div><input class="form-input" placeholder="WR, CB" value="'+d.positions+'" oninput="intakeData.positions=this.value"/></div><div class="form-group"><div class="form-label">Instagram</div><input class="form-input" placeholder="@handle" value="'+d.instagram+'" oninput="intakeData.instagram=this.value"/></div></div><div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Contact Information</div><div class="intake-grid"><div class="form-group"><div class="form-label">Athlete Email</div><input class="form-input" type="email" placeholder="athlete@email.com" value="'+(d.email||'')+'" oninput="intakeData.email=this.value"/></div><div class="form-group"><div class="form-label">Parent / Guardian 1 Email</div><input class="form-input" type="email" placeholder="parent1@email.com" value="'+(d.parent1Email||'')+'" oninput="intakeData.parent1Email=this.value"/></div><div class="form-group"><div class="form-label">Parent / Guardian 2 Email</div><input class="form-input" type="email" placeholder="parent2@email.com" value="'+(d.parent2Email||'')+'" oninput="intakeData.parent2Email=this.value"/></div></div></div>'+
     '<button class="btn btn-accent" style="margin-top:16px;width:100%;padding:13px;font-size:16px" id="intake-submit-btn">Add Athlete</button></div>';
 }
 function submitIntake(){
@@ -905,9 +916,9 @@ function submitIntake(){
   if(!name){alert('First name required.');return;}
   if((state.athletes||[]).includes(name)){alert(name+' already exists.');return;}
   state.athletes.push(name);
-  state.profiles[name]={gender:d.gender,highSchool:d.highSchool,hsGradYear:d.hsGradYear,college:d.college,collegeGradYear:d.collegeGradYear,collegeClass:d.collegeClass,redshirt:d.redshirt,level:d.level,fptMonth:d.fptMonth,fptYear:d.fptYear,sports:d.sports,positions:d.positions,instagram:d.instagram,inactive:false};
+  state.profiles[name]={gender:d.gender,dob:d.dob,highSchool:d.highSchool,hsGradYear:d.hsGradYear,college:d.college,collegeGradYear:d.collegeGradYear,collegeClass:d.collegeClass,redshirt:d.redshirt,level:d.level,fptMonth:d.fptMonth,fptYear:d.fptYear,sports:d.sports,positions:d.positions,instagram:d.instagram,inactive:false};
   saveData();showToast(name+' added!');
-  intakeData={firstName:'',lastName:'',gender:'male',highSchool:'',hsGradYear:'',college:'',collegeGradYear:'',collegeClass:'',redshirt:false,level:'k12',fptMonth:'',fptYear:'',sports:'',positions:'',instagram:''};
+  intakeData={firstName:'',lastName:'',gender:'male',highSchool:'',hsGradYear:'',college:'',collegeGradYear:'',collegeClass:'',redshirt:false,level:'k12',fptMonth:'',fptYear:'',sports:'',positions:'',instagram:'',dob:''};
   render();
 }
 
@@ -1114,8 +1125,8 @@ function renderPendingIntakes(){
       +'<div style="font-size:11px;color:var(--muted);margin-top:4px">Submitted '+submitted+'</div>'
       +'</div>'
       +'<div style="display:flex;gap:8px;flex-shrink:0">'
-      +'<button class="btn btn-accent" style="padding:6px 16px;font-size:13px" onclick="approvePendingIntake('+idx+')">Approve</button>'
-      +'<button class="btn" style="padding:6px 14px;font-size:13px;background:var(--surface3);color:var(--muted)" onclick="rejectPendingIntake('+idx+')">Reject</button>'
+      +'<button class="btn btn-accent" style="padding:6px 16px;font-size:13px" onclick="approvePendingIntake(\''+p.id+'\')">Approve</button>'
+      +'<button class="btn" style="padding:6px 14px;font-size:13px;background:var(--surface3);color:var(--muted)" onclick="rejectPendingIntake(\''+p.id+'\')">Reject</button>'
       +'</div>'
       +'</div>'
       +'<div style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px 16px;font-size:12px;color:var(--muted)">'
@@ -1131,45 +1142,36 @@ function renderPendingIntakes(){
     +cards+'</div>';
 }
 
-function approvePendingIntake(idx){
-  var pending=state.pendingIntakes||[];
-  var d=pending[idx];
-  if(!d)return;
-  var name=(d.firstName||'').trim()+(d.lastName?' '+d.lastName.trim():'');
-  if(!name){showToast('Cannot approve: no name provided.');return;}
-  if((state.athletes||[]).includes(name)){showToast(name+' already on roster.');return;}
-  state.athletes.push(name);
-  state.profiles[name]={
-    gender:d.gender||'male',
-    level:d.level||'k12',
-    highSchool:d.highSchool||'',
-    hsGradYear:d.hsGradYear||'',
-    college:d.college||'',
-    collegeGradYear:d.collegeGradYear||'',
-    collegeClass:d.collegeClass||'',
-    redshirt:d.redshirt||false,
-    fptMonth:d.fptMonth||'',
-    fptYear:d.fptYear||'',
-    sports:d.sports||'',
-    positions:d.positions||'',
-    instagram:d.instagram||'',
-    email:d.email||'',
-    parent1Email:d.parent1Email||'',
-    parent2Email:d.parent2Email||'',
-    inactive:false
-  };
-  state.pendingIntakes.splice(idx,1);
-  saveData();
-  showToast(name+' approved and added to roster!');
-  render();
+async function approvePendingIntake(id){
+  var url=_getApiUrl();
+  if(!url){showToast('No API URL configured.');return;}
+  try{
+    var r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'approveIntake',id:id}),mode:'cors'});
+    var j=await r.json();
+    await loadData();  // pull fresh roster + pendingIntakes from backend, then re-render
+    if(j&&j.ok){
+      showToast(j.alreadyOnRoster?((j.name||'Athlete')+' already on roster — cleared.'):((j.name||'Athlete')+' approved and added!'));
+    } else {
+      showToast((j&&j.error)?j.error:'Approve failed.');
+    }
+  }catch(e){
+    console.warn('approveIntake:',e);
+    showToast('Approve failed — check connection.');
+  }
 }
 
-function rejectPendingIntake(idx){
+async function rejectPendingIntake(id){
   if(!confirm('Reject and delete this intake form?'))return;
-  (state.pendingIntakes||[]).splice(idx,1);
-  saveData();
-  showToast('Intake rejected.');
-  render();
+  var url=_getApiUrl();
+  if(!url){showToast('No API URL configured.');return;}
+  try{
+    await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'rejectIntake',id:id}),mode:'cors'});
+    await loadData();  // pull fresh pendingIntakes from backend, then re-render
+    showToast('Intake rejected.');
+  }catch(e){
+    console.warn('rejectIntake:',e);
+    showToast('Reject failed — check connection.');
+  }
 }
 
 // ── MEDIA UPLOAD UI ────────────────────────────────────────────────────────

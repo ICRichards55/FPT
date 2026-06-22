@@ -64,6 +64,11 @@ select.form-input{appearance:none;background-image:url("data:image/svg+xml,%3Csv
     <div class="err" id="err-name">First and last name are required.</div>
 
     <div class="form-group">
+      <div class="form-label">Date of Birth</div>
+      <input class="form-input" type="date" id="in-dob"/>
+    </div>
+
+    <div class="form-group">
       <div class="form-label">Gender</div>
       <div class="toggle-group">
         <button class="tog on" id="tog-male" onclick="setGender('male')">Male</button>
@@ -275,6 +280,7 @@ function submitIntakeForm(){
     data:{
       firstName:first,
       lastName:last,
+      dob:document.getElementById('in-dob').value,
       gender:gender,
       level:level,
       highSchool:document.getElementById('in-hs').value.trim(),
