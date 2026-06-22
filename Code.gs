@@ -195,18 +195,68 @@ function doPost(e) {
 }
 
 // ── Gym post handler ──────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+// handleGymPost_  — dedup fix + explicit cross-day deletion (deletedIds)
+//
+// REPLACES the current handleGymPost_. Adds one capability on top of the
+// dedup fix already deployed: if the client sends payload.deletedIds (ids the
+// user explicitly deleted), those entries are removed from BOTH historical and
+// live. This is safe because it's an explicit instruction — a stale client
+// only ever sends ids the user actively deleted, never inferred from absence.
+// ══════════════════════════════════════════════════════════════════════════
 function handleGymPost_(payload) {
-  // Guard: only write if payload looks like a real state object
   if (!Array.isArray(payload.athletes)) {
     return ContentService
       .createTextOutput(JSON.stringify({ ok: false, error: 'Invalid gym state payload' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Strip historical entries — only persist new live entries
-  var liveEntries = (payload.entries || []).filter(function(e) {
-    return !e.source || e.source.indexOf('historical') === -1;
-  });
+  var historical = readHistorical_();
+  var histById = {};
+  (historical.entries || []).forEach(function(e) { if (e && e.id != null) histById[e.id] = e; });
+
+  var incoming = payload.entries || [];
+  var seenLive = {};
+  var liveEntries = [];
+  var histChanged = false;
+
+  function sig(e) {
+    return [e.athlete, e.exercise, e.date, e.value, e.total, e.valueFt, e.valueIn].join('|');
+  }
+
+  for (var i = 0; i < incoming.length; i++) {
+    var e = incoming[i];
+    if (!e || e.id == null) continue;
+    if (seenLive[e.id]) continue;
+    seenLive[e.id] = true;
+
+    var h = histById[e.id];
+    if (h) {
+      if (sig(h) !== sig(e)) {
+        for (var k in e) { if (e.hasOwnProperty(k)) h[k] = e[k]; }
+        histChanged = true;
+      }
+    } else {
+      liveEntries.push(e);
+    }
+  }
+
+  // ── Explicit deletions (cross-day): remove these ids from historical + live ──
+  var deletedIds = payload.deletedIds || [];
+  if (deletedIds.length) {
+    var delSet = {};
+    deletedIds.forEach(function(id) { if (id != null) delSet[id] = true; });
+
+    var histBefore = (historical.entries || []).length;
+    historical.entries = (historical.entries || []).filter(function(e) { return !delSet[e.id]; });
+    if (historical.entries.length !== histBefore) histChanged = true;
+
+    liveEntries = liveEntries.filter(function(e) { return !delSet[e.id]; });
+  }
+
+  if (histChanged) {
+    getHistoricalFile_().setContent(JSON.stringify(historical));
+  }
 
   var liveState = {
     athletes:       payload.athletes       || [],
@@ -220,7 +270,8 @@ function handleGymPost_(payload) {
 
   writeLive_(liveState);
   return ContentService
-    .createTextOutput(JSON.stringify({ ok: true }))
+    .createTextOutput(JSON.stringify({ ok: true, liveCount: liveEntries.length,
+                                       histUpdated: histChanged, deleted: deletedIds.length }))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -311,6 +362,12 @@ function handleCopyAthleteToGym_(payload) {
 // ══════════════════════════════════════════════════════════════════════════
 
 // Trigger: every day at midnight ET
+// ══════════════════════════════════════════════════════════════════════════
+// HARDENED NIGHTLY SWEEP — replaces archiveEntriesToHistorical()
+// Fix: never clear live unless the historical write is verified to contain
+// the newly-archived entries. Prevents silent data loss on a failed/partial
+// historical write (the large-file write-timeout failure mode).
+// ══════════════════════════════════════════════════════════════════════════
 function archiveEntriesToHistorical() {
   var live        = readLive_();
   var liveEntries = live.entries || [];
@@ -321,22 +378,64 @@ function archiveEntriesToHistorical() {
   }
 
   var historical = readHistorical_();
+  var existing   = historical.entries || [];
 
   // Dedup by ID — prevents re-archiving on trigger retry
-  var seenIds    = new Set((historical.entries || []).map(function(e) { return e.id; }));
-  var newEntries = liveEntries.filter(function(e) { return !seenIds.has(e.id); });
+  var seenIds    = {};
+  existing.forEach(function(e) { seenIds[e.id] = true; });
+  var newEntries = liveEntries.filter(function(e) { return !seenIds[e.id]; });
 
-  historical.entries = (historical.entries || []).concat(newEntries);
+  if (!newEntries.length) {
+    // Everything already archived (trigger retry). Safe to clear live.
+    live.entries = [];
+    writeLive_(live);
+    Logger.log('Gym: all live entries already in historical. Live cleared.');
+    return;
+  }
+
+  var expectedCount = existing.length + newEntries.length;
+  historical.entries = existing.concat(newEntries);
+
+  // Write historical
   getHistoricalFile_().setContent(JSON.stringify(historical));
 
-  live.entries = [];
-  writeLive_(live);
+  // ── VERIFY the write persisted before touching live ──
+  var verify      = readHistorical_();
+  var verifyCount = (verify.entries || []).length;
+  var verifyIds   = {};
+  (verify.entries || []).forEach(function(e) { verifyIds[e.id] = true; });
+  var allPresent  = newEntries.every(function(e) { return verifyIds[e.id]; });
 
-  Logger.log('Gym: archived ' + newEntries.length + ' entries. ' +
-             'Historical total: ' + historical.entries.length);
+  if (verifyCount >= expectedCount && allPresent) {
+    // Confirmed: every new entry is in historical. Now safe to clear live.
+    live.entries = [];
+    writeLive_(live);
+    Logger.log('Gym: archived ' + newEntries.length + ' entries (verified). ' +
+               'Historical total: ' + verifyCount);
+  } else {
+    // Write did NOT fully persist. Do NOT clear live — data stays safe in live
+    // and will be retried on the next run. Alert so it gets noticed.
+    Logger.log('Gym: ARCHIVE VERIFY FAILED. Expected >=' + expectedCount +
+               ', got ' + verifyCount + ', allPresent=' + allPresent +
+               '. Live NOT cleared — data preserved for retry.');
+    try {
+      GmailApp.sendEmail(
+        IAN_EMAIL,
+        'FPT [ALERT] Nightly archive verify FAILED',
+        'The midnight archive could not confirm ' + newEntries.length +
+        ' entries were written to historical. Live was NOT cleared, so no data was lost. ' +
+        'It will retry next run. Expected >=' + expectedCount + ' historical entries, found ' +
+        verifyCount + '.',
+        { cc: CHRIS_EMAIL, name: 'FPT System' }
+      );
+    } catch (mailErr) {
+      Logger.log('Alert email failed: ' + mailErr);
+    }
+  }
 }
 
 // Trigger: every day at midnight ET (add separately in Triggers panel)
+// ══════════════════════════════════════════════════════════════════════════
 function archiveTeamEntriesToHistorical() {
   var live        = readTeamsLive_();
   var liveEntries = live.entries || [];
@@ -347,19 +446,43 @@ function archiveTeamEntriesToHistorical() {
   }
 
   var historical = readTeamsHistorical_();
+  var existing   = historical.entries || [];
 
-  // Dedup by ID — prevents re-archiving on trigger retry
-  var seenIds    = new Set((historical.entries || []).map(function(e) { return e.id; }));
-  var newEntries = liveEntries.filter(function(e) { return !seenIds.has(e.id); });
+  var seenIds = {};
+  existing.forEach(function(e) { if (e && e.id != null) seenIds[e.id] = true; });
+  var newEntries = liveEntries.filter(function(e) { return !seenIds[e.id]; });
 
-  historical.entries = (historical.entries || []).concat(newEntries);
+  if (!newEntries.length) {
+    live.entries = [];
+    writeTeamsLive_(live);
+    Logger.log('Teams: all live entries already archived. Live cleared.');
+    return;
+  }
+
+  var expected = existing.length + newEntries.length;
+  historical.entries = existing.concat(newEntries);
   getTeamsHistoricalFile_().setContent(JSON.stringify(historical));
 
-  live.entries = [];
-  writeTeamsLive_(live);
+  // verify before clearing live
+  var verify = readTeamsHistorical_();
+  var vIds = {};
+  (verify.entries || []).forEach(function(e) { if (e && e.id != null) vIds[e.id] = true; });
+  var allPresent = newEntries.every(function(e) { return vIds[e.id]; });
 
-  Logger.log('Teams: archived ' + newEntries.length + ' entries. ' +
-             'Historical total: ' + historical.entries.length);
+  if ((verify.entries || []).length >= expected && allPresent) {
+    live.entries = [];
+    writeTeamsLive_(live);
+    Logger.log('Teams: archived ' + newEntries.length + ' entries (verified). ' +
+               'Historical total: ' + (verify.entries || []).length);
+  } else {
+    Logger.log('Teams: ARCHIVE VERIFY FAILED. Live NOT cleared — data preserved for retry.');
+    try {
+      GmailApp.sendEmail(IAN_EMAIL, 'FPT [ALERT] Teams archive verify FAILED',
+        'Teams midnight archive could not confirm ' + newEntries.length +
+        ' entries were written. Live was NOT cleared, so no data was lost. It will retry next run.',
+        { name: 'FPT System' });
+    } catch (e) { Logger.log('Alert email failed: ' + e); }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -588,4 +711,182 @@ function checkServerState() {
   allEntries.slice(-3).forEach(function(e) {
     Logger.log(e.date + ' | ' + e.athlete + ' | ' + e.exercise + ' | ' + (e.value || e.total));
   });
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+function sendLateEntryBackup() {
+  var live  = readLive_();
+  var today = getTodayET_();
+
+  // ET hour:minute helper
+  function etParts(iso) {
+    var d  = new Date(iso);
+    var et = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    var ds = et.getFullYear() + '-' + String(et.getMonth()+1).padStart(2,'0') + '-' + String(et.getDate()).padStart(2,'0');
+    return { date: ds, mins: et.getHours() * 60 + et.getMinutes() };
+  }
+
+  var CUTOFF = 19 * 60 + 45; // 7:45 PM — when the daily report runs
+
+  var late = (live.entries || []).filter(function(e) {
+    if (!e.loggedAt) return false;            // no timestamp = can't be a today late entry
+    var p = etParts(e.loggedAt);
+    return p.date === today && p.mins > CUTOFF;
+  });
+
+  if (!late.length) {
+    Logger.log('Late backup: no entries logged after 7:45 PM. No email sent.');
+    return;
+  }
+
+  var csv = buildCsv_(late);
+  var displayDate = formatDisplayDate_(today);
+  var subject = 'FPT [LATE ENTRIES] ' + displayDate + ' — ' + late.length + ' logged after 7:45 PM';
+  var body = late.length + ' entr' + (late.length === 1 ? 'y was' : 'ies were') +
+             ' logged after the 7:45 PM daily report on ' + displayDate +
+             '. CSV attached as a backup of those entries.';
+
+  try {
+    GmailApp.sendEmail(CHRIS_EMAIL, subject, body, {
+      cc: IAN_EMAIL,
+      name: 'FPT System',
+      attachments: [Utilities.newBlob(csv, 'text/csv', 'FPT_Late_' + today + '.csv')]
+    });
+    Logger.log('Late backup: emailed ' + late.length + ' late entries.');
+  } catch (e) {
+    Logger.log('Late backup email failed: ' + e);
+  }
+}
+
+
+// ── Monthly PR query (manual utility — logs June PRs to console) ──────────
+function getJunePRs() {
+  var historical = readHistorical_();
+  var live = readLive_();
+  var allEntries = (historical.entries || []).concat(live.entries || []);
+  var profiles = live.profiles || {};
+  var juneEntries = allEntries.filter(function(e) {
+    return e.date && e.date.startsWith('2026-06');
+  });
+  var athletes = [...new Set(juneEntries.map(function(e) { return e.athlete; }))];
+  var results = [];
+  athletes.forEach(function(ath) {
+    var prof = profiles[ath] || {};
+    var fptStart = prof.fptYear && prof.fptMonth ?
+      prof.fptYear + '-' + String(prof.fptMonth).padStart(2,'0') : null;
+    var isFirstMonth = fptStart && fptStart.startsWith('2026-06');
+    if (isFirstMonth) return; // exclude first month
+    ['fly','broad','vert'].forEach(function(ex) {
+      var priorBest = allEntries.filter(function(e) {
+        return e.athlete === ath && e.exercise === ex && e.date < '2026-06-01';
+      });
+      var juneBest = juneEntries.filter(function(e) {
+        return e.athlete === ath && e.exercise === ex;
+      });
+      if (!priorBest.length || !juneBest.length) return;
+      var lower = ex === 'fly';
+      var prior = lower ? Math.min.apply(null, priorBest.map(function(e){return e.value;}))
+                        : ex === 'broad' ? Math.max.apply(null, priorBest.map(function(e){return e.total;}))
+                        : Math.max.apply(null, priorBest.map(function(e){return e.value;}));
+      var current = lower ? Math.min.apply(null, juneBest.map(function(e){return e.value;}))
+                          : ex === 'broad' ? Math.max.apply(null, juneBest.map(function(e){return e.total;}))
+                          : Math.max.apply(null, juneBest.map(function(e){return e.value;}));
+      var isPR = lower ? current < prior : current > prior;
+      if (isPR) results.push({
+        athlete: ath, exercise: ex,
+        prior: prior, current: current
+      });
+    });
+  });
+  Logger.log(JSON.stringify(results));
+}
+// ══════════════════════════════════════════════════════════════════════════
+// NAME REMAP TOOL — reconnect entries stuck under an old/misspelled name.
+//
+// Use when an athlete was renamed but old entries kept the previous spelling
+// (their data shows as "missing" because entries don't match the roster name).
+//
+//   1. Add "Old Name": "Correct Name" pairs to REMAP below as you find them.
+//   2. Run reportRemap()  — dry run, logs how many entries each pair will fix.
+//   3. Run applyRemap()   — applies across historical + live, verified write.
+//
+// Matching is normalized (trim + case-insensitive) so spacing/case variants of
+// the OLD name are caught too. Updates entries AND achievements.
+// ══════════════════════════════════════════════════════════════════════════
+
+var REMAP = {
+  'Nate Susher':     'Nate Swisher',
+  'Kadenne Merigo':  'Kadence Merigo',
+  'Savannah McLean': 'Savannah McClean'
+};
+
+function _norm_(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+
+// Build a normalized-old -> correct lookup
+function _remapIndex_() {
+  var idx = {};
+  Object.keys(REMAP).forEach(function(oldName) { idx[_norm_(oldName)] = REMAP[oldName]; });
+  return idx;
+}
+
+function _applyRemapTo_(entries, idx, counts) {
+  (entries || []).forEach(function(e) {
+    if (!e) return;
+    var target = idx[_norm_(e.athlete)];
+    if (target && e.athlete !== target) {
+      counts[target] = (counts[target] || 0) + 1;
+      e.athlete = target;
+    }
+  });
+}
+
+function reportRemap() {
+  var idx = _remapIndex_();
+  var hist = readHistorical_();
+  var live = readLive_();
+  var counts = {};
+  // count without mutating originals (work on copies)
+  function count(entries) {
+    (entries || []).forEach(function(e) {
+      if (!e) return;
+      var t = idx[_norm_(e.athlete)];
+      if (t && e.athlete !== t) counts[t] = (counts[t] || 0) + 1;
+    });
+  }
+  count(hist.entries); count(live.entries);
+  Logger.log('=== REMAP DRY RUN ===');
+  Object.keys(REMAP).forEach(function(o) {
+    Logger.log('  ' + o + ' -> ' + REMAP[o] + '  : ' + (counts[REMAP[o]] || 0) + ' entries (across hist+live)');
+  });
+  var total = Object.keys(counts).reduce(function(s,k){return s+counts[k];},0);
+  Logger.log('  TOTAL entries to remap: ' + total);
+  Logger.log('(Nothing written. Run applyRemap() to apply.)');
+}
+
+function applyRemap() {
+  var idx = _remapIndex_();
+  var hist = readHistorical_();
+  var live = readLive_();
+  var counts = {};
+
+  _applyRemapTo_(hist.entries, idx, counts);
+  _applyRemapTo_(hist.achievements, idx, counts); // harmless if undefined
+  _applyRemapTo_(live.entries, idx, counts);
+  _applyRemapTo_(live.achievements, idx, counts);
+
+  // write historical, verify, then live
+  var expectedLen = (hist.entries || []).length;
+  getHistoricalFile_().setContent(JSON.stringify(hist));
+  var verify = readHistorical_();
+  if ((verify.entries || []).length !== expectedLen) {
+    Logger.log('ABORT: historical write did not verify. Live untouched.');
+    return;
+  }
+  writeLive_(live);
+
+  var total = Object.keys(counts).reduce(function(s,k){return s+counts[k];},0);
+  Logger.log('=== REMAP APPLIED ===');
+  Object.keys(counts).forEach(function(k) { Logger.log('  -> ' + k + ': ' + counts[k] + ' entries'); });
+  Logger.log('  TOTAL remapped: ' + total + '. Historical verified, live updated.');
 }
