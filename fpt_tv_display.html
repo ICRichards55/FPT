@@ -97,7 +97,7 @@ const EX=[
 ];
 
 // ── FORMATTERS ──────────────────────────────────────────────────
-function fmtFly(v){return v!=null?v.toFixed(2):'—';}
+function fmtFly(v){return v!=null?v.toFixed(3):'—';}
 function fmtBroad(v){if(v==null)return'—';return`${Math.floor(v/12)}'${Math.round(v%12)}`;}
 function fmtVert(v){return v!=null?v.toFixed(3):'—';}
 function fmtScore(id,v){return id==='fly'?fmtFly(v):id==='broad'?fmtBroad(v):fmtVert(v);}

@@ -276,15 +276,15 @@ const EX=[
 
 function fmt(id,v){
   if(v==null)return'—';
-  if(id==='fly')return v.toFixed(2)+'s';
+  if(id==='fly')return v.toFixed(3)+'s';
   if(id==='broad'){const f=Math.floor(v/12);return`${f}' ${(v%12).toFixed(1)}"`;}
-  return v.toFixed(1)+'"';
+  return v.toFixed(3)+'"';
 }
 function fmtS(id,v){
   if(v==null)return'—';
-  if(id==='fly')return v.toFixed(2);
+  if(id==='fly')return v.toFixed(3);
   if(id==='broad'){const f=Math.floor(v/12);return`${f}'${Math.round(v%12)}`;}
-  return v.toFixed(1);
+  return v.toFixed(3);
 }
 
 // Session-averaged PRs
@@ -556,11 +556,6 @@ function getMonthPRs(year, month) {
   results.broad.sort(byLast);
   results.vert.sort(byLast);
 
-  // Cap at 6 per exercise
-  results.fly = results.fly.slice(0,6);
-  results.broad = results.broad.slice(0,6);
-  results.vert = results.vert.slice(0,6);
-
   return results;
 }
 
@@ -582,7 +577,7 @@ function fmtMPRShort(ex, v) {
     const f = Math.floor(v/12);
     return f+"'"+Math.round(v%12);
   }
-  return v.toFixed(2)+'"';
+  return v.toFixed(3)+'"';
 }
 
 function buildMPRCanvas(ex, athletes, year, month) {
@@ -627,9 +622,14 @@ function buildMPRCanvas(ex, athletes, year, month) {
   // Month PRs title
   ctx.save();
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'italic 900 '+Math.floor(rowH*0.58)+'px "Barlow Condensed", sans-serif';
   ctx.textAlign = 'left';
-  const monthLabel = MONTH_SHORT[month].toUpperCase()+' PRS';
+  const monthLabel = MONTH_NAMES[month].toUpperCase()+' PRS';
+  let titleFont = Math.floor(rowH*0.58);
+  ctx.font = 'italic 900 '+titleFont+'px "Barlow Condensed", sans-serif';
+  while (ctx.measureText(monthLabel).width > 444 && titleFont > 36) {
+    titleFont -= 2;
+    ctx.font = 'italic 900 '+titleFont+'px "Barlow Condensed", sans-serif';
+  }
   const exLabel = exObj.name.toUpperCase();
   ctx.fillText(monthLabel, 36, 80);
   ctx.font = 'italic 700 32px "Barlow Condensed", sans-serif';
@@ -734,7 +734,7 @@ function buildMPRCanvas(ex, athletes, year, month) {
   try {
     const logoImg = document.querySelector('img.logo-img') || new Image();
     if (logoImg.complete && logoImg.naturalWidth > 0) {
-      const lh = 80; const lw = lh * (logoImg.naturalWidth / logoImg.naturalHeight);
+      const lh = 96; const lw = lh * (logoImg.naturalWidth / logoImg.naturalHeight);
       ctx.drawImage(logoImg, 1048 - lw, 1060 - lh, lw, lh);
     } else {
       ctx.fillText('FPT', 1048, 1060);
@@ -755,7 +755,7 @@ function buildMPRCanvas(ex, athletes, year, month) {
   return canvas;
 }
 
-async function downloadMPR(ex, athletes, year, month) {
+async function downloadMPR(ex, athletes, year, month, pageNum, pageCount) {
   if (!athletes.length) { alert('No PRs for this exercise this month.'); return; }
   // Ensure logo is loaded BEFORE building canvas (canvas draws logo synchronously)
   const _logo = document.querySelector('img.logo-img');
@@ -765,17 +765,19 @@ async function downloadMPR(ex, athletes, year, month) {
   const canvas = buildMPRCanvas(ex, athletes, year, month);
   const dataUrl = canvas.toDataURL('image/png');
   const monStr = MONTH_SHORT[month]+year;
+  const pageSuffix = (pageCount && pageCount > 1) ? ('_p'+pageNum) : '';
+  const pageTitleSuffix = (pageCount && pageCount > 1) ? (' (Page '+pageNum+'/'+pageCount+')') : '';
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   if (isIOS) {
     const w = window.open('','_blank');
     if (w) {
-      w.document.write(`<html><head><title>FPT ${monStr} PRs</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="${dataUrl}"/><p>Long-press → Save Image to Camera Roll</p></body></html>`);
+      w.document.write(`<html><head><title>FPT ${monStr} PRs${pageTitleSuffix}</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="${dataUrl}"/><p>Long-press → Save Image to Camera Roll</p></body></html>`);
       w.document.close();
     }
   } else {
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = 'FPT_'+monStr+'_PRs_'+ex+'.png';
+    a.download = 'FPT_'+monStr+'_PRs_'+ex+pageSuffix+'.png';
     a.click();
   }
 }
@@ -785,6 +787,8 @@ function renderMonthPR() {
   const exObj = EX[mprExIdx];
   const athletes = prData[exObj.id] || [];
   const monthLabel = MONTH_NAMES[mprMonth] + ' ' + mprYear;
+  const pages = [];
+  for (let i=0; i<athletes.length; i+=5) pages.push(athletes.slice(i,i+5));
 
   // Prev/next month navigation
   function prevMonth() {
@@ -800,21 +804,38 @@ function renderMonthPR() {
   window._mprPrev = prevMonth;
   window._mprNext = nextMonth;
   window._mprSetEx = idx => { mprExIdx = idx; render(); };
-  window._mprDownload = () => downloadMPR(exObj.id, athletes, mprYear, mprMonth);
+  window._mprDownloadPage = (pi) => downloadMPR(exObj.id, pages[pi], mprYear, mprMonth, pi+1, pages.length);
 
   // Build preview
   setTimeout(() => {
     const previewEl = document.getElementById('mpr-preview');
     if (!previewEl) return;
-    if (!athletes.length) {
+    if (!pages.length) {
       previewEl.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">No PRs recorded for '+exObj.name+' in '+monthLabel+'</div>';
       return;
     }
-    const canvas = buildMPRCanvas(exObj.id, athletes, mprYear, mprMonth);
-    canvas.style.width = '100%';
-    canvas.style.borderRadius = '8px';
     previewEl.innerHTML = '';
-    previewEl.appendChild(canvas);
+    pages.forEach((pageAths, pi) => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'width:100%;margin-bottom:18px';
+      if (pages.length > 1) {
+        const lbl = document.createElement('div');
+        lbl.style.cssText = "font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--accent);margin-bottom:6px;text-align:center";
+        lbl.textContent = 'Page '+(pi+1)+' of '+pages.length;
+        wrap.appendChild(lbl);
+      }
+      const canvas = buildMPRCanvas(exObj.id, pageAths, mprYear, mprMonth);
+      canvas.style.width = '100%';
+      canvas.style.borderRadius = '8px';
+      wrap.appendChild(canvas);
+      const btn = document.createElement('button');
+      btn.className = 'submit-btn';
+      btn.style.cssText = 'margin-top:10px';
+      btn.textContent = pages.length > 1 ? ('Download Page '+(pi+1)+' (1080×1080 PNG)') : 'Download 1080×1080 PNG';
+      btn.onclick = () => window._mprDownloadPage(pi);
+      wrap.appendChild(btn);
+      previewEl.appendChild(wrap);
+    });
   }, 0);
 
   const exToggs = EX.map((e,i) =>
@@ -833,10 +854,9 @@ function renderMonthPR() {
       <button onclick="_mprNext()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">Next ›</button>
     </div>
     <div class="toggle-group" style="margin-bottom:14px">${exToggs}</div>
-    <div id="mpr-preview" style="min-height:200px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:center">
+    <div id="mpr-preview" style="min-height:200px;background:var(--surface2);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px">
       <div style="color:var(--muted);font-size:13px">Loading preview...</div>
     </div>
-    ${athletes.length ? `<button onclick="_mprDownload()" class="submit-btn" style="margin-top:12px">Download 1080×1080 PNG</button>` : ''}
   </div>`;
 }
 
@@ -1003,9 +1023,9 @@ function renderScatterChart(entries, ath, exId, color, chartH) {
     const v = yMin + (yRange * i / ySteps);
     const y = yCoord(v);
     let lbl;
-    if (exId === 'fly') lbl = v.toFixed(2) + 's';
+    if (exId === 'fly') lbl = v.toFixed(3) + 's';
     else if (exId === 'broad') { const f = Math.floor(v / 12); lbl = f + "'" + Math.round(v % 12) + '"'; }
-    else lbl = v.toFixed(1) + '"';
+    else lbl = v.toFixed(3) + '"';
     return '<text x="-4" y="' + (y + 3) + '" fill="#3a5060" font-size="7" text-anchor="end" font-family="Barlow Condensed,sans-serif">' + lbl + '</text>';
   }).join('');
 
@@ -1087,9 +1107,9 @@ function renderIGCards(athEntries,availEx){
     pr.fly!=null&&first.fly!=null&&first.fly!==pr.fly&&{label:'Fly Improvement',val:`${((first.fly-pr.fly)/first.fly*100).toFixed(1)}%`},
     pr.broad!=null&&{label:'Broad Jump Best',val:fmtS('broad',pr.broad)},
     pr.broad!=null&&first.broad!=null&&first.broad!==pr.broad&&{label:'Broad Increase',val:`${((pr.broad-first.broad)/first.broad*100).toFixed(0)}%`},
-    pr.vert!=null&&!pr.broad&&{label:'Skyhook Best',val:fmtS('vert',pr.vert)},
-    pr.vert!=null&&!pr.broad&&first.vert!=null&&{label:'Skyhook Increase',val:`${((pr.vert-first.vert)/first.vert*100).toFixed(1)}%`},
-  ].filter(Boolean).slice(0,4);
+    pr.vert!=null&&{label:'Skyhook Best',val:fmtS('vert',pr.vert)},
+    pr.vert!=null&&first.vert!=null&&first.vert!==pr.vert&&{label:'Skyhook Increase',val:`${((pr.vert-first.vert)/first.vert*100).toFixed(1)}%`},
+  ].filter(Boolean).slice(0,6);
   const avgs=[
     pr.fly!=null&&first.fly!=null&&{label:'10-10 Fly',val:`${fmtS('fly',first.fly)} → ${fmtS('fly',pr.fly)}`},
     pr.broad!=null&&first.broad!=null&&{label:'Broad Jump',val:`${fmtS('broad',first.broad)} → ${fmtS('broad',pr.broad)}`},
@@ -1114,13 +1134,8 @@ function renderIGCards(athEntries,availEx){
     <div style="position:absolute;bottom:0;left:0;right:0;height:260px;background:#080808;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;padding:0 17px 17px">
       <div style="display:flex;align-items:flex-end;gap:14px;flex:1">
           <div style="line-height:.88;flex:1"><div style="color:#fff;font-size:${nsize}px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.9">${fn}</div>${ln?`<div style="color:#fff;font-size:${ln.length>9?48:nsize-4}px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.92;margin-top:4px">${ln}</div>`:''}</div>
-          <img src="${LOGO}" style="height:${Math.round(nsize*3)}px;flex-shrink:0;margin-bottom:2px"/>
+          <img src="${LOGO}" style="height:${Math.round(nsize*2)}px;width:${Math.round(nsize*2)}px;flex-shrink:0;margin-bottom:2px"/>
         </div>
-      <div style="text-align:right;flex-shrink:0;max-width:185px;padding-bottom:2px">
-        <div style="color:#fff;font-size:12px;font-weight:700;text-decoration:underline;margin-bottom:9px;letter-spacing:.4px">Averages</div>
-        ${avgs.map(a=>`<div style="margin-bottom:6px"><div style="color:#fff;font-size:11px;font-weight:700">${a.label}</div><div style="color:#666;font-size:11px;margin-top:1px">${a.val}</div></div>`).join('')}
-        <div style="margin-top:7px"><div style="color:#fff;font-size:11px;font-weight:700">Timeframe</div><div style="color:#666;font-size:11px;margin-top:1px">${tf}</div></div>
-      </div>
     </div>
   </div>`;
   const cards=[{id:'cover-ig',label:'Card 1 — Cover',html:coverHtml,file:`FPT_${spotAthlete.replace(/ /g,'_')}_Cover.png`}];
@@ -1159,7 +1174,9 @@ function renderXCards(athEntries,availEx){
     pr.fly!=null&&first.fly!=null&&first.fly!==pr.fly&&{label:'Fly Improvement',val:`${((first.fly-pr.fly)/first.fly*100).toFixed(1)}%`},
     pr.broad!=null&&{label:'Broad Jump Best',val:fmtS('broad',pr.broad)},
     pr.broad!=null&&first.broad!=null&&{label:'Broad Increase',val:`${((pr.broad-first.broad)/first.broad*100).toFixed(0)}%`},
-  ].filter(Boolean).slice(0,4);
+    pr.vert!=null&&{label:'Skyhook Best',val:fmtS('vert',pr.vert)},
+    pr.vert!=null&&first.vert!=null&&first.vert!==pr.vert&&{label:'Skyhook Increase',val:`${((pr.vert-first.vert)/first.vert*100).toFixed(1)}%`},
+  ].filter(Boolean).slice(0,6);
   const cards=[
     {id:'cover-x',label:'Cover Card (1200×675)',file:`FPT_${spotAthlete.replace(/ /g,'_')}_Cover_X.png`,
      html:`<div class="x-card"><div class="x-cover">

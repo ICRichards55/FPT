@@ -642,10 +642,11 @@ function saveModalEdit(){
   if(!newName){alert('Name required.');return;}
   var oldName=modalAthlete;
   if(newName!==oldName){
+    var _no=String(oldName||'').trim().toLowerCase();
     var idx=state.athletes.indexOf(oldName);if(idx>-1)state.athletes[idx]=newName;
     state.profiles[newName]=state.profiles[oldName]||{};delete state.profiles[oldName];
-    state.entries.forEach(function(e){if(e.athlete===oldName)e.athlete=newName;});
-    state.achievements.forEach(function(a){if(a.athlete===oldName)a.athlete=newName;});
+    state.entries.forEach(function(e){if(String(e.athlete||'').trim().toLowerCase()===_no)e.athlete=newName;});
+    state.achievements.forEach(function(a){if(String(a.athlete||'').trim().toLowerCase()===_no)a.athlete=newName;});
   }
   if(!state.profiles[newName])state.profiles[newName]={};
   var p=state.profiles[newName];
