@@ -38,7 +38,8 @@ function getLiveFile_() {
   if (files.hasNext()) return files.next();
   var empty = JSON.stringify({
     athletes: [], profiles: {}, entries: [], achievements: [],
-    guests: [], schoolLogos: {}, pendingIntakes: []
+    guests: [], schoolLogos: {}, pendingIntakes: [],
+    adults: {}, challenges: {}, challengeEntries: []
   });
   DriveApp.getRootFolder().createFile('fpt_live.json', empty, MimeType.PLAIN_TEXT);
   return DriveApp.getRootFolder().getFilesByName('fpt_live.json').next();
@@ -57,12 +58,25 @@ function readLive_() {
     return JSON.parse(getLiveFile_().getBlob().getDataAsString());
   } catch(e) {
     return { athletes: [], profiles: {}, entries: [], achievements: [],
-             guests: [], schoolLogos: {}, pendingIntakes: [] };
+             guests: [], schoolLogos: {}, pendingIntakes: [],
+             adults: {}, challenges: {}, challengeEntries: [] };
   }
 }
 
 function writeLive_(state) {
   getLiveFile_().setContent(JSON.stringify(state));
+}
+
+// ── Pending-intake helpers ──────────────────────────────────────────────────
+function _intakeKey_(p){
+  return (((p && p.firstName) || '').trim() + '|' + ((p && p.lastName) || '').trim()).toLowerCase();
+}
+function _ensureIntakeIds_(live){
+  var changed = false;
+  (live.pendingIntakes || []).forEach(function(p){
+    if (p && !p.id){ p.id = Utilities.getUuid(); changed = true; }
+  });
+  return changed;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -139,6 +153,7 @@ function doGet(e) {
   // Default: gym data
   var historical = readHistorical_();
   var live       = readLive_();
+  if (_ensureIntakeIds_(live)) writeLive_(live);  // backfill ids on legacy pendings
 
   var combined = {
     athletes:       live.athletes       || [],
@@ -147,6 +162,9 @@ function doGet(e) {
     guests:         live.guests         || [],
     schoolLogos:    live.schoolLogos    || {},
     pendingIntakes: live.pendingIntakes || [],
+    adults:         live.adults         || {},
+    challenges:     live.challenges     || {},
+    challengeEntries: live.challengeEntries || [],
     entries:        (historical.entries || []).concat(live.entries || [])
   };
 
@@ -163,15 +181,91 @@ function doPost(e) {
   try {
     var payload = JSON.parse(e.postData.contents);
 
-    // ── Pending intake from intake.html ───────────────────────────────────
+    // ── Pending intake from intake.html (id + dedup-by-name + lock) ────────
     if (payload.action === 'pendingIntake') {
-      var live = readLive_();
-      if (!live.pendingIntakes) live.pendingIntakes = [];
-      live.pendingIntakes.push(payload.data);
-      writeLive_(live);
-      return ContentService
-        .createTextOutput(JSON.stringify({ ok: true }))
-        .setMimeType(ContentService.MimeType.JSON);
+      var lock = LockService.getScriptLock();
+      try { lock.waitLock(10000); } catch (e) {}
+      try {
+        var live = readLive_();
+        if (!live.pendingIntakes) live.pendingIntakes = [];
+        var data = payload.data || {};
+        if (!data.id) data.id = Utilities.getUuid();
+        var key = _intakeKey_(data);
+        var existingIdx = -1;
+        for (var pi = 0; pi < live.pendingIntakes.length; pi++) {
+          if (key !== '|' && _intakeKey_(live.pendingIntakes[pi]) === key) { existingIdx = pi; break; }
+        }
+        if (existingIdx >= 0) {
+          data.id = live.pendingIntakes[existingIdx].id || data.id;  // keep stable id
+          live.pendingIntakes[existingIdx] = data;                    // replace, never stack
+        } else {
+          live.pendingIntakes.push(data);
+        }
+        writeLive_(live);
+        return ContentService
+          .createTextOutput(JSON.stringify({ ok: true, id: data.id, replaced: existingIdx >= 0 }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } finally { lock.releaseLock(); }
+    }
+
+    // ── Reject a pending intake (atomic, by id) ───────────────────────────
+    if (payload.action === 'rejectIntake') {
+      var lockR = LockService.getScriptLock();
+      try { lockR.waitLock(10000); } catch (e) {}
+      try {
+        var liveR = readLive_();
+        _ensureIntakeIds_(liveR);
+        var beforeR = (liveR.pendingIntakes || []).length;
+        liveR.pendingIntakes = (liveR.pendingIntakes || []).filter(function(p){ return p.id !== payload.id; });
+        writeLive_(liveR);
+        return ContentService
+          .createTextOutput(JSON.stringify({ ok: true, removed: beforeR - liveR.pendingIntakes.length }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } finally { lockR.releaseLock(); }
+    }
+
+    // ── Approve a pending intake → roster/profile (atomic, by id) ──────────
+    if (payload.action === 'approveIntake') {
+      var lockA = LockService.getScriptLock();
+      try { lockA.waitLock(10000); } catch (e) {}
+      try {
+        var liveA = readLive_();
+        _ensureIntakeIds_(liveA);
+        var pend = liveA.pendingIntakes || [];
+        var d = null;
+        for (var ai = 0; ai < pend.length; ai++) { if (pend[ai].id === payload.id) { d = pend[ai]; break; } }
+        if (!d) {
+          return ContentService.createTextOutput(JSON.stringify({ ok: true, alreadyGone: true }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+        var name = ((d.firstName || '').trim() + (d.lastName ? ' ' + d.lastName.trim() : '')).trim();
+        if (!name) {
+          return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'No name on intake.' }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+        if (!liveA.athletes) liveA.athletes = [];
+        if (!liveA.profiles) liveA.profiles = {};
+        var onRoster = liveA.athletes.indexOf(name) !== -1;
+        if (!onRoster) {
+          liveA.athletes.push(name);
+          liveA.profiles[name] = {
+            gender: d.gender || 'male', dob: d.dob || '', level: d.level || 'k12',
+            highSchool: d.highSchool || '', hsGradYear: d.hsGradYear || '',
+            college: d.college || '', collegeGradYear: d.collegeGradYear || '',
+            collegeClass: d.collegeClass || '', redshirt: d.redshirt || false,
+            fptMonth: d.fptMonth || '', fptYear: d.fptYear || '',
+            sports: d.sports || '', positions: d.positions || '',
+            instagram: d.instagram || '', email: d.email || '',
+            parent1Email: d.parent1Email || '', parent2Email: d.parent2Email || '',
+            inactive: false
+          };
+        }
+        liveA.pendingIntakes = pend.filter(function(p){ return p.id !== payload.id; });
+        writeLive_(liveA);
+        return ContentService
+          .createTextOutput(JSON.stringify({ ok: true, name: name, alreadyOnRoster: onRoster }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } finally { lockA.releaseLock(); }
     }
 
     // ── Copy team athlete to gym roster ───────────────────────────────────
@@ -258,13 +352,22 @@ function handleGymPost_(payload) {
     getHistoricalFile_().setContent(JSON.stringify(historical));
   }
 
+  // pendingIntakes is owned by the dedicated intake actions (submit/reject/
+  // approve), NOT the coach's full-state save — preserve whatever the backend
+  // currently holds so routine gym saves can never clobber a submission or
+  // undo a reject.
+  var _curLive = readLive_();
+
   var liveState = {
     athletes:       payload.athletes       || [],
     profiles:       payload.profiles       || {},
     achievements:   payload.achievements   || [],
     guests:         payload.guests         || [],
     schoolLogos:    payload.schoolLogos    || {},
-    pendingIntakes: payload.pendingIntakes || [],
+    pendingIntakes: (_curLive.pendingIntakes || []),
+    adults:         payload.adults         || {},
+    challenges:     payload.challenges     || {},
+    challengeEntries: payload.challengeEntries || [],
     entries:        liveEntries
   };
 

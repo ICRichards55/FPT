@@ -140,6 +140,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
     <button class="tab" id="tab-today" data-tab="today">Today</button>
     <button class="tab" id="tab-roster" data-tab="roster">Roster</button>
     <button class="tab" id="tab-ach" data-tab="ach">Achievements</button>
+    <button class="tab" id="tab-adults" data-tab="adults">Adults</button>
     <button class="tab" id="tab-settings" data-tab="settings">Settings</button>
   </div>
 </div>
@@ -152,7 +153,7 @@ const LOGO='/fpt_logo.webp';
 
 window._API_URL='https://script.google.com/macros/s/AKfycbwirWQw0-hVSwIwVl6RCWcclgRNKia7awlfUzImilUiKjNKtSapuCueOaTwWgTlJ6Uk/exec';try{localStorage.setItem('fpt_api_url',API_URL);}catch(e){};
 function _esc(s){return String(s).replace(/'/g,"\\'");}
-var state={athletes:[],profiles:{},entries:[],achievements:[],guests:[],schoolLogos:{},pendingIntakes:[]};
+var state={athletes:[],profiles:{},entries:[],achievements:[],guests:[],schoolLogos:{},pendingIntakes:[],adults:{},challenges:{},challengeEntries:[]};
 function getAthleteSchool(name){
   var p=(state.profiles||{})[name]||{};
   var today=new Date();
@@ -173,6 +174,7 @@ var todayEditId=null,todayEditData={};
 var rosterQ='';
 var delAthName='';
 var achAthlete='',achAthQ='',achDdOpen=false,achText='',achWeeks=4,achIsGuest=false;
+var adultSection='roster',newAdultName='',newAdultDob='',challAdult='',challValue='',challDate=TODAY,cdName='',cdUnit='',cdDir='lower',challEditing=false;
 var achEditId=null,achEditText='',achEditWeeks=4;
 var settingsSection='logolib';
 var logoSchool='',logoUrl='';
@@ -294,6 +296,7 @@ function render(){
   else if(currentTab==='today')app.innerHTML=renderToday();
   else if(currentTab==='roster')app.innerHTML=renderRoster();
   else if(currentTab==='ach')app.innerHTML=renderAch();
+  else if(currentTab==='adults')app.innerHTML=renderAdults();
   else if(currentTab==='settings'){app.innerHTML=renderSettings();if(settingsSection==='bulkimport')setTimeout(_bindImportEvents,50);}
 }
 function renderLog(){
@@ -808,6 +811,188 @@ function endNowAch(id){
   a.archived=true;
   saveData();render();
 }
+// ── ADULTS TAB ──────────────────────────────────────────────────────────────
+function adultList(){
+  var set={};
+  (state.guests||[]).forEach(function(g){set[g]=1;});
+  Object.keys(state.adults||{}).forEach(function(a){set[a]=1;});
+  return Object.keys(set).sort(function(a,b){return a.localeCompare(b);});
+}
+function curChallMonth(){return TODAY.slice(0,7);}
+function challMonthLabel(m){var MN=['January','February','March','April','May','June','July','August','September','October','November','December'];var p=String(m).split('-');return (MN[+p[1]-1]||'')+' '+p[0];}
+function setAdultSection(s){adultSection=s;challEditing=false;render();}
+
+function addAdult(){
+  var n=(newAdultName||'').trim();
+  if(!n){alert('Enter a name.');return;}
+  if(!state.adults)state.adults={};
+  if(!state.guests)state.guests=[];
+  if(adultList().some(function(x){return x.toLowerCase()===n.toLowerCase();})){alert(n+' is already an adult.');return;}
+  if(!state.guests.includes(n))state.guests.push(n);
+  state.adults[n]={dob:(newAdultDob||'')};
+  newAdultName='';newAdultDob='';
+  saveData();showToast(n+' added.');render();
+}
+function setAdultDob(name,val){
+  if(!state.adults)state.adults={};
+  if(!state.adults[name])state.adults[name]={};
+  state.adults[name].dob=val;
+  saveData();showToast('Saved.');
+}
+function removeAdult(name){
+  if(!confirm('Remove '+name+' from adults? Their challenge results will also be removed.'))return;
+  state.guests=(state.guests||[]).filter(function(g){return g!==name;});
+  if(state.adults)delete state.adults[name];
+  state.challengeEntries=(state.challengeEntries||[]).filter(function(e){return e.adult!==name;});
+  saveData();showToast(name+' removed.');render();
+}
+
+function renderAdults(){
+  var sub=['roster','challenge'],lbls=['Roster','Monthly Challenge'];
+  var nav=sub.map(function(s,i){return '<button class="sn-btn'+(adultSection===s?' on':'')+'" onclick="setAdultSection(\''+s+'\')">'+lbls[i]+'</button>';}).join('');
+  var content=adultSection==='challenge'?renderAdultChallenge():renderAdultRoster();
+  return '<div class="sn-nav">'+nav+'</div>'+content;
+}
+
+function renderAdultRoster(){
+  var list=adultList();
+  var rows=list.map(function(n){
+    var dob=(state.adults[n]&&state.adults[n].dob)||'';
+    var en=_esc(n);
+    return '<div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="flex:1;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:16px">'+n+'</div>'
+      +'<input class="form-input" type="date" value="'+dob+'" data-adult="'+en+'" onchange="setAdultDob(this.dataset.adult,this.value)" style="width:175px"/>'
+      +'<button class="action-btn" style="color:var(--red)" data-adult="'+en+'" onclick="removeAdult(this.dataset.adult)">Remove</button>'
+      +'</div>';
+  }).join('');
+  return '<div class="panel"><div class="panel-title">Adults <span style="font-size:14px;color:var(--muted);font-weight:400">('+list.length+')</span></div>'
+    +'<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Adults (coaches, members) tracked for birthdays and the monthly challenge. Lightweight: name + date of birth.</div>'
+    +'<div class="row" style="gap:10px;margin-bottom:14px;align-items:flex-end">'
+    +'<div class="form-group" style="flex:1"><div class="form-label">Name</div><input class="form-input" value="'+newAdultName.replace(/"/g,'&quot;')+'" oninput="newAdultName=this.value" onkeydown="if(event.key===\'Enter\')addAdult()"/></div>'
+    +'<div class="form-group"><div class="form-label">Date of Birth</div><input class="form-input" type="date" value="'+newAdultDob+'" oninput="newAdultDob=this.value"/></div>'
+    +'<button class="btn btn-accent btn-sm" onclick="addAdult()">Add Adult</button></div>'
+    +(rows||'<div class="empty">No adults yet</div>')+'</div>';
+}
+
+function saveChallengeDef(){
+  var m=curChallMonth();
+  var name=(cdName||'').trim();
+  if(!name){alert('Enter a challenge name.');return;}
+  if(!state.challenges)state.challenges={};
+  state.challenges[m]={name:name,unit:(cdUnit||'').trim(),betterDir:cdDir||'lower'};
+  challEditing=false;
+  saveData();showToast('Challenge set for '+challMonthLabel(m));render();
+}
+function startEditChallenge(){
+  var ch=(state.challenges||{})[curChallMonth()]||{};
+  cdName=ch.name||'';cdUnit=ch.unit||'';cdDir=ch.betterDir||'lower';
+  challEditing=true;render();
+}
+function logChallengeResult(){
+  var m=curChallMonth();
+  if(!state.challenges||!state.challenges[m]){alert('Define the challenge first.');return;}
+  if(!challAdult){alert('Pick an adult.');return;}
+  var v=parseFloat(challValue);
+  if(isNaN(v)){alert('Enter a numeric result.');return;}
+  if(!state.challengeEntries)state.challengeEntries=[];
+  state.challengeEntries.push({id:_uid(),month:m,adult:challAdult,value:v,date:(challDate||TODAY)});
+  challAdult='';challValue='';challDate=TODAY;
+  saveData();showToast('Result logged.');render();
+}
+function deleteChallengeResult(id){
+  if(!confirm('Delete this result?'))return;
+  state.challengeEntries=(state.challengeEntries||[]).filter(function(e){return e.id!==id;});
+  saveData();showToast('Deleted.');render();
+}
+function challImprovement(m,adult){
+  var es=(state.challengeEntries||[]).filter(function(e){return e.month===m&&e.adult===adult;}).slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
+  if(!es.length)return null;
+  var baseline=es[0],latest=es[es.length-1];
+  if(es.length<2)return {baseline:baseline.value,latest:null,improvement:null,n:1};
+  var dir=((state.challenges[m]||{}).betterDir)||'lower';
+  var imp=dir==='higher'?(latest.value-baseline.value):(baseline.value-latest.value);
+  return {baseline:baseline.value,latest:latest.value,improvement:imp,n:es.length};
+}
+
+function renderAdultChallenge(){
+  var m=curChallMonth();var ch=(state.challenges||{})[m];
+  if(!ch||challEditing){
+    var dirTog='<div class="toggle-group"><button class="tog'+(cdDir==='lower'?' on':'')+'" onclick="cdDir=\'lower\';render()">Lower is better</button><button class="tog'+(cdDir==='higher'?' on':'')+'" onclick="cdDir=\'higher\';render()">Higher is better</button></div>';
+    return '<div class="panel"><div class="panel-title">'+(ch?'Edit':'Define')+' '+challMonthLabel(m)+' Challenge</div>'
+      +'<div style="display:flex;flex-direction:column;gap:14px">'
+      +'<div class="form-group"><div class="form-label">Challenge Name</div><input class="form-input" placeholder="e.g. Echo Bike Max Watts" value="'+(cdName||'').replace(/"/g,'&quot;')+'" oninput="cdName=this.value"/></div>'
+      +'<div class="form-group"><div class="form-label">Unit / Output</div><input class="form-input" placeholder="e.g. watts, seconds, reps, meters" value="'+(cdUnit||'').replace(/"/g,'&quot;')+'" oninput="cdUnit=this.value"/></div>'
+      +'<div class="form-group"><div class="form-label">Scoring</div>'+dirTog+'</div>'
+      +'<button class="submit-btn" onclick="saveChallengeDef()">Save Challenge</button>'
+      +(ch?'<button class="btn btn-ghost" style="width:100%" onclick="challEditing=false;render()">Cancel</button>':'')
+      +'</div></div>';
+  }
+  var adults=adultList();
+  var opts='<option value="">Select adult...</option>'+adults.map(function(a){return '<option value="'+_esc(a)+'"'+(challAdult===a?' selected':'')+'>'+a+'</option>';}).join('');
+  var logCard='<div class="panel"><div class="panel-title">'+ch.name+(ch.unit?' <span style="font-size:13px;color:var(--muted);font-weight:400">('+ch.unit+' &middot; '+(ch.betterDir==='higher'?'higher better':'lower better')+')</span>':'')+'<button class="btn btn-ghost btn-sm" style="float:right" onclick="startEditChallenge()">Edit</button></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:flex-end">'
+    +'<div class="form-group"><div class="form-label">Adult</div><select class="form-input" onchange="challAdult=this.value">'+opts+'</select></div>'
+    +'<div class="form-group"><div class="form-label">Result'+(ch.unit?' &mdash; '+ch.unit:'')+'</div><input class="form-input" type="number" step="0.001" value="'+(challValue||'')+'" oninput="challValue=this.value" placeholder="0"/></div>'
+    +'<div class="form-group"><div class="form-label">Date</div><input class="form-input" type="date" value="'+(challDate||TODAY)+'" onchange="challDate=this.value" style="width:160px"/></div>'
+    +'</div>'
+    +'<button class="btn btn-accent" style="margin-top:12px;width:100%" onclick="logChallengeResult()">Log Result</button></div>';
+
+  var withData=adults.filter(function(a){return (state.challengeEntries||[]).some(function(e){return e.month===m&&e.adult===a;});});
+  var ranked=withData.map(function(a){return {a:a,imp:challImprovement(m,a)};}).sort(function(x,y){
+    var xi=(x.imp&&x.imp.improvement!=null)?x.imp.improvement:-Infinity;
+    var yi=(y.imp&&y.imp.improvement!=null)?y.imp.improvement:-Infinity;
+    return yi-xi;
+  });
+  var tableRows=ranked.map(function(r){
+    var im=r.imp;
+    var base=im.baseline!=null?im.baseline:'&mdash;';
+    var latest=im.latest!=null?im.latest:'<span style="color:var(--muted2)">awaiting 2nd</span>';
+    var impTxt=im.improvement!=null?((im.improvement>0?'+':'')+(Math.round(im.improvement*1000)/1000)):'&mdash;';
+    var impColor=im.improvement!=null?(im.improvement>0?'var(--accent)':(im.improvement<0?'var(--red)':'var(--muted)')):'var(--muted2)';
+    var ents=(state.challengeEntries||[]).filter(function(e){return e.month===m&&e.adult===r.a;}).slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
+    var del=ents.map(function(e){return '<button class="action-btn" style="color:var(--muted2);font-size:10px" onclick="deleteChallengeResult(\''+e.id+'\')">'+e.value+' ('+fmtShortDate(e.date)+') &#10005;</button>';}).join(' ');
+    return '<tr><td style="padding:8px 10px;border-bottom:1px solid var(--border);font-family:\'Barlow Condensed\',sans-serif;font-weight:700">'+r.a+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid var(--border);text-align:right">'+base+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid var(--border);text-align:right">'+latest+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:900;color:'+impColor+'">'+impTxt+'</td>'
+      +'<td style="padding:8px 10px;border-bottom:1px solid var(--border);text-align:right">'+del+'</td></tr>';
+  }).join('');
+  var resultsCard=withData.length?('<div class="panel" style="margin-top:14px"><div class="panel-title">Leaderboard <span style="font-size:13px;color:var(--muted);font-weight:400">(by improvement)</span></div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr>'
+    +'<th style="text-align:left;padding:6px 10px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Adult</th>'
+    +'<th style="text-align:right;padding:6px 10px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Baseline</th>'
+    +'<th style="text-align:right;padding:6px 10px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Latest</th>'
+    +'<th style="text-align:right;padding:6px 10px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Improvement</th>'
+    +'<th style="text-align:right;padding:6px 10px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Entries</th>'
+    +'</tr></thead><tbody>'+tableRows+'</tbody></table></div>'):'';
+  return logCard+resultsCard;
+}
+
+function viewPendingIntake(id){
+  var p=(state.pendingIntakes||[]).filter(function(x){return x.id===id;})[0];
+  if(!p){showToast('Submission not found.');return;}
+  function vrow(label,val){if(val===undefined||val===null||val==='')return'';return '<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)"><div style="min-width:150px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">'+label+'</div><div style="font-size:14px">'+val+'</div></div>';}
+  var name=(p.firstName||'')+(p.lastName?' '+p.lastName:'');
+  var lvl=p.level==='k12'?'K-12':p.level==='college'?'College':p.level==='pro'?'Pro':(p.level||'');
+  var html='<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:900;margin-bottom:4px">'+name+'</div>'
+    +'<div style="font-size:12px;color:var(--muted);margin-bottom:16px">Pending intake submission</div>'
+    +vrow('Date of Birth',p.dob?dobStr(p.dob):'')
+    +vrow('Gender',p.gender)+vrow('Level',lvl)
+    +vrow('High School',(p.highSchool||'')+(p.hsGradYear?' (Class of '+p.hsGradYear+')':''))
+    +vrow('College',(p.college||'')+(p.collegeGradYear?' (Class of '+p.collegeGradYear+')':''))
+    +vrow('College Class',p.collegeClass)+vrow('Redshirt',p.redshirt?'Yes':'')
+    +vrow('FPT Start',p.fptMonth&&p.fptYear?p.fptMonth+'/'+p.fptYear:'')
+    +vrow('Sport(s)',p.sports)+vrow('Position(s)',p.positions)
+    +vrow('Instagram',p.instagram?'@'+String(p.instagram).replace('@',''):'')
+    +vrow('Athlete Email',p.email)+vrow('Parent 1 Email',p.parent1Email)+vrow('Parent 2 Email',p.parent2Email)
+    +vrow('Submitted',p.submittedAt?new Date(p.submittedAt).toLocaleString():'')
+    +'<div style="display:flex;gap:8px;margin-top:18px">'
+    +'<button class="btn btn-accent" style="flex:1" onclick="closeModal();approvePendingIntake(\''+p.id+'\')">Approve</button>'
+    +'<button class="btn" style="flex:1;background:var(--surface3);color:var(--muted)" onclick="closeModal();rejectPendingIntake(\''+p.id+'\')">Reject</button>'
+    +'<button class="btn btn-ghost" onclick="closeModal()">Close</button></div>';
+  showModal(html);
+}
+
 function renderSettings(){
   var sections=['logolib','export','intake','history','backup','bulkimport','bulkedit'];
   var labels=['Logo Library','Data Export','Intake','History','Backup & Restore','Bulk Import','Bulk Editor'];
@@ -1062,7 +1247,7 @@ function renderHist(){
   var EX_C={fly:'var(--fly)',broad:'var(--broad)',vert:'var(--vert)',fly510:'var(--muted)',rsi42:'var(--muted)'};
   return '<div class="panel"><div class="panel-title">Recent Entries (last 100)</div>'+recent.map(function(e){var ex=EX_LIST.filter(function(x){return x.id===e.exercise;})[0]||{name:e.exercise};var val=e.exercise==='broad'?fmtBroad(e.total):e.exercise==='fly'?fmtFly(e.value):fmtVert(e.value);return '<div class="hist-row"><span class="hist-date">'+fmtShortDate(e.date)+'</span><span class="hist-ath">'+e.athlete+'</span><span class="hist-ex" style="color:'+(EX_C[e.exercise]||'var(--muted)')+'">'+ex.name.split(' ')[0]+'</span><span class="hist-val">'+val+'</span></div>';}).join('')+'</div>';
 }
-async function loadData(){var loaded=await _apiLoad();if(loaded&&Array.isArray(loaded.athletes)){state=loaded;}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];render();}
+async function loadData(){var loaded=await _apiLoad();if(loaded&&Array.isArray(loaded.athletes)){state=loaded;}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];if(!state.adults)state.adults={};if(!state.challenges)state.challenges={};if(!state.challengeEntries)state.challengeEntries=[];render();}
 function _uid(){try{if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();}catch(e){}return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)+'-'+Math.random().toString(36).slice(2,10);}
 function saveData(){
   // Auto-archive naturally expired achievements to profiles
@@ -1125,7 +1310,7 @@ function renderPendingIntakes(){
       +'<div style="font-size:11px;color:var(--muted);margin-top:4px">Submitted '+submitted+'</div>'
       +'</div>'
       +'<div style="display:flex;gap:8px;flex-shrink:0">'
-      +'<button class="btn btn-accent" style="padding:6px 16px;font-size:13px" onclick="approvePendingIntake(\''+p.id+'\')">Approve</button>'
+      +'<button class="btn" style="padding:6px 14px;font-size:13px;background:var(--surface3);color:var(--text)" onclick="viewPendingIntake(\''+p.id+'\')">View</button>'+'<button class="btn btn-accent" style="padding:6px 16px;font-size:13px" onclick="approvePendingIntake(\''+p.id+'\')">Approve</button>'
       +'<button class="btn" style="padding:6px 14px;font-size:13px;background:var(--surface3);color:var(--muted)" onclick="rejectPendingIntake(\''+p.id+'\')">Reject</button>'
       +'</div>'
       +'</div>'

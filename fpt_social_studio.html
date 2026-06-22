@@ -210,6 +210,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
     <button class="nav-btn active" id="tab-story" onclick="setTab('story')">PR Stories</button>
     <button class="nav-btn" id="tab-spot" onclick="setTab('spot')">Athlete Spotlights</button>
     <button class="nav-btn" id="tab-monthpr" onclick="setTab('monthpr')">Month PRs</button>
+    <button class="nav-btn" id="tab-challenge" onclick="setTab('challenge')">Adult Challenge</button>
   </div>
 </div>
 
@@ -232,6 +233,13 @@ let mprMonth = _nowET.getDate() <= 5
   ? (_nowET.getMonth() === 0 ? 11 : _nowET.getMonth()-1)
   : _nowET.getMonth(); // 0-indexed
 let mprExIdx = 0; // which exercise graphic is showing (0=fly,1=broad,2=vert)
+// Adult Monthly Challenge state (same day<=5 -> previous month container logic)
+let challYear = _nowET.getDate() <= 5
+  ? (_nowET.getMonth() === 0 ? _nowET.getFullYear()-1 : _nowET.getFullYear())
+  : _nowET.getFullYear();
+let challMonth = _nowET.getDate() <= 5
+  ? (_nowET.getMonth() === 0 ? 11 : _nowET.getMonth()-1)
+  : _nowET.getMonth();
 
 // Story state
 let storyType='gym'; // gym | athlete
@@ -342,6 +350,9 @@ async function loadData(){
   const loaded=await _apiLoad();
   if(loaded)state=loaded;
   if(!state.profiles)state.profiles={};
+  if(!state.adults)state.adults={};
+  if(!state.challenges)state.challenges={};
+  if(!state.challengeEntries)state.challengeEntries=[];
   render();
 }
 
@@ -491,6 +502,7 @@ function render(){
   const app=document.getElementById('app');
   if(currentTab==='story')app.innerHTML=renderStory();
   else if(currentTab==='monthpr')app.innerHTML=renderMonthPR();
+  else if(currentTab==='challenge')app.innerHTML=renderChallenge();
   else app.innerHTML=renderSpotlight();
   renderStoryPreview();
   updateOverlay();
@@ -780,6 +792,164 @@ async function downloadMPR(ex, athletes, year, month, pageNum, pageCount) {
     a.download = 'FPT_'+monStr+'_PRs_'+ex+pageSuffix+'.png';
     a.click();
   }
+}
+
+// ── ADULT MONTHLY CHALLENGE GRAPHIC ──────────────────────────────
+function _ch_round3(v){return Math.round(v*1000)/1000;}
+function getChallengeData(year, month){
+  const mm=year+'-'+String(month+1).padStart(2,'0');
+  const ch=(state.challenges||{})[mm];
+  if(!ch)return {ch:null,rows:[]};
+  const ents=(state.challengeEntries||[]).filter(e=>e.month===mm);
+  const byAdult={};
+  ents.forEach(e=>{(byAdult[e.adult]=byAdult[e.adult]||[]).push(e);});
+  const dir=ch.betterDir||'lower';
+  let rows=Object.keys(byAdult).map(a=>{
+    const es=byAdult[a].slice().sort((x,y)=>String(x.date).localeCompare(String(y.date)));
+    const baseline=es[0].value, latest=es.length>1?es[es.length-1].value:null;
+    const improvement=latest!=null?(dir==='higher'?latest-baseline:baseline-latest):null;
+    return {adult:a,baseline:baseline,latest:latest,improvement:improvement};
+  });
+  rows.sort((x,y)=>{const xi=x.improvement!=null?x.improvement:-Infinity;const yi=y.improvement!=null?y.improvement:-Infinity;return yi-xi;});
+  return {ch:ch,rows:rows};
+}
+
+function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
+  const canvas=document.createElement('canvas');
+  canvas.width=1080;canvas.height=1080;
+  const ctx=canvas.getContext('2d');
+  // Background
+  ctx.fillStyle='#0a0a0a';ctx.fillRect(0,0,1080,1080);
+  // Subtle halftone band along the bottom for texture (brand-consistent)
+  ctx.save();
+  ctx.fillStyle='#1a1a1a';
+  for(let dy=1012;dy<1080;dy+=18){for(let dx=20;dx<1080;dx+=18){ctx.beginPath();ctx.arc(dx,dy,2.4,0,Math.PI*2);ctx.fill();}}
+  ctx.restore();
+
+  // Title — "<MONTH> CHALLENGE"
+  ctx.fillStyle='#ffffff';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  let titleStr=MONTH_NAMES[month].toUpperCase()+' CHALLENGE';
+  let tf=70;ctx.font='italic 900 '+tf+'px "Barlow Condensed", sans-serif';
+  while(ctx.measureText(titleStr).width>1000&&tf>40){tf-=2;ctx.font='italic 900 '+tf+'px "Barlow Condensed", sans-serif';}
+  ctx.fillText(titleStr,40,100);
+  // Subtitle — challenge name + unit + direction
+  let sub=ch.name.toUpperCase()+(ch.unit?'  ('+ch.unit.toUpperCase()+')':'')+'   \u00B7   '+(ch.betterDir==='higher'?'HIGHER IS BETTER':'LOWER IS BETTER');
+  let sf=34;ctx.fillStyle='#bbbbbb';ctx.font='italic 700 '+sf+'px "Barlow Condensed", sans-serif';
+  while(ctx.measureText(sub).width>1000&&sf>18){sf-=2;ctx.font='italic 700 '+sf+'px "Barlow Condensed", sans-serif';}
+  ctx.fillText(sub,40,142);
+  // Accent divider under header
+  ctx.fillStyle='#ffffff';ctx.fillRect(40,158,1000,3);
+
+  // Table geometry
+  const tableTop=200, tableBottom=1000, headH=48;
+  const n=rows.length;
+  const rowH=Math.min(60, Math.floor((tableBottom-tableTop-headH)/Math.max(n,1)));
+  const colAdultX=124, colBase=712, colLatest=872, colImp=1040;
+
+  // Header row
+  ctx.fillStyle='#888888';ctx.font='700 28px "Barlow Condensed", sans-serif';
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillText('#',44,tableTop+32);
+  ctx.fillText('ADULT',colAdultX,tableTop+32);
+  ctx.textAlign='right';
+  ctx.fillText('BASE',colBase,tableTop+32);
+  ctx.fillText('LATEST',colLatest,tableTop+32);
+  ctx.fillText('IMPROVE',colImp,tableTop+32);
+  ctx.fillStyle='#333333';ctx.fillRect(40,tableTop+headH-6,1000,2);
+
+  rows.forEach((r,i)=>{
+    const y=tableTop+headH+i*rowH;
+    if(i%2===1){ctx.fillStyle='#141414';ctx.fillRect(40,y,1000,rowH);}
+    const midY=y+rowH/2;
+    ctx.textBaseline='middle';
+    // rank
+    ctx.fillStyle='#5e5e5e';ctx.font='900 '+Math.floor(rowH*0.40)+'px "Barlow Condensed", sans-serif';
+    ctx.textAlign='left';ctx.fillText(String(i+1),44,midY);
+    // adult name
+    ctx.fillStyle='#ffffff';let nf=Math.floor(rowH*0.50);ctx.font='italic 900 '+nf+'px "Barlow Condensed", sans-serif';
+    let nm=r.adult.toUpperCase();
+    while(ctx.measureText(nm).width>(colBase-70-colAdultX)&&nf>16){nf-=2;ctx.font='italic 900 '+nf+'px "Barlow Condensed", sans-serif';}
+    ctx.fillText(nm,colAdultX,midY);
+    // baseline
+    ctx.textAlign='right';ctx.fillStyle='#8c8c8c';ctx.font='900 '+Math.floor(rowH*0.44)+'px "Barlow Condensed", sans-serif';
+    ctx.fillText(String(_ch_round3(r.baseline)),colBase,midY);
+    // latest
+    ctx.fillStyle='#ffffff';
+    ctx.fillText(r.latest!=null?String(_ch_round3(r.latest)):'\u2014',colLatest,midY);
+    // improvement
+    const imp=r.improvement;
+    ctx.fillStyle=imp==null?'#4a4a4a':(imp>0?'#3ad07a':(imp<0?'#e0564b':'#9a9a9a'));
+    ctx.font='900 '+Math.floor(rowH*0.46)+'px "Barlow Condensed", sans-serif';
+    ctx.fillText(imp!=null?((imp>0?'+':'')+_ch_round3(imp)):'\u2014',colImp,midY);
+    ctx.textBaseline='alphabetic';
+  });
+
+  // Page indicator
+  if(pageCount&&pageCount>1){
+    ctx.fillStyle='#666666';ctx.font='700 26px "Barlow Condensed", sans-serif';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    ctx.fillText('PAGE '+pageNum+' / '+pageCount,40,1052);
+  }
+  // Logo bottom-right
+  try{
+    const logoImg=document.querySelector('img.logo-img')||new Image();
+    if(logoImg.complete&&logoImg.naturalWidth>0){const lh=116;const lw=lh*(logoImg.naturalWidth/logoImg.naturalHeight);ctx.drawImage(logoImg,1048-lw,1058-lh,lw,lh);}
+    else{ctx.fillStyle='#ffffff';ctx.font='italic 900 60px "Barlow Condensed", sans-serif';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText('FPT',1048,1056);}
+  }catch(e){}
+  return canvas;
+}
+
+async function downloadChallenge(year, month, rows, ch, pageNum, pageCount){
+  if(!rows||!rows.length){alert('No challenge results to export.');return;}
+  const _logo=document.querySelector('img.logo-img');
+  if(_logo&&!(_logo.complete&&_logo.naturalWidth>0)){await new Promise(r=>{_logo.onload=r;_logo.onerror=r;setTimeout(r,2000);});}
+  const canvas=buildChallengeCanvas(year,month,rows,ch,pageNum,pageCount);
+  const dataUrl=canvas.toDataURL('image/png');
+  const monStr=MONTH_SHORT[month]+year;
+  const pageSuffix=(pageCount&&pageCount>1)?('_p'+pageNum):'';
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  if(isIOS){
+    const w=window.open('','_blank');
+    if(w){w.document.write('<html><head><title>FPT '+monStr+' Challenge</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="'+dataUrl+'"/><p>Long-press \u2192 Save Image to Camera Roll</p></body></html>');w.document.close();}
+  }else{
+    const a=document.createElement('a');a.href=dataUrl;a.download='FPT_'+monStr+'_Challenge'+pageSuffix+'.png';a.click();
+  }
+}
+
+function renderChallenge(){
+  const {ch,rows}=getChallengeData(challYear,challMonth);
+  const monthLabel=MONTH_NAMES[challMonth]+' '+challYear;
+  const PER=14;
+  const pages=[];
+  for(let i=0;i<rows.length;i+=PER)pages.push(rows.slice(i,i+PER));
+  window._chPrev=()=>{if(challMonth===0){challMonth=11;challYear--;}else challMonth--;render();};
+  window._chNext=()=>{if(challMonth===11){challMonth=0;challYear++;}else challMonth++;render();};
+  window._chDownload=(pi)=>downloadChallenge(challYear,challMonth,pages[pi],ch,pi+1,pages.length);
+  setTimeout(()=>{
+    const el=document.getElementById('ch-preview');if(!el)return;
+    if(!ch){el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">No challenge defined for '+monthLabel+'.<br>Set one in the coaching portal \u2192 Adults \u2192 Monthly Challenge.</div>';return;}
+    if(!rows.length){el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">No results logged yet for \u201C'+ch.name+'\u201D.</div>';return;}
+    el.innerHTML='';
+    pages.forEach((pageRows,pi)=>{
+      const wrap=document.createElement('div');wrap.style.cssText='width:100%;margin-bottom:18px';
+      if(pages.length>1){const lbl=document.createElement('div');lbl.style.cssText="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--accent);margin-bottom:6px;text-align:center";lbl.textContent='Page '+(pi+1)+' of '+pages.length;wrap.appendChild(lbl);}
+      const canvas=buildChallengeCanvas(challYear,challMonth,pageRows,ch,pi+1,pages.length);
+      canvas.style.width='100%';canvas.style.borderRadius='8px';wrap.appendChild(canvas);
+      const btn=document.createElement('button');btn.className='submit-btn';btn.style.cssText='margin-top:10px';
+      btn.textContent=pages.length>1?('Download Page '+(pi+1)+' (1080\u00D71080 PNG)'):'Download 1080\u00D71080 PNG';
+      btn.onclick=()=>window._chDownload(pi);wrap.appendChild(btn);
+      el.appendChild(wrap);
+    });
+  },0);
+  const subtitle=ch?(ch.name+(ch.unit?' ('+ch.unit+')':'')):'No challenge set this month';
+  return '<div class="panel">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<button onclick="_chPrev()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700">\u2039 Prev</button>'
+    +'<div style="text-align:center"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--accent)">'+monthLabel+'</div>'
+    +'<div style="font-size:12px;color:var(--muted)">'+subtitle+'</div></div>'
+    +'<button onclick="_chNext()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700">Next \u203A</button>'
+    +'</div>'
+    +'<div id="ch-preview" style="min-height:200px;background:var(--surface2);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px"><div style="color:var(--muted);font-size:13px">Loading preview...</div></div>'
+    +'</div>';
 }
 
 function renderMonthPR() {

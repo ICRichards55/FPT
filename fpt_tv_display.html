@@ -78,6 +78,26 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .nd{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22);transition:.3s;cursor:pointer}
 .nd.on{background:rgba(255,255,255,.85)}
 .prog-bar{position:fixed;bottom:0;left:0;height:3px;background:rgba(255,255,255,.5);z-index:300}
+/* BIRTHDAYS (dark slide) */
+.bd-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 3vw}
+.bd-title{font-family:'Permanent Marker',cursive;font-size:clamp(70px,13vw,210px);line-height:.82;color:#fff;text-transform:uppercase;margin-bottom:.4vh;flex-shrink:0}
+.bd-sub{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(18px,2.6vw,44px);letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:3vh;flex-shrink:0}
+.bd-list{display:grid;grid-template-columns:repeat(2,1fr);gap:.6vh 4vw;align-content:start;flex:1}
+.bd-item{display:flex;justify-content:space-between;align-items:baseline;gap:1vw;padding:.9vh 0;border-bottom:1px solid rgba(255,255,255,.15)}
+.bd-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(20px,2.6vw,44px);color:#fff;letter-spacing:1px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-date{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(15px,1.9vw,32px);color:rgba(255,255,255,.6);white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
+.bd-today .bd-name,.bd-today .bd-date{color:#ffd34d}
+/* MONTHLY CHALLENGE (light slide) */
+.ch-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 3vw}
+.ch-title{font-family:'Permanent Marker',cursive;font-size:clamp(56px,9vw,150px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
+.ch-name-sub{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(20px,2.8vw,46px);letter-spacing:1px;text-transform:uppercase;color:#222;margin:1vh 0 2.5vh;flex-shrink:0}
+.ch-table{width:100%;border-collapse:collapse;font-family:'Barlow Condensed',sans-serif}
+.ch-table th{font-size:clamp(13px,1.5vw,24px);font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#777;text-align:right;padding:.6vh 1.2vw;border-bottom:2px solid #ccc}
+.ch-table td{font-size:clamp(18px,2.3vw,40px);font-weight:700;color:#111;text-align:right;padding:.65vh 1.2vw;border-bottom:1px solid rgba(0,0,0,.1)}
+.ch-rank{color:#999;font-weight:900;text-align:center!important;width:clamp(40px,5vw,80px)}
+.ch-name{text-align:left!important;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
+.ch-imp{font-weight:900;color:#999}
+.ch-pos{color:#1a8f3c}
 </style>
 </head>
 <body>
@@ -87,9 +107,10 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 <script>
 window._API_URL='https://script.google.com/macros/s/AKfycbwirWQw0-hVSwIwVl6RCWcclgRNKia7awlfUzImilUiKjNKtSapuCueOaTwWgTlJ6Uk/exec';
 const LOGO='/fpt_logo.webp';
+const SHOW_CHALLENGE_SLIDE=false; // TV Monthly Challenge slide — flip to true after talking with Chris
 const SHREDMILL_URL='';
-const SLIDE_TIMES=[10,12,12,12,12,12,12,14,12,11,13];
-const TOTAL_SLIDES=11;
+let SLIDE_TIMES=[10,12,12,12,12,12,12,14,12,11,13];
+let TOTAL_SLIDES=11;
 const EX=[
   {id:'fly',  name:'10-10 Fly',  lower:true},
   {id:'broad',name:'Broad Jump', lower:false},
@@ -342,6 +363,96 @@ function buildCongrats(){
   </div>`;
 }
 
+// ── BIRTHDAYS + CHALLENGE (dynamic, self-suppressing) ────────────
+function _etNow(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));}
+function round3(v){return Math.round(v*1000)/1000;}
+function weekRangeMonSun(){
+  var now=_etNow();
+  var day=now.getDay();              // 0=Sun..6=Sat
+  var diffToMon=(day===0?-6:1-day);
+  var mon=new Date(now.getFullYear(),now.getMonth(),now.getDate()+diffToMon);
+  return {mon:mon,today:now};
+}
+function birthdaysThisWeek(){
+  var r=weekRangeMonSun();
+  var cands=[];
+  var p=state.profiles||{};
+  Object.keys(p).forEach(function(n){var pr=p[n];if(pr&&!pr.inactive&&pr.dob)cands.push({name:n,dob:pr.dob});});
+  var ad=state.adults||{};
+  Object.keys(ad).forEach(function(n){if(ad[n]&&ad[n].dob)cands.push({name:n,dob:ad[n].dob});});
+  var out=[],seen={};
+  cands.forEach(function(c){
+    if(seen[c.name])return;
+    var parts=String(c.dob).split('-'); if(parts.length!==3)return;
+    var bm=+parts[1],bd=+parts[2];
+    for(var i=0;i<7;i++){
+      var d=new Date(r.mon.getFullYear(),r.mon.getMonth(),r.mon.getDate()+i);
+      if(d.getMonth()+1===bm&&d.getDate()===bd){
+        var isToday=(r.today.getMonth()===d.getMonth()&&r.today.getDate()===d.getDate());
+        out.push({name:c.name,bm:bm,bd:bd,dayIndex:i,isToday:isToday});
+        seen[c.name]=1;break;
+      }
+    }
+  });
+  out.sort(function(a,b){return a.dayIndex-b.dayIndex||a.name.localeCompare(b.name);});
+  return out;
+}
+function fmtBday(bm,bd){var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return (MN[bm-1]||'')+' '+bd;}
+function buildBirthdays(){
+  var list=birthdaysThisWeek();
+  if(!list.length)return '';            // self-suppress when no birthdays this week
+  var items=list.map(function(b){
+    return '<div class="bd-item'+(b.isToday?' bd-today':'')+'">'
+      +'<span class="bd-name">'+b.name+(b.isToday?' \uD83C\uDF89':'')+'</span>'
+      +'<span class="bd-date">'+fmtBday(b.bm,b.bd)+(b.isToday?' \u00B7 TODAY':'')+'</span>'
+      +'</div>';
+  }).join('');
+  return '<div class="slide slide-dark">'+whiteBrush()
+    +'<img class="slide-logo logo-cover" src="'+LOGO+'" alt="FPT"/>'
+    +'<div class="bd-body">'
+    +'<div class="bd-title">Birthdays</div>'
+    +'<div class="bd-sub">In the Gym This Week</div>'
+    +'<div class="bd-list">'+items+'</div>'
+    +'</div></div>';
+}
+function challengeLeaderboard(m,ch){
+  var ents=(state.challengeEntries||[]).filter(function(e){return e.month===m;});
+  var byAdult={};
+  ents.forEach(function(e){(byAdult[e.adult]=byAdult[e.adult]||[]).push(e);});
+  var dir=ch.betterDir||'lower';
+  var rows=Object.keys(byAdult).map(function(a){
+    var es=byAdult[a].slice().sort(function(x,y){return String(x.date).localeCompare(String(y.date));});
+    var baseline=es[0].value, latest=es.length>1?es[es.length-1].value:null;
+    var improvement=latest!=null?(dir==='higher'?latest-baseline:baseline-latest):null;
+    return {adult:a,baseline:baseline,latest:latest,improvement:improvement};
+  });
+  rows.sort(function(x,y){var xi=x.improvement!=null?x.improvement:-Infinity;var yi=y.improvement!=null?y.improvement:-Infinity;return yi-xi;});
+  return rows;
+}
+function buildChallengeSlide(){
+  var et=_etNow();
+  var mm=et.getFullYear()+'-'+String(et.getMonth()+1).padStart(2,'0');
+  var ch=(state.challenges||{})[mm];
+  if(!ch)return '';                     // no challenge defined this month
+  var rows=challengeLeaderboard(mm,ch);
+  if(!rows.length)return '';            // no results logged yet
+  var monName=et.toLocaleString('en-US',{month:'long'});
+  var trs=rows.map(function(r,i){
+    var imp=r.improvement!=null?((r.improvement>0?'+':'')+round3(r.improvement)):'\u2014';
+    var latest=r.latest!=null?round3(r.latest):'<span style="opacity:.4">\u2014</span>';
+    return '<tr><td class="ch-rank">'+(i+1)+'</td><td class="ch-name">'+r.adult+'</td>'
+      +'<td>'+round3(r.baseline)+'</td><td>'+latest+'</td>'
+      +'<td class="ch-imp'+(r.improvement>0?' ch-pos':'')+'">'+imp+'</td></tr>';
+  }).join('');
+  return '<div class="slide slide-light">'+blackBrush()
+    +'<img class="slide-logo logo-light" src="'+LOGO+'" alt="FPT"/>'
+    +'<div class="ch-body">'
+    +'<div class="ch-title">'+monName+'<br>Challenge</div>'
+    +'<div class="ch-name-sub">'+ch.name+(ch.unit?' <span style="font-weight:600;color:#666">('+ch.unit+')</span>':'')+'</div>'
+    +'<table class="ch-table"><thead><tr><th></th><th style="text-align:left">Adult</th><th>Base</th><th>Latest</th><th>Improve</th></tr></thead><tbody>'+trs+'</tbody></table>'
+    +'</div></div>';
+}
+
 // ── ENGINE ───────────────────────────────────────────────────────
 let current=0,timer=null;
 let state={entries:[],profiles:{},achievements:[]};
@@ -352,23 +463,33 @@ async function loadData(){
   if(!state.profiles)state.profiles={};
   if(!state.achievements)state.achievements=[];
   if(!state.schoolLogos)state.schoolLogos={};
+  if(!state.adults)state.adults={};
+  if(!state.challenges)state.challenges={};
+  if(!state.challengeEntries)state.challengeEntries=[];
   renderBoard();
 }
 
 function renderBoard(){
   const{entries=[]}=state;
-  document.getElementById('board').innerHTML=
-    buildWelcome()+
-    buildLeaderboard(1,EX[0],'male',entries)+
-    buildLeaderboard(2,EX[0],'female',entries)+
-    buildLeaderboard(3,EX[1],'male',entries)+
-    buildLeaderboard(4,EX[1],'female',entries)+
-    buildLeaderboard(5,EX[2],'male',entries)+
-    buildLeaderboard(6,EX[2],'female',entries)+
-    buildMonthlyPRs(entries)+
-    buildBigBoysBoard(entries)+
-    buildShredmill()+
-    buildCongrats();
+  var slides=[];
+  function add(html,time){if(html)slides.push({html:html,time:time});}
+  add(buildWelcome(),10);
+  add(buildLeaderboard(1,EX[0],'male',entries),12);
+  add(buildLeaderboard(2,EX[0],'female',entries),12);
+  add(buildLeaderboard(3,EX[1],'male',entries),12);
+  add(buildLeaderboard(4,EX[1],'female',entries),12);
+  add(buildLeaderboard(5,EX[2],'male',entries),12);
+  add(buildLeaderboard(6,EX[2],'female',entries),12);
+  add(buildMonthlyPRs(entries),14);
+  add(buildBigBoysBoard(entries),12);
+  add(buildShredmill(),11);
+  add(buildBirthdays(),13);
+  if(SHOW_CHALLENGE_SLIDE)add(buildChallengeSlide(),13);
+  add(buildCongrats(),13);
+  TOTAL_SLIDES=slides.length;
+  SLIDE_TIMES=slides.map(function(s){return s.time;});
+  document.getElementById('board').innerHTML=slides.map(function(s){return s.html;}).join('');
+  if(current>=TOTAL_SLIDES)current=0;
   buildDots();
   activateSlide(current);
 }
