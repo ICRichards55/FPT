@@ -75,7 +75,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 /* ── X CARD (16:9) ── */
 .x-card{width:480px;height:270px;position:relative;overflow:hidden;border-radius:6px;flex-shrink:0}
 .x-cover{width:100%;height:100%;background:#050505;display:flex;align-items:stretch}
-.x-cover-left{flex:1;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between}
+.x-cover-left{flex:1;min-width:0;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between}
 .x-cover-logo{height:28px;position:absolute;bottom:10px;right:10px}
 .x-boxes{display:grid;grid-template-columns:1fr 1fr;gap:4px;flex:1;margin-top:10px;align-content:start}
 .x-box{border:1px solid #fff;padding:5px 7px}
@@ -321,6 +321,16 @@ function getAthleteFirstResult(ath,id){
   if(!sorted.length)return null;
   return id==='broad'?sorted[0].total:sorted[0].value;
 }
+function getAthleteIntakeBest(ath,id){
+  // best result on the EARLIEST testing day (direction-aware) — the honest improvement baseline
+  const es=state.entries.filter(e=>_nameEq(e.athlete,ath)&&e.exercise===id)
+    .map(e=>({date:e.date,v:id==='broad'?e.total:e.value}))
+    .filter(o=>o.v!=null&&!isNaN(o.v));
+  if(!es.length)return null;
+  const d0=es.map(o=>o.date).sort()[0];
+  const day=es.filter(o=>o.date===d0).map(o=>o.v);
+  return id==='fly'?Math.min(...day):Math.max(...day);
+}
 function getGymPR(id){
   const all=state.athletes.map(a=>getAthletesPR(a,id)).filter(v=>v!=null);
   if(!all.length)return null;
@@ -503,7 +513,7 @@ function render(){
   if(currentTab==='story')app.innerHTML=renderStory();
   else if(currentTab==='monthpr')app.innerHTML=renderMonthPR();
   else if(currentTab==='challenge')app.innerHTML=renderChallenge();
-  else app.innerHTML=renderSpotlight();
+  else {app.innerHTML=renderSpotlight();_scheduleCoverFit();}
   renderStoryPreview();
   updateOverlay();
   if(currentTab==='spot')bindSpotSearch();
@@ -1273,15 +1283,16 @@ function spotRegressed(ath,id){
   if(dates.length<2)return false;             // need intake + a later session to judge
   const lower=id==='fly';
   const sb=d=>lower?Math.min(...byDate[d]):Math.max(...byDate[d]);
-  const intake=sb(dates[0]), latest=sb(dates[dates.length-1]);
-  return lower ? latest>intake : latest<intake;
+  const intake=sb(dates[0]);
+  const pr=lower?Math.min(...dates.map(sb)):Math.max(...dates.map(sb));
+  return lower ? !(pr<intake) : !(pr>intake);   // regressed = best never beat the intake session (not merely a dip in the latest session)
 }
 
 
 function renderIGCards(athEntries,availEx){
   if(!athEntries.length)return`<div class="panel"><div class="empty">No data recorded for ${spotAthlete} yet</div></div>`;
   const pr={};availEx.forEach(ex=>{pr[ex.id]=getPRForSpot(spotAthlete,ex.id);});
-  const first={};availEx.forEach(ex=>{first[ex.id]=getAthleteFirstResult(spotAthlete,ex.id);});
+  const first={};availEx.forEach(ex=>{first[ex.id]=getAthleteIntakeBest(spotAthlete,ex.id);});
   const fdate=([...athEntries].sort((a,b)=>a.date.localeCompare(b.date))[0]||{}).date;
   const tf=fdate?`${new Date(fdate+'T12:00:00').toLocaleString('en-US',{month:'short',year:'numeric'})} – Present`:'—';
   const [fn,...lp]=spotAthlete.split(' ');const ln=lp.join(' ');
@@ -1298,27 +1309,19 @@ function renderIGCards(athEntries,availEx){
     pr.broad!=null&&first.broad!=null&&{label:'Broad Jump',val:`${fmtS('broad',first.broad)} → ${fmtS('broad',pr.broad)}`},
     pr.vert!=null&&first.vert!=null&&{label:'Skyhook',val:`${fmtS('vert',first.vert)} → ${fmtS('vert',pr.vert)}`},
   ].filter(Boolean);
-  const nsize=fn.length>8||ln.length>9?76:90;
   const coverHtml=`<div style="width:540px;height:540px;background:#050505;position:relative;overflow:hidden;font-family:'Barlow Condensed',sans-serif;flex-shrink:0;border-radius:4px">
-    <div style="position:absolute;top:0;left:0;right:0;height:308px">
-      <div style="position:absolute;top:13px;left:15px">
-        <span style="font-family:'Barlow Condensed',sans-serif;color:#fff;font-size:11px;font-weight:900;letter-spacing:2.5px;text-transform:uppercase;opacity:.85">FRYE PERFORMANCE TRAINING</span>
-      </div>
-      <div style="position:absolute;top:52px;left:14px;right:14px;display:flex;gap:10px;align-items:flex-start">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;flex:1">
-          ${boxes.map(b=>`<div style="border:1.5px solid #fff;padding:7px 9px;background:rgba(0,0,0,.5)"><div style="color:#bbb;font-size:8px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px">${b.label}</div><div style="color:#fff;font-size:28px;font-weight:900;line-height:1;letter-spacing:-1px">${b.val}</div></div>`).join('')}
-        </div>
-        <div style="width:195px;height:215px;flex-shrink:0;margin-top:2px">
-          ${spotPhotoUrl?`<img src="${spotPhotoUrl}" style="width:100%;height:100%;object-fit:cover;clip-path:polygon(12% 0%,100% 0%,88% 100%,0% 100%)"/>`:`<div style="width:100%;height:100%;background:#181818;clip-path:polygon(12% 0%,100% 0%,88% 100%,0% 100%);display:flex;align-items:center;justify-content:center"><span style="color:#2a2a2a;font-size:9px;letter-spacing:1px">PHOTO</span></div>`}
-        </div>
-      </div>
+    <div style="position:absolute;top:13px;left:15px">
+      <span style="font-family:'Barlow Condensed',sans-serif;color:#fff;font-size:11px;font-weight:900;letter-spacing:2.5px;text-transform:uppercase;opacity:.85">FRYE PERFORMANCE TRAINING</span>
     </div>
-
-    <div style="position:absolute;bottom:0;left:0;right:0;height:260px;background:#080808;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;padding:0 17px 17px">
-      <div style="display:flex;align-items:flex-end;gap:14px;flex:1">
-          <div style="line-height:.88;flex:1"><div style="color:#fff;font-size:${nsize}px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.9">${fn}</div>${ln?`<div style="color:#fff;font-size:${ln.length>9?48:nsize-4}px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.92;margin-top:4px">${ln}</div>`:''}</div>
-          <img src="${LOGO}" style="height:${Math.round(nsize*2)}px;width:${Math.round(nsize*2)}px;flex-shrink:0;margin-bottom:2px"/>
-        </div>
+    <div style="position:absolute;top:52px;left:14px;width:300px;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+      ${boxes.map(b=>`<div style="border:1.5px solid #fff;padding:7px 9px;background:rgba(0,0,0,.5)"><div style="color:#bbb;font-size:8px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px">${b.label}</div><div style="color:#fff;font-size:28px;font-weight:900;line-height:1;letter-spacing:-1px">${b.val}</div></div>`).join('')}
+    </div>
+    <div style="position:absolute;top:52px;right:14px;width:200px;height:300px">
+      ${spotPhotoUrl?`<img src="${spotPhotoUrl}" style="width:100%;height:100%;object-fit:cover;clip-path:polygon(12% 0%,100% 0%,88% 100%,0% 100%)"/>`:`<div style="width:100%;height:100%;background:#181818;clip-path:polygon(12% 0%,100% 0%,88% 100%,0% 100%);display:flex;align-items:center;justify-content:center"><span style="color:#2a2a2a;font-size:9px;letter-spacing:1px">PHOTO</span></div>`}
+    </div>
+    <img src="${LOGO}" style="position:absolute;bottom:16px;right:14px;height:150px;width:150px;object-fit:contain"/>
+    <div style="position:absolute;bottom:16px;left:17px;width:330px;line-height:.88">
+      <div data-name="fn" style="color:#fff;font-size:90px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.9;white-space:nowrap">${fn}</div>${ln?`<div data-name="ln" style="color:#fff;font-size:90px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.92;margin-top:4px;white-space:nowrap">${ln}</div>`:''}
     </div>
   </div>`;
   const cards=[{id:'cover-ig',label:'Card 1 — Cover',html:coverHtml,file:`FPT_${spotAthlete.replace(/ /g,'_')}_Cover.png`}];
@@ -1350,7 +1353,7 @@ function renderIGCards(athEntries,availEx){
 function renderXCards(athEntries,availEx){
   if(!athEntries.length)return`<div class="panel"><div class="empty">No data recorded for ${spotAthlete} yet</div></div>`;
   const pr={};availEx.forEach(ex=>{pr[ex.id]=getPRForSpot(spotAthlete,ex.id);});
-  const first={};availEx.forEach(ex=>{first[ex.id]=getAthleteFirstResult(spotAthlete,ex.id);});
+  const first={};availEx.forEach(ex=>{first[ex.id]=getAthleteIntakeBest(spotAthlete,ex.id);});
   const [fn,...lp]=spotAthlete.split(' ');const ln=lp.join(' ');
   const boxes=[
     pr.fly!=null&&{label:'10-10 Fly Best',val:fmtS('fly',pr.fly)},
@@ -1367,7 +1370,7 @@ function renderXCards(athEntries,availEx){
         <div style="font-family:'Barlow Condensed',sans-serif;color:#fff;font-size:8px;font-weight:900;letter-spacing:2px;text-transform:uppercase;opacity:.8;margin-bottom:6px">FRYE PERFORMANCE TRAINING</div>
         <div class="x-boxes">${boxes.map(b=>`<div class="x-box"><div class="x-box-label">${b.label}</div><div class="x-box-val">${b.val}</div></div>`).join('')}</div>
         <div style="display:flex;align-items:flex-end;gap:8px">
-          <div class="x-cover-name" style="flex:1">${fn}${ln?`<br>${ln}`:''}</div>
+          <div class="x-cover-name" style="flex:1;min-width:0"><div data-xname="fn" style="white-space:nowrap">${fn}</div>${ln?`<div data-xname="ln" style="white-space:nowrap">${ln}</div>`:''}</div>
           <img src="${LOGO}" style="height:68px;flex-shrink:0;margin-bottom:2px"/>
         </div>
       </div>
@@ -1406,8 +1409,27 @@ function bindSpotSearch(){
   });
 }
 
+function _fitOneCover(wrapId,attr,MAX,MIN){
+  var wrap=document.getElementById(wrapId);if(!wrap)return;
+  var fnEl=wrap.querySelector('['+attr+'="fn"]');if(!fnEl)return;
+  var lnEl=wrap.querySelector('['+attr+'="ln"]');
+  var boxw=fnEl.parentElement.clientWidth;if(!boxw)return;
+  var s=MAX;
+  function set(v){fnEl.style.fontSize=v+'px';if(lnEl)lnEl.style.fontSize=v+'px';}
+  set(s);
+  while(s>MIN&&(fnEl.scrollWidth>boxw||(lnEl&&lnEl.scrollWidth>boxw))){s-=1;set(s);}
+}
+function _fitCoverName(){
+  _fitOneCover('cover-ig-wrap','data-name',90,34);
+  _fitOneCover('cover-x-wrap','data-xname',26,12);
+}
+function _scheduleCoverFit(){
+  if(document.fonts&&document.fonts.ready){document.fonts.ready.then(_fitCoverName);}
+  setTimeout(_fitCoverName,60);
+}
 async function dlCard(wrapId,filename){
   const el=document.getElementById(wrapId);if(!el)return;
+  try{_fitCoverName();}catch(e){}
   const cardEl=el.querySelector('[style*="width:540px"],[style*="width:480px"],.x-card,.x-chart-card');if(!cardEl)return;
   if(!window.html2canvas){alert('Loading download function — try again in a moment.');return;}
   try{
