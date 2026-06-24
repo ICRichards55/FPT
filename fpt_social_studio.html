@@ -1250,7 +1250,7 @@ function renderSpotEmpty(){return`<div class="panel"><div class="empty">Select a
 
 function renderSpotCards(){
   const athEntries=state.entries.filter(e=>_nameEq(e.athlete,spotAthlete));
-  const availEx=EX.filter(ex=>athEntries.some(e=>e.exercise===ex.id));
+  const availEx=EX.filter(ex=>athEntries.some(e=>e.exercise===ex.id) && !spotRegressed(spotAthlete,ex.id));
   if(spotFormat==='ig') return renderIGCards(athEntries,availEx);
   return renderXCards(athEntries,availEx);
 }
@@ -1262,6 +1262,19 @@ function getPRForSpot(ath,id){
     .filter(v=>v!=null&&!isNaN(v));
   if(!vals.length)return null;
   return id==='fly'?Math.min(...vals):Math.max(...vals);
+}
+
+// Regressed = latest testing session is worse than the FIRST (intake) session, direction-aware.
+function spotRegressed(ath,id){
+  const es=state.entries.filter(e=>_nameEq(e.athlete,ath)&&e.exercise===id);
+  const byDate={};
+  es.forEach(e=>{const v=id==='broad'?e.total:e.value; if(v==null||isNaN(v))return; (byDate[e.date]=byDate[e.date]||[]).push(v);});
+  const dates=Object.keys(byDate).sort();
+  if(dates.length<2)return false;             // need intake + a later session to judge
+  const lower=id==='fly';
+  const sb=d=>lower?Math.min(...byDate[d]):Math.max(...byDate[d]);
+  const intake=sb(dates[0]), latest=sb(dates[dates.length-1]);
+  return lower ? latest>intake : latest<intake;
 }
 
 
