@@ -98,6 +98,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .stat-val{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800}
 canvas{max-width:100%;border-radius:8px;margin-top:8px}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -115,10 +116,10 @@ canvas{max-width:100%;border-radius:8px;margin-top:8px}
 
 <div id="main-app">
   <div class="header">
-    <div class="logo-wrap">
+    <a class="logo-wrap" href="index.html" style="text-decoration:none;color:inherit;cursor:pointer">
       <img class="logo-img" src="/fpt_logo.webp" alt="FPT"/>
       <div class="header-title">FPT Teams</div>
-    </div>
+    </a>
     <div class="team-badge none" id="header-team-badge">No Team Selected</div>
   </div>
   <div class="tab-bar">
@@ -126,6 +127,7 @@ canvas{max-width:100%;border-radius:8px;margin-top:8px}
     <button class="tab" id="tab-today" data-tab="today">Today</button>
     <button class="tab" id="tab-roster" data-tab="roster">Roster</button>
     <button class="tab" id="tab-ach" data-tab="ach">Achievements</button>
+    <button class="tab" id="tab-studio" data-tab="studio">Studio</button>
     <button class="tab" id="tab-settings" data-tab="settings">Settings</button>
   </div>
   <div id="app"></div>
@@ -137,7 +139,7 @@ canvas{max-width:100%;border-radius:8px;margin-top:8px}
 var API_URL = 'https://script.google.com/macros/s/AKfycbwirWQw0-hVSwIwVl6RCWcclgRNKia7awlfUzImilUiKjNKtSapuCueOaTwWgTlJ6Uk/exec';
 
 // ── STATE ─────────────────────────────────────────────────────────────────
-var state = { teams:[], athletes:{}, profiles:{}, entries:[], achievements:[] };
+var state = { teams:[], athletes:{}, profiles:{}, entries:[], achievements:[], branding:{} };
 var currentTab = 'log';
 var currentTeam = '';
 var TODAY = (function(){
@@ -162,6 +164,9 @@ var achEditId = null, achEditText = '', achEditWeeks = 4;
 
 // Settings state
 var settingsSection = 'teams';
+
+// Branding editor state
+var brandingTeam = '', brandingDraft = { logoUrl:'', palette:null }, brandingPullError = false;
 
 // Team exercises (subset of gym)
 var EX_LIST = [
@@ -195,6 +200,10 @@ function _handleDelegatedClick(e, prevent){
   if(id==='ach-save-edit-btn'){ if(prevent)e.preventDefault(); saveAchEdit(); }
   else if(id==='team-save-btn'){ if(prevent)e.preventDefault(); saveNewTeam(); }
   else if(id==='team-athlete-add-btn'){ if(prevent)e.preventDefault(); addAthleteToTeam(); }
+  else if(id==='branding-pull-btn'){ if(prevent)e.preventDefault(); _pullPalette(); }
+  else if(id==='branding-save-btn'){ if(prevent)e.preventDefault(); _saveBranding(); }
+  else if(id==='spot-dl-btn'){ if(prevent)e.preventDefault(); _downloadSpotlight(); }
+  else if(id==='report-dl-btn'){ if(prevent)e.preventDefault(); _downloadReport(); }
 }
 document.addEventListener('click', function(e){ _handleDelegatedClick(e,false); });
 document.addEventListener('touchend', function(e){ _handleDelegatedClick(e,true); });
@@ -232,6 +241,7 @@ async function loadData(){
       if(!state.profiles) state.profiles = {};
       if(!state.entries) state.entries = [];
       if(!state.achievements) state.achievements = [];
+      if(!state.branding) state.branding = {};
     }
   } catch(e){ console.error('Load failed', e); }
   render();
@@ -308,6 +318,7 @@ function render(){
   else if(currentTab==='today') app.innerHTML = renderToday();
   else if(currentTab==='roster') app.innerHTML = renderRoster();
   else if(currentTab==='ach') app.innerHTML = renderAch();
+  else if(currentTab==='studio') app.innerHTML = renderStudio();
   else if(currentTab==='settings') app.innerHTML = renderSettings();
 }
 
@@ -747,14 +758,15 @@ function endNowAch(id){
 
 // ── SETTINGS TAB ──────────────────────────────────────────────────────────
 function renderSettings(){
-  var sections = ['teams','athletes','copytogym','backup'];
-  var labels   = ['Teams','Athletes','Copy to Gym','Backup'];
+  var sections = ['teams','athletes','branding','copytogym','backup'];
+  var labels   = ['Teams','Athletes','Branding','Copy to Gym','Backup'];
   var nav = sections.map(function(s,i){
     return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';render()">'+labels[i]+'</button>';
   }).join('');
   var content = '';
   if(settingsSection==='teams') content = renderSettingsTeams();
   else if(settingsSection==='athletes') content = renderSettingsAthletes();
+  else if(settingsSection==='branding') content = renderSettingsBranding();
   else if(settingsSection==='copytogym') content = renderSettingsCopyToGym();
   else if(settingsSection==='backup') content = renderSettingsBackup();
   return '<div class="sn-nav">'+nav+'</div>'+content;
@@ -803,6 +815,513 @@ function deleteTeam(name){
   state.teams = state.teams.filter(function(t){ return t!==name; });
   if(currentTeam===name) currentTeam='';
   saveData(); showToast('Team deleted.'); render();
+}
+
+// ── Studio ────────────────────────────────────────────────────────────────
+var studioAthlete = '', studioGraphic = 'spotlight', studioMode = 'photo', studioPhoto = '', studioTeamPhoto = '';
+
+function _teamBrand(){
+  var b = (state.branding && state.branding[currentTeam]) || {};
+  return {
+    logoUrl: b.logoUrl || '',
+    palette: b.palette || { accent:'#C8102E', text:'#F2F2F2', background:'#0A0A0A' }
+  };
+}
+function _lum(hex){
+  hex = (hex||'#000000').replace('#','');
+  if(hex.length===3) hex = hex.split('').map(function(c){ return c+c; }).join('');
+  var r=parseInt(hex.slice(0,2),16), g=parseInt(hex.slice(2,4),16), b=parseInt(hex.slice(4,6),16);
+  return 0.299*r + 0.587*g + 0.114*b;
+}
+function _hexA(hex, a){
+  hex = (hex||'#000000').replace('#','');
+  if(hex.length===3) hex = hex.split('').map(function(c){ return c+c; }).join('');
+  var r=parseInt(hex.slice(0,2),16), g=parseInt(hex.slice(2,4),16), b=parseInt(hex.slice(4,6),16);
+  return 'rgba('+r+','+g+','+b+','+a+')';
+}
+function _fptLogoFor(bg){ return _lum(bg) < 140 ? '/fpt_logo.webp' : '/fpt_logo_dark.png'; }
+
+// intake-day best (direction-aware) and best-to-best improvement %
+function getIntakeBest(ath, id){
+  var ents = state.entries.filter(function(e){ return e.athlete===ath && e.exercise===id; });
+  if(!ents.length) return null;
+  var firstDate = ents.map(function(e){ return e.date; }).sort()[0];
+  var vals = ents.filter(function(e){ return e.date===firstDate; })
+                 .map(function(e){ return id==='broad'?e.total:e.value; })
+                 .filter(function(v){ return v!=null && !isNaN(v); });
+  if(!vals.length) return null;
+  return id==='fly' ? Math.min.apply(null,vals) : Math.max.apply(null,vals);
+}
+function getImprovementPct(ath, id){
+  var intake = getIntakeBest(ath,id), best = getPR(ath,id);
+  if(intake==null || best==null || intake===0) return null;
+  return id==='fly' ? (intake-best)/intake*100 : (best-intake)/intake*100;
+}
+function _spotVal(id, v){
+  if(v==null || isNaN(v)) return '--';
+  if(id==='broad') return Math.floor(v/12)+"'"+Math.round(v%12);
+  if(id==='fly')   return v.toFixed(2);
+  return String(parseFloat(v.toFixed(1)));
+}
+
+function _spotBoxes(ath, P){
+  var muted = _hexA(P.text, 0.55);
+  var defs = [
+    ['broad','Broad Jump Best','Broad Increase'],
+    ['fly','10-10 Fly Best','Fly Improvement'],
+    ['vert','Skyhook Best','Skyhook Increase']
+  ];
+  var html = '';
+  defs.forEach(function(d){
+    var id=d[0];
+    var best = _spotVal(id, getPR(ath,id));
+    var imp = getImprovementPct(ath,id);
+    var impStr = (imp==null) ? '--' : (imp>=0?'+':'')+Math.round(imp)+'%';
+    [[d[1],best],[d[2],impStr]].forEach(function(pair){
+      html += '<div style="border:1.5px solid '+P.accent+';padding:7px 9px;background:'+_hexA('#000000',0.30)+'">'+
+        '<div style="color:'+muted+';font-size:8px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px">'+pair[0]+'</div>'+
+        '<div style="color:'+P.text+';font-size:28px;font-weight:900;line-height:1;letter-spacing:-1px">'+pair[1]+'</div></div>';
+    });
+  });
+  return html;
+}
+
+function _spotlightCardHtml(ath){
+  var brand = _teamBrand(), P = brand.palette;
+  var parts = (ath||'').split(' ');
+  var fn = parts.shift()||'', ln = parts.join(' ')||'';
+  var teamLogo = brand.logoUrl || '';
+  var fptLogo = _fptLogoFor(P.background);
+  var colBottom = 187;
+  var boxes = _spotBoxes(ath, P);
+
+  var rightSide;
+  if(studioMode==='photo'){
+    var inner = studioPhoto
+      ? '<img src="'+studioPhoto+'" style="width:100%;height:100%;object-fit:cover"/>'
+      : '<div style="width:100%;height:100%;background:'+_hexA(P.text,0.06)+';display:flex;align-items:center;justify-content:center"><span style="color:'+_hexA(P.text,0.3)+';font-size:9px;letter-spacing:1px">PHOTO</span></div>';
+    rightSide = '<div style="position:absolute;top:52px;right:14px;width:200px;height:300px;overflow:hidden">'+inner+'</div>';
+  } else {
+    rightSide = '<div style="position:absolute;top:60px;right:18px;width:208px;height:300px;display:flex;align-items:center;justify-content:center">'+
+      (teamLogo ? '<img src="'+teamLogo+'" crossorigin="anonymous" style="width:100%;height:auto;max-height:100%;object-fit:contain"/>' : '')+'</div>';
+  }
+
+  var midLogo = (studioMode==='photo' && teamLogo)
+    ? '<div style="flex:1;min-height:0;margin-top:14px;display:flex;align-items:center;justify-content:flex-start"><img src="'+teamLogo+'" crossorigin="anonymous" style="height:100%;width:auto;max-width:100%;object-fit:contain"/></div>'
+    : '';
+
+  return '<div id="spot-card" style="width:540px;height:540px;background:'+P.background+';position:relative;overflow:hidden;font-family:\'Barlow Condensed\',sans-serif">'+
+    '<div style="position:absolute;top:14px;left:15px;right:15px"><span style="color:'+P.accent+';font-size:12px;font-weight:900;letter-spacing:2px;text-transform:uppercase">'+currentTeam+'</span></div>'+
+    rightSide+
+    '<div style="position:absolute;top:52px;left:14px;width:300px;bottom:'+colBottom+'px;display:flex;flex-direction:column;z-index:2">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'+boxes+'</div>'+
+      midLogo+
+    '</div>'+
+    '<img src="'+fptLogo+'" crossorigin="anonymous" style="position:absolute;bottom:16px;right:14px;height:150px;width:150px;object-fit:contain"/>'+
+    '<div style="position:absolute;bottom:16px;left:17px;width:330px;line-height:.88">'+
+      '<div data-spotname="fn" style="color:'+P.text+';font-size:90px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.9;white-space:nowrap">'+fn+'</div>'+
+      '<div data-spotname="ln" style="color:'+P.text+';font-size:90px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.92;margin-top:4px;white-space:nowrap">'+ln+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function _fitSpotName(){
+  var fn=document.querySelector('[data-spotname=fn]'), ln=document.querySelector('[data-spotname=ln]');
+  if(!fn||!ln) return;
+  var w = fn.parentElement.clientWidth, s = 90;
+  function set(v){ fn.style.fontSize=v+'px'; ln.style.fontSize=v+'px'; }
+  set(s);
+  while(s>30 && (fn.scrollWidth>w || ln.scrollWidth>w)){ s-=1; set(s); }
+}
+function _fitSpotStage(){
+  var wrap=document.getElementById('spot-stage-wrap'), sc=document.getElementById('spot-stage-scale');
+  if(!wrap||!sc) return;
+  var card=sc.firstElementChild; if(!card) return;
+  var cw=card.offsetWidth||540, ch=card.offsetHeight||540;
+  var k = Math.min(1, wrap.clientWidth/cw);
+  sc.style.transform='scale('+k+')';
+  wrap.style.height=(ch*k)+'px';
+}
+function _scheduleStudioFit(){
+  setTimeout(function(){ _fitSpotName(); _fitSpotStage(); }, 30);
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(function(){ _fitSpotName(); _fitSpotStage(); }); }
+}
+
+function _studioPhotoUpload(input){
+  var f=input.files&&input.files[0]; if(!f) return;
+  var rd=new FileReader();
+  rd.onload=function(ev){ studioPhoto=ev.target.result; render(); };
+  rd.readAsDataURL(f);
+}
+function _setStudioAthlete(a){ studioAthlete=a; studioPhoto=''; render(); }
+function _setStudioMode(m){ studioMode=m; render(); }
+
+async function _downloadSpotlight(){
+  if(!window.html2canvas){ alert('Still loading — try again in a moment.'); return; }
+  var card=document.getElementById('spot-card'); if(!card){ alert('Pick an athlete first.'); return; }
+  // clone off-screen at true 540px so the preview's display scale doesn't shrink the capture
+  var holder=document.createElement('div');
+  holder.style.cssText='position:fixed;left:-9999px;top:0;width:540px;height:540px';
+  var clone=card.cloneNode(true);
+  holder.appendChild(clone); document.body.appendChild(holder);
+  function cleanup(){ if(holder.parentNode) document.body.removeChild(holder); }
+  try {
+    var canvas=await window.html2canvas(clone,{scale:2,useCORS:true,backgroundColor:null,logging:false});
+    cleanup();
+    var dataUrl=canvas.toDataURL('image/png');
+    var fname='FPT_'+(studioAthlete||'athlete').replace(/\s+/g,'_')+'_Spotlight.png';
+    var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+    if(isIOS){
+      var w=window.open('','_blank');
+      if(w) w.document.write('<title>'+fname+'</title><img src="'+dataUrl+'" style="width:100%"/><p style="font-family:sans-serif;text-align:center">Long-press the image → Add to Photos</p>');
+    } else {
+      var a=document.createElement('a'); a.href=dataUrl; a.download=fname; a.click();
+    }
+  } catch(e){ cleanup(); console.error(e); alert('Could not generate the image.'); }
+}
+
+// ── Studio — Team Report ──────────────────────────────────────────────────
+function _reportDates(){
+  var seen={}; state.entries.forEach(function(e){ if(e.athlete && (state.athletes[currentTeam]||[]).indexOf(e.athlete)>-1 && e.date) seen[e.date]=1; });
+  var arr=Object.keys(seen).sort();
+  return { intake:arr[0]||null, retest:arr[arr.length-1]||null, count:arr.length };
+}
+function _teamReportData(){
+  var roster=state.athletes[currentTeam]||[];
+  var out={};
+  ['broad','fly','vert'].forEach(function(id){
+    var rows=[];
+    roster.forEach(function(ath){
+      var imp=getImprovementPct(ath,id);
+      if(imp==null) return;
+      rows.push({ath:ath, imp:imp});
+    });
+    var n=rows.length;
+    out[id]={
+      avg: n? rows.reduce(function(s,r){return s+r.imp;},0)/n : 0,
+      prd: rows.filter(function(r){return r.imp>0;}).length,
+      n: n,
+      top5: rows.slice().sort(function(a,b){return b.imp-a.imp;}).slice(0,5)
+    };
+  });
+  return out;
+}
+function _studioTeamPhotoUpload(input){
+  var f=input.files&&input.files[0]; if(!f) return;
+  var rd=new FileReader();
+  rd.onload=function(ev){ studioTeamPhoto=ev.target.result; render(); };
+  rd.readAsDataURL(f);
+}
+
+function _teamReportCardHtml(){
+  var brand=_teamBrand(), P=brand.palette, muted=_hexA(P.text,0.55), line=_hexA(P.text,0.14);
+  var R=_teamReportData(), dates=_reportDates();
+  var period = (dates.intake && dates.retest && dates.intake!==dates.retest)
+    ? 'Intake '+fmtShortDate(dates.intake)+' \u2192 Retest '+fmtShortDate(dates.retest)
+    : 'Intake '+(dates.intake?fmtShortDate(dates.intake):'\u2014')+' \u00b7 awaiting retest';
+  var roster=state.athletes[currentTeam]||[];
+  var fptLogo=_fptLogoFor(P.background), teamLogo=brand.logoUrl;
+  var EXN={broad:'Broad Jump',fly:'10-10 Fly',vert:'Skyhook'};
+  function section(id,last){
+    var d=R[id], rows='';
+    d.top5.forEach(function(r,i){
+      rows+='<div style="display:flex;align-items:baseline;gap:8px;padding:1px 0">'+
+        '<span style="color:'+P.accent+';font-weight:900;font-size:11px;width:12px;flex-shrink:0">'+(i+1)+'</span>'+
+        '<span style="color:'+P.text+';font-size:13.5px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.ath+'</span>'+
+        '<span style="color:'+P.accent+';font-size:13.5px;font-weight:900;flex-shrink:0">'+(r.imp>=0?'+':'')+Math.round(r.imp)+'%</span></div>';
+    });
+    if(!d.top5.length) rows='<div style="color:'+muted+';font-size:12px;padding-top:3px">No data yet</div>';
+    return '<div style="display:flex;gap:18px;padding:7px 0;'+(last?'':'border-bottom:1px solid '+line)+'">'+
+      '<div style="width:150px;flex-shrink:0">'+
+        '<div style="color:'+P.text+';font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:-.3px">'+EXN[id]+'</div>'+
+        '<div style="color:'+P.accent+';font-size:29px;font-weight:900;line-height:1;margin-top:1px">'+(d.avg>=0?'+':'')+d.avg.toFixed(1)+'%</div>'+
+        '<div style="color:'+muted+';font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">team avg improvement</div>'+
+        '<div style="color:'+P.text+';font-size:18px;font-weight:900;line-height:1;margin-top:5px">'+d.prd+'/'+d.n+'</div>'+
+        '<div style="color:'+muted+';font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">set personal records</div>'+
+      '</div>'+
+      '<div style="flex:1;min-width:0;padding-top:1px">'+
+        '<div style="color:'+muted+';font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">Top 5 Improvements</div>'+rows+
+      '</div></div>';
+  }
+  var banner = studioTeamPhoto
+    ? '<div style="height:172px;border-radius:3px;overflow:hidden;border:1px solid '+line+'"><img src="'+studioTeamPhoto+'" style="width:100%;height:100%;object-fit:cover;display:block"/></div>'
+    : '';
+  return '<div id="report-card" style="width:540px;height:675px;background:'+P.background+';position:relative;overflow:hidden;font-family:\'Barlow Condensed\',sans-serif;padding:0 32px">'+
+    '<div style="display:flex;align-items:center;gap:11px;padding:13px 0 8px">'+
+      (teamLogo?'<img src="'+teamLogo+'" crossorigin="anonymous" style="height:44px;width:auto;object-fit:contain;flex-shrink:0"/>':'')+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="color:'+P.accent+';font-size:10.5px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase">'+currentTeam+'</div>'+
+        '<div style="color:'+P.text+';font-size:27px;font-weight:900;text-transform:uppercase;letter-spacing:-1px;line-height:.95">Team Report</div>'+
+        '<div style="color:'+muted+';font-size:9.5px;letter-spacing:.4px">'+period+' \u00b7 '+roster.length+' athletes</div>'+
+      '</div>'+
+    '</div>'+
+    banner+
+    '<div style="margin-top:'+(studioTeamPhoto?'5':'12')+'px">'+section('broad')+section('fly')+section('vert',true)+'</div>'+
+    '<div style="position:absolute;bottom:12px;left:32px;right:32px;display:flex;align-items:center;justify-content:flex-end;gap:10px;border-top:1px solid '+line+';padding-top:8px">'+
+      '<span style="color:'+muted+';font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase">Powered by</span>'+
+      '<img src="'+fptLogo+'" crossorigin="anonymous" style="height:44px;width:auto;object-fit:contain"/>'+
+    '</div>'+
+  '</div>';
+}
+
+async function _downloadReport(){
+  if(!window.html2canvas){ alert('Still loading — try again in a moment.'); return; }
+  var card=document.getElementById('report-card'); if(!card){ alert('Report not ready.'); return; }
+  var holder=document.createElement('div');
+  holder.style.cssText='position:fixed;left:-9999px;top:0;width:540px;height:675px';
+  var clone=card.cloneNode(true); holder.appendChild(clone); document.body.appendChild(holder);
+  function cleanup(){ if(holder.parentNode) document.body.removeChild(holder); }
+  try {
+    var canvas=await window.html2canvas(clone,{scale:2,useCORS:true,backgroundColor:null,logging:false});
+    cleanup();
+    var dataUrl=canvas.toDataURL('image/png');
+    var fname='FPT_'+(currentTeam||'team').replace(/\s+/g,'_')+'_Report.png';
+    var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+    if(isIOS){
+      var w=window.open('','_blank');
+      if(w) w.document.write('<title>'+fname+'</title><img src="'+dataUrl+'" style="width:100%"/><p style="font-family:sans-serif;text-align:center">Long-press the image \u2192 Add to Photos</p>');
+    } else { var a=document.createElement('a'); a.href=dataUrl; a.download=fname; a.click(); }
+  } catch(e){ cleanup(); console.error(e); alert('Could not generate the image.'); }
+}
+
+function renderStudio(){
+  if(!currentTeam){
+    return '<div class="panel"><div class="panel-title">Studio</div><div class="empty" style="padding:16px 0">Select a team first (top of screen).</div></div>';
+  }
+  var roster=getTeamAthletes();
+  if(!studioAthlete || roster.indexOf(studioAthlete)<0) studioAthlete = roster[0]||'';
+  var esc=function(s){ return String(s||'').replace(/"/g,'&quot;'); };
+  var html='<div class="panel"><div class="panel-title">Studio</div>';
+
+  if(!(state.branding && state.branding[currentTeam])){
+    html += '<div style="background:#241a13;border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:12px;font-size:13px;color:var(--muted)">Tip: set this team\'s logo + colors in <b style="color:var(--text)">Settings → Branding</b> to theme these graphics. Using defaults for now.</div>';
+  }
+
+  html += '<div class="form-group"><div class="form-label">Graphic</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button class="btn'+(studioGraphic==='spotlight'?' btn-team':'')+'" style="flex:1" onclick="studioGraphic=\'spotlight\';render()">Spotlight</button>'+
+      '<button class="btn'+(studioGraphic==='report'?' btn-team':'')+'" style="flex:1" onclick="studioGraphic=\'report\';render()">Team Report</button>'+
+    '</div></div>';
+
+  if(studioGraphic==='report'){
+    html += '<div class="form-group"><div class="form-label">Team photo '+(studioTeamPhoto?'<span style="color:var(--muted);font-weight:400">(loaded — tap to replace)</span>':'<span style="color:var(--muted);font-weight:400">(optional, landscape)</span>')+'</div>'+
+      '<input type="file" accept="image/*" style="width:100%;font-size:12px" onchange="_studioTeamPhotoUpload(this)"/></div>';
+    if(studioTeamPhoto){
+      html += '<button class="btn" style="width:100%;margin-bottom:10px;font-size:12px;color:var(--muted)" onclick="studioTeamPhoto=\'\';render()">Remove team photo</button>';
+    }
+    html += '<div class="form-label">Preview</div>'+
+      '<div id="spot-stage-wrap" style="width:100%;overflow:hidden;margin:6px 0 14px">'+
+        '<div id="spot-stage-scale" style="transform-origin:top left;width:540px">'+_teamReportCardHtml()+'</div>'+
+      '</div>';
+    html += '<button class="btn btn-team" id="report-dl-btn" style="width:100%">Download Team Report (1080×1350)</button>';
+    html += '</div>';
+    _scheduleStudioFit();
+    return html;
+  }
+
+  // ── Spotlight ──
+  if(!roster.length){
+    html += '<div class="empty" style="padding:16px 0">No athletes on this team yet.</div></div>';
+    return html;
+  }
+  html += '<div class="form-group"><div class="form-label">Athlete</div><select class="form-input" onchange="_setStudioAthlete(this.value)">';
+  roster.forEach(function(a){ html += '<option value="'+esc(a)+'"'+(a===studioAthlete?' selected':'')+'>'+a+'</option>'; });
+  html += '</select></div>';
+
+  html += '<div class="form-group"><div class="form-label">Layout</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button class="btn'+(studioMode==='photo'?' btn-team':'')+'" style="flex:1" onclick="_setStudioMode(\'photo\')">Photo</button>'+
+      '<button class="btn'+(studioMode==='logo'?' btn-team':'')+'" style="flex:1" onclick="_setStudioMode(\'logo\')">Logo hero</button>'+
+    '</div></div>';
+
+  if(studioMode==='photo'){
+    html += '<div class="form-group"><div class="form-label">Athlete photo '+(studioPhoto?'<span style="color:var(--muted);font-weight:400">(loaded — tap to replace)</span>':'')+'</div>'+
+      '<input type="file" accept="image/*" style="width:100%;font-size:12px" onchange="_studioPhotoUpload(this)"/></div>';
+  }
+
+  html += '<div class="form-label">Preview</div>'+
+    '<div id="spot-stage-wrap" style="width:100%;overflow:hidden;margin:6px 0 14px">'+
+      '<div id="spot-stage-scale" style="transform-origin:top left;width:540px">'+_spotlightCardHtml(studioAthlete)+'</div>'+
+    '</div>';
+  html += '<button class="btn btn-team" id="spot-dl-btn" style="width:100%">Download Spotlight (1080×1080)</button>';
+  html += '</div>';
+
+  _scheduleStudioFit();
+  return html;
+}
+
+// ── Settings — Branding ───────────────────────────────────────────────────
+function _selectBrandingTeam(t){
+  brandingTeam = t;
+  var b = (state.branding && state.branding[t]) || {};
+  brandingDraft = { logoUrl: b.logoUrl||'', palette: b.palette ? Object.assign({}, b.palette) : null };
+  brandingPullError = false;
+  render();
+}
+
+function _paletteFromImage(img){
+  var c = document.createElement('canvas'); c.width = 80; c.height = 80;
+  var ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, 80, 80);
+  var data = ctx.getImageData(0, 0, 80, 80).data; // throws if CORS-tainted
+  var buckets = {};
+  for(var i=0;i<data.length;i+=4){
+    if(data[i+3] < 128) continue;
+    var r = data[i] & 0xE0, g = data[i+1] & 0xE0, b = data[i+2] & 0xE0;
+    var key = r+'_'+g+'_'+b;
+    if(!buckets[key]) buckets[key] = { r:r, g:g, b:b, n:0 };
+    buckets[key].n++;
+  }
+  var arr = Object.keys(buckets).map(function(k){ return buckets[k]; });
+  if(!arr.length) throw new Error('empty');
+  function lum(x){ return 0.299*x.r + 0.587*x.g + 0.114*x.b; }
+  function sat(x){ var mx=Math.max(x.r,x.g,x.b), mn=Math.min(x.r,x.g,x.b); return mx===0?0:(mx-mn)/mx; }
+  function hx(x){ return '#'+[x.r,x.g,x.b].map(function(v){ return ('0'+v.toString(16)).slice(-2); }).join(''); }
+  var accent = arr.slice().sort(function(a,b){ return (sat(b)*Math.min(b.n,300)) - (sat(a)*Math.min(a.n,300)); })[0];
+  var background = arr.slice().sort(function(a,b){ return lum(a) - lum(b); })[0];
+  var text = arr.slice().sort(function(a,b){ return lum(b) - lum(a); })[0];
+  return { accent: hx(accent), text: hx(text), background: hx(background) };
+}
+
+function _pullPalette(){
+  var url = (brandingDraft.logoUrl||'').trim();
+  if(!url){ alert('Enter a logo URL first.'); return; }
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function(){
+    try {
+      brandingDraft.palette = _paletteFromImage(img);
+      brandingPullError = false; render();
+      showToast('Palette pulled — confirm, swap, or nudge below.');
+    } catch(err){ brandingPullError = true; render(); }
+  };
+  img.onerror = function(){ brandingPullError = true; render(); };
+  img.src = url;
+}
+
+function _onBrandingFile(input){
+  var f = input.files && input.files[0]; if(!f) return;
+  var rd = new FileReader();
+  rd.onload = function(ev){
+    var img = new Image();
+    img.onload = function(){
+      try {
+        brandingDraft.palette = _paletteFromImage(img);
+        brandingPullError = false; render();
+        showToast('Palette pulled from image.');
+      } catch(e){ alert('Could not read colors from that image.'); }
+    };
+    img.src = ev.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+
+function _updatePalettePreview(){
+  if(!brandingDraft.palette) return;
+  var p = brandingDraft.palette;
+  ['accent','text','background'].forEach(function(k){
+    var el = document.getElementById('hex-'+k); if(el) el.textContent = p[k];
+  });
+  var pv = document.getElementById('palette-preview');
+  if(pv) pv.style.background = p.background;
+  var nm = document.getElementById('pp-name'); if(nm) nm.style.color = p.accent;
+  var tx = document.getElementById('pp-text'); if(tx) tx.style.color = p.text;
+}
+
+function _assignRole(role, color){
+  if(!brandingDraft.palette) return;
+  var p = brandingDraft.palette;
+  if((p[role]||'').toLowerCase() === color.toLowerCase()) return;
+  var other = ['accent','text','background'].filter(function(r){ return r!==role && (p[r]||'').toLowerCase()===color.toLowerCase(); })[0];
+  var old = p[role];
+  p[role] = color;
+  if(other) p[other] = old; // swap so all three colors stay assigned
+  render();
+}
+
+function _saveBranding(){
+  if(!brandingTeam){ alert('Pick a team.'); return; }
+  if(!(brandingDraft.logoUrl||'').trim()){ alert('Enter a logo URL.'); return; }
+  if(!brandingDraft.palette){ alert('Pull a palette first.'); return; }
+  if(!state.branding) state.branding = {};
+  state.branding[brandingTeam] = {
+    logoUrl: brandingDraft.logoUrl.trim(),
+    palette: { accent: brandingDraft.palette.accent, text: brandingDraft.palette.text, background: brandingDraft.palette.background }
+  };
+  saveData(); showToast('Branding saved for '+brandingTeam); render();
+}
+
+function renderSettingsBranding(){
+  if(!state.teams.length){
+    return '<div class="panel"><div class="panel-title">Team Branding</div><div class="empty" style="padding:16px 0">Add a team first (Teams tab).</div></div>';
+  }
+  if(!brandingTeam || state.teams.indexOf(brandingTeam) < 0){
+    brandingTeam = (currentTeam && state.teams.indexOf(currentTeam) > -1) ? currentTeam : state.teams[0];
+    var b0 = (state.branding && state.branding[brandingTeam]) || {};
+    brandingDraft = { logoUrl: b0.logoUrl||'', palette: b0.palette ? Object.assign({}, b0.palette) : null };
+  }
+  var esc = function(s){ return String(s||'').replace(/"/g,'&quot;'); };
+  var html = '<div class="panel"><div class="panel-title">Team Branding</div>';
+
+  html += '<div class="form-group"><div class="form-label">Team</div>'+
+    '<select class="form-input" onchange="_selectBrandingTeam(this.value)">';
+  state.teams.forEach(function(t){
+    var done = (state.branding && state.branding[t]) ? '  \u2713' : '';
+    html += '<option value="'+esc(t)+'"'+(t===brandingTeam?' selected':'')+'>'+t+done+'</option>';
+  });
+  html += '</select></div>';
+
+  html += '<div class="form-group"><div class="form-label">Logo URL <span style="color:var(--muted);font-weight:400">(renders on graphics)</span></div>'+
+    '<input class="form-input" id="branding-logo-input" placeholder="https://…/logo.png" value="'+esc(brandingDraft.logoUrl)+'" oninput="brandingDraft.logoUrl=this.value"/></div>';
+
+  if((brandingDraft.logoUrl||'').trim()){
+    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'+
+      '<div style="width:64px;height:64px;border:1px solid var(--border);border-radius:8px;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">'+
+      '<img src="'+esc(brandingDraft.logoUrl)+'" crossorigin="anonymous" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.style.opacity=0"/></div>'+
+      '<button class="btn btn-team" id="branding-pull-btn" style="flex:1">Pull colors from logo</button></div>';
+  }
+
+  if(brandingPullError){
+    html += '<div style="background:#241313;border:1px solid var(--red);border-radius:8px;padding:11px 13px;margin-bottom:12px;font-size:13px;color:var(--text)">'+
+      'That logo host blocked color reading. Drop the image file here to sample its colors (used only to read colors, not stored — the URL above still renders the logo):'+
+      '<input type="file" accept="image/*" style="margin-top:8px;width:100%;font-size:12px" onchange="_onBrandingFile(this)"/></div>';
+  }
+
+  if(brandingDraft.palette){
+    var p = brandingDraft.palette;
+    var pool = [];
+    [p.accent, p.text, p.background].forEach(function(c){ if(c && pool.indexOf(c)<0) pool.push(c); });
+    var roles = [['accent','Accent (loud)'],['text','Text'],['background','Background']];
+    html += '<div class="form-label">Palette — tap a swatch to move a color between roles, or nudge</div>'+
+      '<div style="display:flex;flex-direction:column;gap:13px;margin:6px 0 14px">';
+    roles.forEach(function(r){
+      var k = r[0], v = brandingDraft.palette[k]||'#000000';
+      var swatches = pool.map(function(c){
+        var sel = (c.toLowerCase()===v.toLowerCase());
+        return '<button onclick="_assignRole(\''+k+'\',\''+c+'\')" title="'+c+'" style="width:32px;height:32px;border-radius:7px;background:'+c+';cursor:pointer;padding:0;border:'+(sel?'3px solid var(--text)':'1px solid var(--border)')+'"></button>';
+      }).join('');
+      html += '<div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+          '<span style="font-size:13px;font-weight:700">'+r[1]+'</span>'+
+          '<span style="display:flex;align-items:center;gap:9px">'+
+            '<span style="font-size:12px;color:var(--muted);font-family:monospace" id="hex-'+k+'">'+v+'</span>'+
+            '<input type="color" value="'+v+'" oninput="brandingDraft.palette.'+k+'=this.value;_updatePalettePreview()" onchange="render()" title="Nudge" style="width:38px;height:28px;border:1px solid var(--border);border-radius:6px;background:none;padding:2px;cursor:pointer"/>'+
+          '</span>'+
+        '</div>'+
+        '<div style="display:flex;gap:8px">'+swatches+'</div>'+
+      '</div>';
+    });
+    html += '</div>';
+
+    html += '<div id="palette-preview" style="border-radius:8px;padding:16px;margin-bottom:14px;border:1px solid var(--border);background:'+p.background+'">'+
+      '<div id="pp-name" style="font-weight:900;font-size:19px;letter-spacing:1px;text-transform:uppercase;color:'+p.accent+'">'+brandingTeam+'</div>'+
+      '<div id="pp-text" style="font-size:13px;margin-top:3px;color:'+p.text+'">Sample — this is how the graphics will be themed</div></div>';
+
+    html += '<button class="btn btn-team" id="branding-save-btn" style="width:100%">Save Branding</button>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 // Settings — Athletes

@@ -95,7 +95,7 @@ function getTeamsLiveFile_() {
   var files = DriveApp.getRootFolder().getFilesByName('fpt_teams_live.json');
   if (files.hasNext()) return files.next();
   var empty = JSON.stringify({
-    teams: [], athletes: {}, profiles: {}, entries: [], achievements: []
+    teams: [], athletes: {}, profiles: {}, entries: [], achievements: [], branding: {}
   });
   // teams: array of team name strings
   // athletes: { teamName: [athleteName, ...] }
@@ -118,7 +118,7 @@ function readTeamsLive_() {
   try {
     return JSON.parse(getTeamsLiveFile_().getBlob().getDataAsString());
   } catch(e) {
-    return { teams: [], athletes: {}, profiles: {}, entries: [], achievements: [] };
+    return { teams: [], athletes: {}, profiles: {}, entries: [], achievements: [], branding: {} };
   }
 }
 
@@ -142,6 +142,7 @@ function doGet(e) {
       athletes:     teamsLive.athletes     || {},
       profiles:     teamsLive.profiles     || {},
       achievements: teamsLive.achievements || [],
+      branding:     teamsLive.branding     || {},
       entries:      (teamsHistorical.entries || []).concat(teamsLive.entries || [])
     };
 
@@ -392,11 +393,18 @@ function handleTeamsPost_(payload) {
     return !e.source || e.source.indexOf('historical') === -1;
   });
 
+  // preserve existing branding if the client didn't send it (stale-tab guard)
+  var existingTeams_ = readTeamsLive_();
+  var brandingState = (payload.branding !== undefined && payload.branding !== null)
+                      ? payload.branding
+                      : (existingTeams_.branding || {});
+
   var liveState = {
     teams:        payload.teams        || [],
     athletes:     payload.athletes     || {},
     profiles:     payload.profiles     || {},
     achievements: payload.achievements || [],
+    branding:     brandingState,
     entries:      liveEntries
   };
 
