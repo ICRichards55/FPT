@@ -1216,6 +1216,19 @@ function _onBrandingFile(input){
   rd.readAsDataURL(f);
 }
 
+function _onBrandingLogoFile(input){
+  var f=input.files&&input.files[0]; if(!f) return;
+  var rd=new FileReader();
+  rd.onload=function(ev){
+    brandingDraft.logoUrl=ev.target.result; // store as data URL: always displays + downloads, no CORS
+    var img=new Image();
+    img.onload=function(){ try{ brandingDraft.palette=_paletteFromImage(img); }catch(e){} brandingPullError=false; render(); showToast('Logo loaded \u2014 palette pulled.'); };
+    img.onerror=function(){ render(); showToast('Logo loaded.'); };
+    img.src=ev.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+
 function _updatePalettePreview(){
   if(!brandingDraft.palette) return;
   var p = brandingDraft.palette;
@@ -1271,15 +1284,19 @@ function renderSettingsBranding(){
   });
   html += '</select></div>';
 
-  html += '<div class="form-group"><div class="form-label">Logo URL <span style="color:var(--muted);font-weight:400">(renders on graphics)</span></div>'+
-    '<input class="form-input" id="branding-logo-input" placeholder="https://…/logo.png" value="'+esc(brandingDraft.logoUrl)+'" oninput="brandingDraft.logoUrl=this.value"/></div>';
+  html += '<div class="form-group"><div class="form-label">Team logo</div>'+
+    '<input type="file" accept="image/*" style="width:100%;font-size:12px" onchange="_onBrandingLogoFile(this)"/>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4">Uploading the image file is the reliable option — it always shows and downloads. Or paste a direct image URL below.</div></div>';
+  var _isData=(brandingDraft.logoUrl||'').indexOf('data:')===0;
+  html += '<div class="form-group"><div class="form-label">…or logo URL</div>'+
+    '<input class="form-input" id="branding-logo-input" placeholder="https://…/logo.png" value="'+esc(_isData?'':brandingDraft.logoUrl)+'" oninput="brandingDraft.logoUrl=this.value" onchange="render()"/>'+
+    (_isData?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Currently using your uploaded image.</div>':'')+'</div>';
 
-  if((brandingDraft.logoUrl||'').trim()){
-    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'+
-      '<div style="width:64px;height:64px;border:1px solid var(--border);border-radius:8px;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">'+
-      '<img src="'+esc(brandingDraft.logoUrl)+'" crossorigin="anonymous" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.style.opacity=0"/></div>'+
-      '<button class="btn btn-team" id="branding-pull-btn" style="flex:1">Pull colors from logo</button></div>';
-  }
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'+
+    '<div style="width:64px;height:64px;border:1px solid var(--border);border-radius:8px;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">'+
+    ((brandingDraft.logoUrl||'').trim() ? '<img src="'+esc(brandingDraft.logoUrl)+'" crossorigin="anonymous" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.style.opacity=0"/>' : '<span style="color:var(--muted);font-size:9px;letter-spacing:1px">LOGO</span>')+
+    '</div>'+
+    '<button class="btn btn-team" id="branding-pull-btn" style="flex:1">Pull colors from logo</button></div>';
 
   if(brandingPullError){
     html += '<div style="background:#241313;border:1px solid var(--red);border-radius:8px;padding:11px 13px;margin-bottom:12px;font-size:13px;color:var(--text)">'+
