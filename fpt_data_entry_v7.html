@@ -171,7 +171,7 @@ window._athQ='';
 var sessionMode=false,sessionEx='fly',sessionDate=TODAY,sessionRows=[];
 var _sessAthQ='',_sessAth='',_sessDdOpen=false;
 var todayEditId=null,todayEditData={};
-var editDataAthlete=null,editDataEditId=null,editDataDelId=null;
+var editDataAthlete=null,editDataEditId=null,editDataDelId=null,editDataEditEx=null,_edEditState=null;
 var rosterQ='';
 var delAthName='';
 var achAthlete='',achAthQ='',achDdOpen=false,achText='',achWeeks=4,achIsGuest=false;
@@ -539,17 +539,23 @@ function _edRowHtml(e){
     return '<div class="hist-row" style="align-items:center"><span class="hist-date">'+fmtShortDate(e.date)+'</span><span class="hist-val" style="flex:1">'+disp+'</span><span style="font-size:11px;color:var(--muted)">no id — can\'t edit</span></div>';
   }
   if(editDataEditId!=null&&e.id===editDataEditId){
+    var curEx=editDataEditEx||e.exercise;
+    var pdate=_edEditState?_edEditState.date:(e.date||'');
+    var exOpts=EX_LIST.map(function(x){return '<option value="'+x.id+'"'+(x.id===curEx?' selected':'')+'>'+x.name+'</option>';}).join('');
+    var exSel='<select class="form-input" id="eda-ex" onchange="editDataExChange()" style="width:140px">'+exOpts+'</select>';
     var valFields;
-    if(e.exercise==='broad'){
-      var ft=e.valueFt!=null?e.valueFt:Math.floor((raw||0)/12);
-      var inch=e.valueIn!=null?e.valueIn:Math.round((raw||0)%12);
-      valFields='<input class="form-input" id="eda-ft" type="number" step="1" value="'+ft+'" style="width:60px" placeholder="ft"/>'+
-                '<input class="form-input" id="eda-in" type="number" step="1" value="'+inch+'" style="width:60px" placeholder="in"/>';
+    if(curEx==='broad'){
+      var bv=_edEditState?_edEditState.val:((e.exercise==='broad')?(e.total!=null?e.total:((e.valueFt||0)*12+(e.valueIn||0))):null);
+      var ftv=(bv!=null&&!isNaN(bv))?Math.floor(bv/12):'';
+      var inv=(bv!=null&&!isNaN(bv))?Math.round(bv%12):'';
+      valFields='<input class="form-input" id="eda-ft" type="number" step="1" value="'+ftv+'" style="width:60px" placeholder="ft"/>'+
+                '<input class="form-input" id="eda-in" type="number" step="1" value="'+inv+'" style="width:60px" placeholder="in"/>';
     }else{
-      valFields='<input class="form-input" id="eda-val" type="number" step="0.001" value="'+(e.value!=null?e.value:'')+'" style="width:110px"/>';
+      var sv=_edEditState?((_edEditState.val!=null&&!isNaN(_edEditState.val))?_edEditState.val:''):((e.exercise!=='broad'&&e.value!=null)?e.value:'');
+      valFields='<input class="form-input" id="eda-val" type="number" step="0.001" value="'+sv+'" style="width:100px"/>';
     }
     return '<div class="hist-row" style="flex-wrap:wrap;gap:8px;align-items:center">'+
-      '<input class="form-input" id="eda-date" type="date" value="'+(e.date||'')+'" style="width:150px"/>'+valFields+
+      '<input class="form-input" id="eda-date" type="date" value="'+pdate+'" style="width:140px"/>'+exSel+valFields+
       '<div style="display:flex;gap:6px;margin-left:auto">'+
         '<button class="action-btn" data-ed-save="'+e.id+'" style="color:#4ade80;border-color:rgba(74,222,128,.45)">Save</button>'+
         '<button class="action-btn" data-ed-cancel="1">Cancel</button></div></div>';
@@ -568,25 +574,47 @@ function _edRowHtml(e){
       '<button class="action-btn" data-ed-entry="'+e.id+'">Edit</button>'+
       '<button class="action-btn action-btn-danger" data-ed-del="'+e.id+'">Delete</button></div></div>';
 }
-function editDataStart(id){editDataDelId=null;editDataEditId=id;_edRefresh();}
-function editDataCancel(){editDataEditId=null;_edRefresh();}
+function editDataStart(id){var e=(state.entries||[]).filter(function(x){return x.id===id;})[0];editDataDelId=null;editDataEditId=id;editDataEditEx=e?e.exercise:null;_edEditState=null;_edRefresh();}
+function editDataCancel(){editDataEditId=null;editDataEditEx=null;_edEditState=null;_edRefresh();}
+function editDataExChange(){
+  var sel=document.getElementById('eda-ex');if(!sel)return;
+  var oldEx=editDataEditEx,newEx=sel.value;
+  var d=(document.getElementById('eda-date')||{}).value;
+  var cur;
+  if(oldEx==='broad'){
+    var ft=parseFloat((document.getElementById('eda-ft')||{}).value);
+    var inch=parseFloat((document.getElementById('eda-in')||{}).value);
+    cur=(isNaN(ft)&&isNaN(inch))?null:(((isNaN(ft)?0:ft)*12)+(isNaN(inch)?0:inch));
+  }else{
+    cur=parseFloat((document.getElementById('eda-val')||{}).value);if(isNaN(cur))cur=null;
+  }
+  var sameBroad=((oldEx==='broad')===(newEx==='broad'));
+  editDataEditEx=newEx;
+  _edEditState={date:d,val:sameBroad?cur:null};
+  _edRefresh();
+}
 function editDataSave(id){
   var e=(state.entries||[]).filter(function(x){return x.id===id;})[0];
-  if(!e){editDataEditId=null;_edRefresh();return;}
+  if(!e){editDataEditId=null;editDataEditEx=null;_edEditState=null;_edRefresh();return;}
   var nd=(document.getElementById('eda-date')||{}).value;if(nd)e.date=nd;
-  if(e.exercise==='broad'){
+  var selEx=document.getElementById('eda-ex');var newEx=selEx?selEx.value:e.exercise;
+  e.exercise=newEx;
+  if(newEx==='broad'){
     var ft=parseFloat((document.getElementById('eda-ft')||{}).value);
     var inch=parseFloat((document.getElementById('eda-in')||{}).value);
     if(!isNaN(ft))e.valueFt=Math.round(ft);
     if(!isNaN(inch))e.valueIn=Math.round(inch);
     if(!isNaN(ft)&&!isNaN(inch))e.total=Math.round(ft)*12+Math.round(inch);
+    e.value=null;
   }else{
     var v=parseFloat((document.getElementById('eda-val')||{}).value);
     if(!isNaN(v))e.value=v;
+    e.valueFt=null;e.valueIn=null;e.total=null;
   }
-  editDataEditId=null;saveData();showToast('Entry updated.');_edRefresh();
+  editDataEditId=null;editDataEditEx=null;_edEditState=null;
+  saveData();showToast('Entry updated.');_edRefresh();
 }
-function editDataDelete(id){editDataEditId=null;editDataDelId=id;_edRefresh();}
+function editDataDelete(id){editDataEditId=null;editDataEditEx=null;_edEditState=null;editDataDelId=id;_edRefresh();}
 function editDataDelCancel(){editDataDelId=null;_edRefresh();}
 async function editDataDelConfirm(id){
   var e=(state.entries||[]).filter(function(x){return x.id===id;})[0];
