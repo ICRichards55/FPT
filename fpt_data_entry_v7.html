@@ -627,7 +627,7 @@ async function editDataDelConfirm(id){
   showToast(ok?'Entry deleted.':'Delete failed to save — retry');
 }
 function _rosterCardHtml(name,inactive,safe_name,sub,pills){
-  return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit Profile</button><button class="action-btn" data-editdata="'+safe_name+'">Edit Data</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
+  return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit Profile</button><button class="action-btn" data-editdata="'+safe_name+'">Edit Data</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="genAthleteFullReport(this.dataset.n)" data-n="'+safe_name+'">Full Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
 }
 function _firstNameOf(n){return String(n||'').trim().split(/\s+/)[0]||'';}
 function openDeleteAthlete(name){
@@ -680,7 +680,7 @@ function renderRoster(){
     var p=state.profiles[name]||{};var inactive=p.inactive;var safe_name=name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     var school=getAthleteSchool(name);var sub=[school,p.sports].filter(Boolean).join(' -- ');
     var pills=EX_LIST.map(function(e){var pr=getPR(name,e.id);if(pr==null)return'';var cls=e.id==='fly'||e.id==='fly510'?'pill-fly':e.id==='broad'?'pill-broad':e.id==='rsi42'?'pill-vert':'pill-vert';var lbl=e.id==='fly510'?'5-10':e.id==='fly'?'10-10':e.id==='broad'?'Broad':e.id==='vert'?'Sky':'RSI';return'<span class="pr-pill '+cls+'" title="'+e.name+'">'+lbl+': '+fmtPR(e.id,pr)+'</span>';}).join('');
-    return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit Profile</button><button class="action-btn" data-editdata="'+safe_name+'">Edit Data</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
+    return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit Profile</button><button class="action-btn" data-editdata="'+safe_name+'">Edit Data</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="genAthleteFullReport(this.dataset.n)" data-n="'+safe_name+'">Full Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
   }).join('');
   return search+'<div id="roster-list-wrap">'+_rosterListHtml()+'</div>';
 }
@@ -852,7 +852,7 @@ function addAch(){
 function startAchEdit(id){var a=state.achievements.filter(function(x){return x.id===id;})[0];if(!a)return;achEditId=id;achEditText=a.achievement;achEditWeeks=a.durationWeeks;render();}
 function saveAchEdit(){var a=state.achievements.filter(function(x){return x.id===achEditId;})[0];if(!a)return;a.achievement=achEditText;a.durationWeeks=achEditWeeks;achEditId=null;saveData();showToast('Achievement updated!');render();}
 
-function genAthleteReport(name){
+function genAthleteReport(name,full){
   var p=state.profiles[name]||{};
   var entries=state.entries||[];
   var EX_REPORT=[
@@ -879,13 +879,13 @@ function genAthleteReport(name){
       byDate[e.date].push(ex.id==='broad'?e.total:e.value);
     });
     var dates=Object.keys(byDate).sort();
-    var last4=dates.slice(-4);
+    var useDates=full?dates.slice():dates.slice(-4);
     var allVals=dates.reduce(function(a,d){return a.concat(byDate[d]);},[]); 
     var firstAvg=byDate[dates[0]].reduce(function(a,b){return a+b;},0)/byDate[dates[0]].length;
     var firstBest=ex.lower?Math.min.apply(null,byDate[dates[0]]):Math.max.apply(null,byDate[dates[0]]);
     var pr=ex.lower?Math.min.apply(null,allVals):Math.max.apply(null,allVals);
     var pct=ex.lower?((firstBest-pr)/firstBest*100).toFixed(1):((pr-firstBest)/firstBest*100).toFixed(1);
-    var rows=last4.map(function(d){
+    var rows=useDates.map(function(d){
       var vals=byDate[d];var padded=vals.concat(['','','','']).slice(0,4);
       var avg=vals.reduce(function(a,b){return a+b;},0)/vals.length;
       return{date:d,vals:padded,avg:avg};
@@ -903,7 +903,7 @@ function genAthleteReport(name){
   };
   var blockHtml=function(s){
     var statsHtml=s.empty?'':('<td style="font-size:10px;color:#fff">First: <strong>'+fmtR(s.ex,s.first)+'</strong></td><td style="font-size:10px;color:#fff">PR: <strong>'+fmtR(s.ex,s.pr)+'</strong></td><td style="font-size:10px;color:#C8922A;font-weight:700">+'+s.pct+'% improvement</td>');
-    return '<div style="margin-bottom:14px">'+
+    return '<div class="exblock" style="margin-bottom:14px">'+
       '<table style="width:100%;border-collapse:collapse;border:1px solid #ccc">'+
       '<thead><tr style="background:#1E3A5F">'+
       '<th style="color:#fff;text-align:left;padding:6px 8px;font-size:12px" colspan="3">'+s.ex.label+'</th>'+
@@ -912,10 +912,10 @@ function genAthleteReport(name){
       '<tr style="background:#1a1a1a"><th style="color:#fff;text-align:left;padding:4px 6px;font-size:10px">Date</th><th style="color:#fff;text-align:center;padding:4px;font-size:10px">1</th><th style="color:#fff;text-align:center;padding:4px;font-size:10px">2</th><th style="color:#fff;text-align:center;padding:4px;font-size:10px">3</th><th style="color:#fff;text-align:center;padding:4px;font-size:10px">4</th><th style="color:#fff;text-align:center;padding:4px;font-size:10px">Avg</th></tr>'+
       '</thead><tbody>'+rowHtml(s)+'</tbody></table></div>';
   };
-  var pageHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+name+' — FPT Report</title>'+
-    '<style>body{font-family:Arial,sans-serif;margin:0;padding:16px;background:#fff}@media print{body{padding:0}button{display:none}}</style></head><body>'+
+  var pageHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+name+' — FPT '+(full?'Full ':'')+'Report</title>'+
+    '<style>body{font-family:Arial,sans-serif;margin:0;padding:16px;background:#fff}@media print{body{padding:0}button{display:none}.exblock{break-inside:avoid;page-break-inside:avoid}.exblock>table>thead{display:table-header-group}.exblock tr{break-inside:avoid;page-break-inside:avoid}}@page{margin:14mm}</style></head><body>'+
     '<div style="background:#1E3A5F;color:#fff;padding:10px 14px;margin-bottom:4px"><div style="font-size:16px;font-weight:700">FRYE PERFORMANCE TRAINING</div><div style="font-size:10px;opacity:0.7">Athlete Performance Report</div></div>'+
-    '<div style="background:#1a1a1a;color:#fff;padding:6px 14px;margin-bottom:12px;font-size:14px;font-weight:700">'+name+'<span style="float:right;font-size:10px;font-weight:400;opacity:0.6">Last 4 testing sessions</span></div>'+
+    '<div style="background:#1a1a1a;color:#fff;padding:6px 14px;margin-bottom:12px;font-size:14px;font-weight:700">'+name+'<span style="float:right;font-size:10px;font-weight:400;opacity:0.6">'+(full?'All testing sessions':'Last 4 testing sessions')+'</span></div>'+
     sections.map(blockHtml).join('')+
     '<div style="font-size:9px;color:#888;margin-top:8px;border-top:1px solid #eee;padding-top:6px">FPT Performance Tracking System &mdash; Confidential &mdash; Generated '+new Date().toLocaleDateString()+'</div>'+
     '<br><button onclick="window.print()" style="padding:8px 20px;background:#1E3A5F;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px">Print / Save as PDF</button>'+
@@ -924,6 +924,7 @@ function genAthleteReport(name){
   w.document.write(pageHtml);
   w.document.close();
 }
+function genAthleteFullReport(name){genAthleteReport(name,true);}
 
 function endNowAch(id){
   var a=state.achievements.filter(function(x){return x.id===id;})[0];
