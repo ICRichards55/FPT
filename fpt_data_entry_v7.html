@@ -380,7 +380,9 @@ function submitSession(){
     else{entry.value=r.value;}
     state.entries.push(entry);
   });
-  saveData();showToast(sessionRows.length+' entries logged!');sessionRows=[];render();
+  var _newOnes=state.entries.slice(-sessionRows.length);
+  var _n=sessionRows.length;sessionRows=[];render();
+  _logConfirmed(_newOnes,_n+' entries logged!');
 }
 function editLastEntry(){
   var today=(state.entries||[]).filter(function(e){return e.date===TODAY;});
@@ -431,7 +433,7 @@ function submitEntry(){
   entry.id=_uid();
   entry.loggedAt=new Date().toISOString();
   state.entries.push(entry);
-  saveData();showToast('Entry logged!');
+  _logConfirmed([entry],'Entry logged!');
   var el=document.getElementById('res-val')||document.getElementById('res-ft');if(el)el.value='';
   var el2=document.getElementById('res-in');if(el2)el2.value='';
   document.getElementById('pr-indicator').style.display='none';render();
@@ -1390,9 +1392,12 @@ function renderHist(){
   var EX_C={fly:'var(--fly)',broad:'var(--broad)',vert:'var(--vert)',fly510:'var(--muted)',rsi42:'var(--muted)'};
   return '<div class="panel"><div class="panel-title">Recent Entries (last 100)</div>'+recent.map(function(e){var ex=EX_LIST.filter(function(x){return x.id===e.exercise;})[0]||{name:e.exercise};var val=e.exercise==='broad'?fmtBroad(e.total):e.exercise==='fly'?fmtFly(e.value):fmtVert(e.value);return '<div class="hist-row"><span class="hist-date">'+fmtShortDate(e.date)+'</span><span class="hist-ath">'+e.athlete+'</span><span class="hist-ex" style="color:'+(EX_C[e.exercise]||'var(--muted)')+'">'+ex.name.split(' ')[0]+'</span><span class="hist-val">'+val+'</span></div>';}).join('')+'</div>';
 }
-async function loadData(){var loaded=await _apiLoad();if(loaded&&Array.isArray(loaded.athletes)){state=loaded;}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];if(!state.adults)state.adults={};if(!state.challenges)state.challenges={};if(!state.challengeEntries)state.challengeEntries=[];render();}
+var _loadedOK=false;
+function _setLoadWarning(show){var el=document.getElementById('load-warning');if(show){if(!el){el=document.createElement('div');el.id='load-warning';el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;padding:11px 14px;font-family:sans-serif;font-size:14px;font-weight:700;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.45)';el.innerHTML='Could not load data from the server. Do NOT add or edit anything - your changes will not save. <button onclick="loadData()" style="margin-left:10px;background:#fff;color:#b91c1c;border:none;border-radius:5px;padding:5px 14px;font-weight:800;cursor:pointer">Retry</button>';document.body.appendChild(el);}el.style.display='block';}else if(el){el.style.display='none';}}
+async function loadData(){var loaded=await _apiLoad();if(loaded){if(Array.isArray(loaded.athletes))state=loaded;_loadedOK=true;_setLoadWarning(false);var _ob=_obAll();if(_ob.length){var _ids={};(state.entries||[]).forEach(function(e){_ids[e.id]=true;});_ob.forEach(function(e){if(!_ids[e.id])state.entries.push(e);});setTimeout(function(){_obRetry(false);},400);}}else if(!_loadedOK){_setLoadWarning(true);}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];if(!state.adults)state.adults={};if(!state.challenges)state.challenges={};if(!state.challengeEntries)state.challengeEntries=[];render();}
 function _uid(){try{if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();}catch(e){}return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)+'-'+Math.random().toString(36).slice(2,10);}
 function saveData(){
+  if(!_loadedOK){_setLoadWarning(true);showToast('Data has not loaded yet - refresh before making changes.');return;}
   // Auto-archive naturally expired achievements to profiles
   var now2=new Date();
   (state.achievements||[]).forEach(function(a){
@@ -1415,9 +1420,41 @@ async function _apiLoad(){var url=_getApiUrl();if(!url)return null;try{var r=awa
 async function _apiSave(s){var url=_getApiUrl();if(!url)return false;try{var r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(s),mode:'cors'});try{var j=await r.json();return !!(j&&j.ok);}catch(e2){return r&&r.ok;}}catch(e){console.warn('FPT save:',e);return false;}}
 function _debounceSave(s){if(_saveTimer)clearTimeout(_saveTimer);_saveTimer=setTimeout(function(){_apiSave(s);},800);}
 async function _saveNowConfirmed(s){if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}var ok=await _apiSave(s);if(!ok){ok=await _apiSave(s);}return ok;}
+// ── OUTBOX: locally persisted entries until server confirms ─────────────
+function _obAll(){try{return JSON.parse(localStorage.getItem('fpt_outbox')||'[]');}catch(e){return [];}}
+function _obWrite(a){try{localStorage.setItem('fpt_outbox',JSON.stringify(a));}catch(e){}}
+function _obAdd(entries){var a=_obAll();entries.forEach(function(e){if(!a.some(function(x){return x.id===e.id;}))a.push(e);});_obWrite(a);_obBadge();}
+function _obRemove(ids){var s={};ids.forEach(function(i){s[i]=true;});_obWrite(_obAll().filter(function(e){return !s[e.id];}));_obBadge();}
+function _obBadge(){
+  var n=_obAll().length;var el=document.getElementById('outbox-badge');
+  if(n>0){
+    if(!el){el=document.createElement('div');el.id='outbox-badge';el.style.cssText='position:fixed;bottom:14px;left:14px;z-index:99998;background:#b45309;color:#fff;padding:9px 14px;border-radius:8px;font-family:sans-serif;font-size:13px;font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.5);cursor:pointer';el.onclick=function(){_obRetry(true);};document.body.appendChild(el);}
+    el.innerHTML=n+' entr'+(n===1?'y':'ies')+' not saved yet &mdash; tap to retry';el.style.display='block';
+  }else if(el){el.style.display='none';}
+}
+var _obRetrying=false;
+async function _obRetry(manual){
+  var pend=_obAll();if(!pend.length||_obRetrying)return;
+  if(!_loadedOK){if(manual)showToast('Still can\'t reach the server \u2014 entries are safe locally.');return;}
+  _obRetrying=true;
+  try{
+    var ids={};(state.entries||[]).forEach(function(e){ids[e.id]=true;});
+    pend.forEach(function(e){if(!ids[e.id])state.entries.push(e);});
+    var ok=await _saveNowConfirmed(state);
+    if(ok){_obRemove(pend.map(function(e){return e.id;}));showToast(pend.length+' pending entr'+(pend.length===1?'y':'ies')+' saved!');}
+    else if(manual){showToast('Save failed \u2014 entries still safe locally.');}
+  }finally{_obRetrying=false;}
+}
+async function _logConfirmed(newEntries,okMsg){
+  _obAdd(newEntries);
+  var ok=await _saveNowConfirmed(state);
+  if(ok){_obRemove(newEntries.map(function(e){return e.id;}));showToast(okMsg);}
+  else{showToast('NOT saved \u2014 kept locally, will retry. Check connection.');_obBadge();}
+}
 var _pendingDeletes=[];
 async function _saveWithDeletes(){var payload=Object.assign({},state,{deletedIds:_pendingDeletes.slice()});var ok=await _saveNowConfirmed(payload);if(ok)_pendingDeletes=[];return ok;}
-setInterval(loadData,300000);
+setInterval(function(){if(sessionRows.length||todayEditId!=null||(typeof editDataEditId!=='undefined'&&editDataEditId!=null))return;loadData();},300000);
+try{_obBadge();}catch(e){}
 if(_isAuthed())loadData();
 
 
