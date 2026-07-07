@@ -359,6 +359,14 @@ function handleGymPost_(payload) {
   // undo a reject.
   var _curLive = readLive_();
 
+  // GUARD: never let a save empty a populated roster (blocks empty-state overwrite / wipe)
+  if ((payload.athletes || []).length === 0 && (_curLive.athletes || []).length > 0) {
+    sendGuardAlert_('GYM roster');
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: 'Refused: this save would erase a populated roster. No changes were written.', guard: 'roster_wipe_blocked' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   var liveState = {
     athletes:       payload.athletes       || [],
     profiles:       payload.profiles       || {},
@@ -395,6 +403,18 @@ function handleTeamsPost_(payload) {
 
   // preserve existing branding if the client didn't send it (stale-tab guard)
   var existingTeams_ = readTeamsLive_();
+
+  // GUARD: never let a save empty a populated teams roster (blocks empty-state overwrite / wipe)
+  var _inTeams  = (payload.teams || []).length;
+  var _curTeams = (existingTeams_.teams || []).length;
+  var _inAth    = Object.keys(payload.athletes || {}).length;
+  var _curAth   = Object.keys(existingTeams_.athletes || {}).length;
+  if ((_inTeams === 0 && _curTeams > 0) || (_inAth === 0 && _curAth > 0)) {
+    sendGuardAlert_('TEAMS roster');
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: 'Refused: this save would erase a populated teams roster. No changes were written.', guard: 'teams_wipe_blocked' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   var brandingState = (payload.branding !== undefined && payload.branding !== null)
                       ? payload.branding
                       : (existingTeams_.branding || {});
@@ -727,6 +747,50 @@ function sendDailyReport() {
              ' entries, ' + athleteNames.length + ' athletes.');
 }
 
+// ── GUARD ALERT ──────────────────────────────────────────────────────────
+function sendGuardAlert_(which) {
+  try {
+    GmailApp.sendEmail(
+      IAN_EMAIL,
+      'FPT GUARD TRIPPED: ' + which,
+      'The ' + which + ' guard just blocked a save that would have erased a populated roster.\n\n' +
+      'This means a device is running the app in a bad state (it loaded empty data and tried to save). ' +
+      'No data was written. Find the device showing an empty roster and refresh it.\n\n' +
+      'Time: ' + new Date().toString(),
+      { name: 'FPT System' }
+    );
+  } catch (e) { Logger.log('Guard alert email failed: ' + e); }
+}
+
+// ── NIGHTLY DRIVE SNAPSHOTS ──────────────────────────────────────────────
+// Copies all four data files into a dated "FPT Backups" folder.
+// Run nightly via time trigger (e.g. 11 PM ET). Keeps the last 30 days.
+function nightlySnapshot() {
+  var root = DriveApp.getRootFolder();
+  var it = root.getFoldersByName('FPT Backups');
+  var folder = it.hasNext() ? it.next() : root.createFolder('FPT Backups');
+  var today = getTodayET_();
+
+  ['fpt_live.json', 'fpt_historical.json', 'fpt_teams_live.json', 'fpt_teams_historical.json']
+    .forEach(function(name) {
+      var files = root.getFilesByName(name);
+      if (!files.hasNext()) return;
+      var snapName = name.replace('.json', '') + '_' + today + '.json';
+      // skip if today's snapshot already exists (trigger retry safety)
+      if (folder.getFilesByName(snapName).hasNext()) return;
+      folder.createFile(snapName, files.next().getBlob().getDataAsString(), MimeType.PLAIN_TEXT);
+    });
+
+  // prune snapshots older than 30 days
+  var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  var all = folder.getFiles();
+  while (all.hasNext()) {
+    var f = all.next();
+    if (f.getDateCreated() < cutoff) f.setTrashed(true);
+  }
+  Logger.log('Nightly snapshot complete for ' + today + '.');
+}
+
 // ── WEEKLY FULL BACKUP ────────────────────────────────────────────────────
 // Trigger: every Sunday ~9 PM ET
 // Needs all entries — merges historical + live
@@ -757,8 +821,9 @@ function sendWeeklyBackup() {
 
   html += '<div style="padding:24px 28px;">';
   html += '<p style="color:#ccc;font-size:14px;line-height:1.6;">Your full database backup is attached ' +
-          'as a CSV file. Keep this somewhere safe — combined with the daily CSVs from this week, ' +
-          'it can reconstruct the complete dataset if anything goes wrong.</p>';
+          'as a CSV, plus full JSON snapshots of the live data (roster, profiles, adults) and the ' +
+          'historical archive. The CSV is human-readable; the fpt_live / fpt_historical JSON files are ' +
+          'drop-in restores if anything goes wrong.</p>';
   html += '<div style="background:#1a1a1a;border-radius:6px;padding:16px 20px;margin-top:16px;">';
   html += '<div style="font-size:13px;color:#888;margin-bottom:8px;">Snapshot Summary</div>';
   html += '<div style="font-size:28px;font-weight:700;color:#e8c84a;">' + entries.length +
@@ -770,13 +835,15 @@ function sendWeeklyBackup() {
   html += 'FPT Performance Tracking System &nbsp;·&nbsp; Full backup generated ' + displayDate;
   html += '</div></div>';
 
-  var csvBlob = Utilities.newBlob(buildCsv_(entries), 'text/csv', 'FPT_FullBackup_' + today + '.csv');
+  var csvBlob  = Utilities.newBlob(buildCsv_(entries), 'text/csv', 'FPT_FullBackup_' + today + '.csv');
+  var liveBlob = Utilities.newBlob(JSON.stringify(live, null, 2), 'application/json', 'fpt_live_' + today + '.json');
+  var histBlob = Utilities.newBlob(JSON.stringify(historical), 'application/json', 'fpt_historical_' + today + '.json');
 
   GmailApp.sendEmail(
     CHRIS_EMAIL,
     subject,
     'Please view this email in an HTML-capable client.',
-    { htmlBody: html, cc: IAN_EMAIL, attachments: [csvBlob], name: 'Ian Richards' }
+    { htmlBody: html, cc: IAN_EMAIL, attachments: [csvBlob, liveBlob, histBlob], name: 'Ian Richards' }
   );
 
   Logger.log('Weekly backup sent — ' + entries.length + ' entries, ' + athleteCount + ' athletes.');
