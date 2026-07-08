@@ -88,16 +88,19 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .bd-date{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(15px,1.9vw,32px);color:rgba(255,255,255,.6);white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
 .bd-today .bd-name,.bd-today .bd-date{color:#ffd34d}
 /* MONTHLY CHALLENGE (light slide) */
-.ch-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 3vw}
-.ch-title{font-family:'Permanent Marker',cursive;font-size:clamp(56px,9vw,150px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
-.ch-name-sub{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(20px,2.8vw,46px);letter-spacing:1px;text-transform:uppercase;color:#222;margin:1vh 0 2.5vh;flex-shrink:0}
-.ch-table{width:100%;border-collapse:collapse;font-family:'Barlow Condensed',sans-serif}
-.ch-table th{font-size:clamp(13px,1.5vw,24px);font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#777;text-align:right;padding:.6vh 1.2vw;border-bottom:2px solid #ccc}
-.ch-table td{font-size:clamp(18px,2.3vw,40px);font-weight:700;color:#111;text-align:right;padding:.65vh 1.2vw;border-bottom:1px solid rgba(0,0,0,.1)}
-.ch-rank{color:#999;font-weight:900;text-align:center!important;width:clamp(40px,5vw,80px)}
-.ch-name{text-align:left!important;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
-.ch-imp{font-weight:900;color:#999}
-.ch-pos{color:#1a8f3c}
+.ch-row{display:flex;align-items:center;gap:1vw;padding:.35vh 0;border-bottom:1px solid rgba(0,0,0,.08)}
+.ch-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#111;line-height:1.15;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;color:#111;line-height:1;flex-shrink:0}
+.ch-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
+.ch-cols-1 .ch-rank{font-size:clamp(24px,3.5vw,56px);min-width:clamp(48px,6vw,90px)}
+.ch-cols-1 .ch-name{font-size:clamp(18px,2.5vw,40px)}
+.ch-cols-1 .ch-score{font-size:clamp(22px,3vw,48px)}
+.ch-cols-2 .ch-rank{font-size:clamp(20px,1.9vw,38px);min-width:clamp(38px,3.4vw,60px)}
+.ch-cols-2 .ch-name{font-size:clamp(15px,1.45vw,27px)}
+.ch-cols-2 .ch-score{font-size:clamp(17px,1.7vw,32px)}
+.ch-cols-3 .ch-rank{font-size:clamp(17px,1.4vw,28px);min-width:clamp(30px,2.4vw,44px)}
+.ch-cols-3 .ch-name{font-size:clamp(13px,1.05vw,20px)}
+.ch-cols-3 .ch-score{font-size:clamp(14px,1.25vw,23px)}
 </style>
 </head>
 <body>
@@ -380,7 +383,12 @@ function birthdaysThisWeek(){
   var p=state.profiles||{};
   Object.keys(p).forEach(function(n){var pr=p[n];if(pr&&!pr.inactive&&pr.dob)cands.push({name:n,dob:pr.dob});});
   var ad=state.adults||{};
-  Object.keys(ad).forEach(function(n){if(ad[n]&&ad[n].dob)cands.push({name:n,dob:ad[n].dob});});
+  Object.keys(ad).forEach(function(n){
+    if(!ad[n]||!ad[n].dob)return;
+    var fp=_adultNameParts(n);
+    var disp=(ad[n].isCoach?'Coach ':'')+fp.first;
+    cands.push({name:disp,dob:ad[n].dob});
+  });
   var out=[],seen={};
   cands.forEach(function(c){
     if(seen[c.name])return;
@@ -424,6 +432,47 @@ function buildBirthdays(){
     +'<div class="bd-list">'+items+'</div>'
     +'</div></div>';
 }
+function _adultNameParts(key){
+  var a=(state.adults||{})[key]||{};
+  var fn=a.firstName, ln=a.lastName;
+  if(fn===undefined||fn===null||fn===''){
+    var parts=String(key).trim().split(/\s+/);
+    fn=parts[0]||key; ln=parts.slice(1).join(' ')||'';
+  }
+  if(ln===undefined||ln===null)ln='';
+  return {first:fn,last:ln};
+}
+// Given the adult keys appearing on a slide, return {key: displayLabel} using first name,
+// disambiguated by progressively longer last-name-initial prefixes only when first names collide.
+function _chDisplayLabels(adultKeys){
+  var parts={}; adultKeys.forEach(function(k){parts[k]=_adultNameParts(k);});
+  var groups={};
+  adultKeys.forEach(function(k){
+    var fnLow=parts[k].first.toLowerCase();
+    (groups[fnLow]=groups[fnLow]||[]).push(k);
+  });
+  var labels={};
+  Object.keys(groups).forEach(function(fnLow){
+    var keys=groups[fnLow];
+    var first=parts[keys[0]].first;
+    if(keys.length===1){labels[keys[0]]=first;return;}
+    var maxLen=Math.max.apply(null,keys.map(function(k){return parts[k].last.length;}));
+    var n=1,unique=false,prefixes;
+    while(n<=Math.max(maxLen,1)){
+      prefixes=keys.map(function(k){return parts[k].last.slice(0,n).toLowerCase();});
+      unique=(new Set(prefixes)).size===prefixes.length;
+      if(unique)break;
+      n++;
+    }
+    keys.forEach(function(k){
+      var last=parts[k].last;
+      if(!last){labels[k]=first;return;}
+      var pre=last.slice(0,Math.min(n,last.length));
+      labels[k]=first+' '+pre+(pre.length<last.length?'.':'');
+    });
+  });
+  return labels;
+}
 function challengeLeaderboard(m,ch){
   var ents=(state.challengeEntries||[]).filter(function(e){return e.month===m;});
   var byAdult={};
@@ -433,10 +482,17 @@ function challengeLeaderboard(m,ch){
     var es=byAdult[a].slice().sort(function(x,y){return String(x.date).localeCompare(String(y.date));});
     var baseline=es[0].value, latest=es.length>1?es[es.length-1].value:null;
     var improvement=latest!=null?(dir==='higher'?latest-baseline:baseline-latest):null;
-    return {adult:a,baseline:baseline,latest:latest,improvement:improvement};
+    // Rank by baseline until a 2nd entry exists, then rank by their latest (current) result
+    var current=latest!=null?latest:baseline;
+    return {adult:a,baseline:baseline,latest:latest,improvement:improvement,current:current};
   });
-  rows.sort(function(x,y){var xi=x.improvement!=null?x.improvement:-Infinity;var yi=y.improvement!=null?y.improvement:-Infinity;return yi-xi;});
+  rows.sort(function(x,y){return dir==='higher'?y.current-x.current:x.current-y.current;});
   return rows;
+}
+function _chColumnCount(n){
+  if(n<=6)return 1;
+  if(n<=12)return 2;
+  return 3;
 }
 function buildChallengeSlide(){
   var et=_etNow();
@@ -445,21 +501,42 @@ function buildChallengeSlide(){
   if(!ch)return '';                     // no challenge defined this month
   var rows=challengeLeaderboard(mm,ch);
   if(!rows.length)return '';            // no results logged yet
-  var monName=et.toLocaleString('en-US',{month:'long'});
-  var trs=rows.map(function(r,i){
-    var imp=r.improvement!=null?((r.improvement>0?'+':'')+round3(r.improvement)):'\u2014';
-    var latest=r.latest!=null?round3(r.latest):'<span style="opacity:.4">\u2014</span>';
-    return '<tr><td class="ch-rank">'+(i+1)+'</td><td class="ch-name">'+r.adult+'</td>'
-      +'<td>'+round3(r.baseline)+'</td><td>'+latest+'</td>'
-      +'<td class="ch-imp'+(r.improvement>0?' ch-pos':'')+'">'+imp+'</td></tr>';
+  var monName=et.toLocaleString('en-US',{month:'long'}).toUpperCase();
+  var unitSfx=ch.unit?(' '+ch.unit):'';
+
+  // Rank the FULL list first (tie-aware), then split into columns so numbering stays continuous.
+  var rankNum=1;
+  var ranked=rows.map(function(r,i){
+    if(i>0){var prevTied=rows[i-1].current===r.current;if(!prevTied)rankNum=i+1;}
+    return {r:r,rank:rankNum};
+  });
+
+  var nCols=_chColumnCount(ranked.length);
+  var perCol=Math.ceil(ranked.length/nCols);
+  var cols=[];
+  for(var c=0;c<nCols;c++)cols.push(ranked.slice(c*perCol,(c+1)*perCol));
+
+  var dispLabels=_chDisplayLabels(rows.map(function(r){return r.adult;}));
+
+  var colsHtml=cols.map(function(colRows){
+    var rowsHtml=colRows.map(function(x){
+      return '<div class="ch-row">'
+        +'<div class="ch-rank">'+rankStr(x.rank)+'</div>'
+        +'<div class="ch-name">'+(dispLabels[x.r.adult]||x.r.adult)+'</div>'
+        +'<div class="ch-score">'+round3(x.r.current)+unitSfx+'</div>'
+        +'</div>';
+    }).join('');
+    return '<div>'+rowsHtml+'</div>';
   }).join('');
+
   return '<div class="slide slide-light">'+blackBrush()
     +'<img class="slide-logo logo-light" src="'+LOGO+'" alt="FPT"/>'
-    +'<div class="ch-body">'
-    +'<div class="ch-title">'+monName+'<br>Challenge</div>'
-    +'<div class="ch-name-sub">'+ch.name+(ch.unit?' <span style="font-weight:600;color:#666">('+ch.unit+')</span>':'')+'</div>'
-    +'<table class="ch-table"><thead><tr><th></th><th style="text-align:left">Adult</th><th>Base</th><th>Latest</th><th>Improve</th></tr></thead><tbody>'+trs+'</tbody></table>'
-    +'</div></div>';
+    +'<div class="lb-body">'
+    +'<div class="lb-ex-name">'+monName+'<br>Challenge</div>'
+    +'<div class="lb-col-head">'+ch.name+(ch.unit?' &mdash; '+ch.unit:'')+'</div>'
+    +'<div class="lb-columns ch-cols-'+nCols+'" style="grid-template-columns:repeat('+nCols+',1fr)">'
+    +colsHtml
+    +'</div></div></div>';
 }
 
 // ── ENGINE ───────────────────────────────────────────────────────

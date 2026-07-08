@@ -175,7 +175,7 @@ var editDataAthlete=null,editDataEditId=null,editDataDelId=null,editDataEditEx=n
 var rosterQ='';
 var delAthName='';
 var achAthlete='',achAthQ='',achDdOpen=false,achText='',achWeeks=4,achIsGuest=false;
-var adultSection='roster',newAdultName='',newAdultDob='',challAdult='',challValue='',challDate=TODAY,cdName='',cdUnit='',cdDir='lower',challEditing=false;
+var adultSection='roster',newAdultFirst='',newAdultLast='',newAdultDob='',challAdult='',challValue='',challDate=TODAY,cdName='',cdUnit='',cdDir='lower',challEditing=false;
 var achEditId=null,achEditText='',achEditWeeks=4;
 var settingsSection='logolib';
 var logoSchool='',logoUrl='';
@@ -957,15 +957,54 @@ function challMonthLabel(m){var MN=['January','February','March','April','May','
 function setAdultSection(s){adultSection=s;challEditing=false;render();}
 
 function addAdult(){
-  var n=(newAdultName||'').trim();
-  if(!n){alert('Enter a name.');return;}
+  var fn=(newAdultFirst||'').trim(), ln=(newAdultLast||'').trim();
+  if(!fn){alert('Enter a first name.');return;}
+  var n=(fn+(ln?' '+ln:'')).trim();
   if(!state.adults)state.adults={};
   if(!state.guests)state.guests=[];
   if(adultList().some(function(x){return x.toLowerCase()===n.toLowerCase();})){alert(n+' is already an adult.');return;}
   if(!state.guests.includes(n))state.guests.push(n);
-  state.adults[n]={dob:(newAdultDob||'')};
-  newAdultName='';newAdultDob='';
+  state.adults[n]={dob:(newAdultDob||''),firstName:fn,lastName:ln};
+  newAdultFirst='';newAdultLast='';newAdultDob='';
   saveData();showToast(n+' added.');render();
+}
+function setAdultFirst(name,val){
+  if(!state.adults)state.adults={};
+  if(!state.adults[name])state.adults[name]={};
+  state.adults[name].firstName=(val||'').trim();
+  saveData();
+}
+function setAdultLast(name,val){
+  if(!state.adults)state.adults={};
+  if(!state.adults[name])state.adults[name]={};
+  state.adults[name].lastName=(val||'').trim();
+  saveData();
+}
+function setAdultCoach(name,checked){
+  if(!state.adults)state.adults={};
+  if(!state.adults[name])state.adults[name]={};
+  state.adults[name].isCoach=!!checked;
+  saveData();
+}
+function _migrateAdultNames(){
+  if(!state.adults)return false;
+  var changed=false;
+  Object.keys(state.adults).forEach(function(n){
+    var a=state.adults[n];
+    if(a.firstName===undefined||a.firstName===null){
+      var src=String(n).trim();
+      var isCoach=false;
+      var m=src.match(/^coach\s+(.+)$/i);
+      if(m){isCoach=true;src=m[1];}
+      var parts=src.split(/\s+/);
+      a.firstName=parts[0]||src;
+      a.lastName=parts.slice(1).join(' ')||'';
+      if(a.isCoach===undefined)a.isCoach=isCoach;
+      changed=true;
+    }
+    if(a.isCoach===undefined||a.isCoach===null){a.isCoach=false;changed=true;}
+  });
+  return changed;
 }
 function setAdultDob(name,val){
   if(!state.adults)state.adults={};
@@ -1001,19 +1040,28 @@ function renderAdults(){
 function renderAdultRoster(){
   var list=adultList();
   var rows=list.map(function(n){
-    var dob=(state.adults[n]&&state.adults[n].dob)||'';
+    var rec=state.adults[n]||{};
+    var dob=rec.dob||'';
+    var fn=rec.firstName!==undefined?rec.firstName:n.split(/\s+/)[0];
+    var ln=rec.lastName!==undefined?rec.lastName:n.split(/\s+/).slice(1).join(' ');
+    var isCoach=!!rec.isCoach;
     var en=_esc(n);
     var pp=_mmddParts(dob);
-    return '<div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">'
-      +'<div style="flex:1;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:16px">'+n+'</div>'
-      +'<div style="display:flex;gap:6px"><select class="form-input" data-adult="'+en+'" onchange="setAdultMonth(this.dataset.adult,this.value)" style="width:90px">'+_monthOpts(pp[0])+'</select><select class="form-input" data-adult="'+en+'" onchange="setAdultDay(this.dataset.adult,this.value)" style="width:84px">'+_dayOpts(pp[1],pp[0])+'</select></div>'
+    var lbl='font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px';
+    return '<div style="padding:12px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+      +'<div><div style="'+lbl+'">Challenge first name</div><input class="form-input" data-adult="'+en+'" value="'+_esc(fn).replace(/"/g,'&quot;')+'" placeholder="First" style="width:120px" onchange="setAdultFirst(this.dataset.adult,this.value)"/></div>'
+      +'<div><div style="'+lbl+'">Last (disambig. only)</div><input class="form-input" data-adult="'+en+'" value="'+_esc(ln).replace(/"/g,'&quot;')+'" placeholder="Last" style="width:120px" onchange="setAdultLast(this.dataset.adult,this.value)"/></div>'
+      +'<label style="display:flex;align-items:center;gap:6px;padding-bottom:9px;cursor:pointer;font-size:13px;color:var(--text)"><input type="checkbox" data-adult="'+en+'" '+(isCoach?'checked':'')+' onchange="setAdultCoach(this.dataset.adult,this.checked)"/>Coach</label>'
+      +'<div style="display:flex;gap:6px;margin-left:auto"><select class="form-input" data-adult="'+en+'" onchange="setAdultMonth(this.dataset.adult,this.value)" style="width:90px">'+_monthOpts(pp[0])+'</select><select class="form-input" data-adult="'+en+'" onchange="setAdultDay(this.dataset.adult,this.value)" style="width:84px">'+_dayOpts(pp[1],pp[0])+'</select></div>'
       +'<button class="action-btn" style="color:var(--red)" data-adult="'+en+'" onclick="removeAdult(this.dataset.adult)">Remove</button>'
-      +'</div>';
+      +'</div></div>';
   }).join('');
   return '<div class="panel"><div class="panel-title">Adults <span style="font-size:14px;color:var(--muted);font-weight:400">('+list.length+')</span></div>'
-    +'<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Adults (coaches, members) tracked for birthdays and the monthly challenge. Lightweight: name + date of birth.</div>'
-    +'<div class="row" style="gap:10px;margin-bottom:14px;align-items:flex-end">'
-    +'<div class="form-group" style="flex:1"><div class="form-label">Name</div><input class="form-input" value="'+newAdultName.replace(/"/g,'&quot;')+'" oninput="newAdultName=this.value" onkeydown="if(event.key===\'Enter\')addAdult()"/></div>'
+    +'<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Adults (coaches, members) tracked for birthdays and the monthly challenge. Challenge leaderboard always shows just the first name. Check <b>Coach</b> to have the birthday slide show "Coach [First Name]" instead of just the first name.</div>'
+    +'<div class="row" style="gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap">'
+    +'<div class="form-group"><div class="form-label">First Name</div><input class="form-input" value="'+newAdultFirst.replace(/"/g,'&quot;')+'" oninput="newAdultFirst=this.value" onkeydown="if(event.key===\'Enter\')addAdult()" style="width:130px"/></div>'
+    +'<div class="form-group"><div class="form-label">Last Name</div><input class="form-input" value="'+newAdultLast.replace(/"/g,'&quot;')+'" oninput="newAdultLast=this.value" onkeydown="if(event.key===\'Enter\')addAdult()" style="width:130px"/></div>'
     +'<div class="form-group"><div class="form-label">Birthday</div><div style="display:flex;gap:6px"><select class="form-input" onchange="setNewAdultMonth(this.value)" style="width:90px">'+_monthOpts(_mmddParts(newAdultDob)[0])+'</select><select class="form-input" onchange="setNewAdultDay(this.value)" style="width:84px">'+_dayOpts(_mmddParts(newAdultDob)[1],_mmddParts(newAdultDob)[0])+'</select></div></div>'
     +'<button class="btn btn-accent btn-sm" onclick="addAdult()">Add Adult</button></div>'
     +(rows||'<div class="empty">No adults yet</div>')+'</div>';
@@ -1394,7 +1442,7 @@ function renderHist(){
 }
 var _loadedOK=false;
 function _setLoadWarning(show){var el=document.getElementById('load-warning');if(show){if(!el){el=document.createElement('div');el.id='load-warning';el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;padding:11px 14px;font-family:sans-serif;font-size:14px;font-weight:700;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.45)';el.innerHTML='Could not load data from the server. Do NOT add or edit anything - your changes will not save. <button onclick="loadData()" style="margin-left:10px;background:#fff;color:#b91c1c;border:none;border-radius:5px;padding:5px 14px;font-weight:800;cursor:pointer">Retry</button>';document.body.appendChild(el);}el.style.display='block';}else if(el){el.style.display='none';}}
-async function loadData(){var loaded=await _apiLoad();if(loaded){if(Array.isArray(loaded.athletes))state=loaded;_loadedOK=true;_setLoadWarning(false);var _ob=_obAll();if(_ob.length){var _ids={};(state.entries||[]).forEach(function(e){_ids[e.id]=true;});_ob.forEach(function(e){if(!_ids[e.id])state.entries.push(e);});setTimeout(function(){_obRetry(false);},400);}}else if(!_loadedOK){_setLoadWarning(true);}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];if(!state.adults)state.adults={};if(!state.challenges)state.challenges={};if(!state.challengeEntries)state.challengeEntries=[];render();}
+async function loadData(){var loaded=await _apiLoad();if(loaded){if(Array.isArray(loaded.athletes))state=loaded;_loadedOK=true;_setLoadWarning(false);var _ob=_obAll();if(_ob.length){var _ids={};(state.entries||[]).forEach(function(e){_ids[e.id]=true;});_ob.forEach(function(e){if(!_ids[e.id])state.entries.push(e);});setTimeout(function(){_obRetry(false);},400);}}else if(!_loadedOK){_setLoadWarning(true);}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];if(!state.adults)state.adults={};if(!state.challenges)state.challenges={};if(!state.challengeEntries)state.challengeEntries=[];if(_loadedOK&&_migrateAdultNames())saveData();render();}
 function _uid(){try{if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();}catch(e){}return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)+'-'+Math.random().toString(36).slice(2,10);}
 function saveData(){
   if(!_loadedOK){_setLoadWarning(true);showToast('Data has not loaded yet - refresh before making changes.');return;}
