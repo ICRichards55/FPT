@@ -174,9 +174,9 @@ var todayEditId=null,todayEditData={};
 var editDataAthlete=null,editDataEditId=null,editDataDelId=null,editDataEditEx=null,_edEditState=null;
 var rosterQ='';
 var delAthName='';
-var achAthlete='',achAthQ='',achDdOpen=false,achText='',achWeeks=4,achIsGuest=false;
+var achAthlete='',achAthQ='',achDdOpen=false,achText='',achWeeks=4,achIsGuest=false,achShowLastName=true;
 var adultSection='roster',newAdultFirst='',newAdultLast='',newAdultDob='',challAdult='',challValue='',challDate=TODAY,cdName='',cdUnit='',cdDir='lower',challEditing=false;
-var achEditId=null,achEditText='',achEditWeeks=4;
+var achEditId=null,achEditText='',achEditWeeks=4,achEditShowLastName=true;
 var settingsSection='logolib';
 var logoSchool='',logoUrl='';
 var exportAllAths=true,exportSelAths=[],exportAllExs=true,exportSelExs=[],exportAllDates=true,exportStart='',exportEnd=TODAY;
@@ -811,48 +811,92 @@ function renderAch(){
   var sourceToggle='<div class="toggle-group" style="margin-bottom:6px"><button class="tog'+(achIsGuest?'':' on')+'" onclick="setAchSource(false)">Athlete</button><button class="tog'+(achIsGuest?' on':'')+'" onclick="setAchSource(true)">Adult</button></div>';
   var placeholder=achIsGuest?'Search or add adult...':'Search athlete...';
   var achAthHtml;
-  if(achAthlete){achAthHtml=sourceToggle+'<div class="ath-selected"><span class="ath-name-disp">'+achAthlete+'</span><button class="ath-clear" onclick="clearAchAthlete()">&#x2715;</button></div>';}
+  if(achAthlete){var achAthLabel=_achAthleteLabel({athlete:achAthlete,showLastName:achShowLastName});achAthHtml=sourceToggle+'<div class="ath-selected"><span class="ath-name-disp">'+achAthLabel+'</span><button class="ath-clear" onclick="clearAchAthlete()">&#x2715;</button></div>';}
   else{achAthHtml=sourceToggle+'<div class="ath-search-wrap"><input class="form-input" id="ach-ath-search" style="width:100%" placeholder="'+placeholder+'" value="'+q.replace(/"/g,'&quot;')+'" oninput="achAthQ=this.value;updateAchDropdown()" onfocus="achDdOpen=true;updateAchDropdown()" onblur="setTimeout(function(){closeAchDropdown();},200)" autocomplete="off"/><div class="ath-dropdown" id="ach-dropdown" style="display:'+(achDdOpen?'block':'none')+'"></div></div>';}
   var wkToggs=[2,4,6,8].map(function(w){return '<button class="tog'+(achWeeks===w?' on':'')+'" data-wk="'+w+'" onclick="achWeeks=parseInt(this.dataset.wk);render()">'+w+' wks</button>';}).join('');
-  var html='<div class="panel"><div class="panel-title">Add Achievement</div><div class="row" style="gap:12px"><div class="form-group" style="flex:1;min-width:140px"><div class="form-label">Person</div>'+achAthHtml+'</div><div class="form-group" style="flex:2;min-width:180px"><div class="form-label">Achievement</div><input class="form-input" id="ach-text-input" placeholder="e.g. Sub-1.20 10-10 Fly" value="'+achText.replace(/"/g,'&quot;')+'"/></div><div class="form-group"><div class="form-label">Display Duration</div><div class="toggle-group">'+wkToggs+'</div></div></div><button class="btn btn-accent" id="add-ach-btn" style="margin-top:12px">Add Achievement</button></div>';
+  var lastNameChk='<div class="form-group"><div class="form-label">&nbsp;</div><label style="display:flex;align-items:center;gap:6px;padding:9px 0;cursor:pointer;font-size:13px"><input type="checkbox" id="ach-lastname-chk" '+(achShowLastName?'checked':'')+' onchange="achShowLastName=this.checked;render()"/>Last name</label></div>';
+  var html='<div class="panel"><div class="panel-title">Add Achievement</div><div class="row" style="gap:12px"><div class="form-group" style="flex:1;min-width:140px"><div class="form-label">Person</div>'+achAthHtml+'</div>'+lastNameChk+'<div class="form-group" style="flex:2;min-width:180px"><div class="form-label">Achievement</div><input class="form-input" id="ach-text-input" placeholder="e.g. Sub-1.20 10-10 Fly" value="'+achText.replace(/"/g,'&quot;')+'"/></div><div class="form-group"><div class="form-label">Display Duration</div><div class="toggle-group">'+wkToggs+'</div></div></div><button class="btn btn-accent" id="add-ach-btn" style="margin-top:12px">Add Achievement</button></div>';
   if(active.length)html+='<div class="panel"><div class="panel-title">Active ('+active.length+')</div>'+active.map(function(a){return achCard(a,now);}).join('')+'</div>';
   if(expired.length)html+='<div class="panel"><div class="panel-title">Pending Archive ('+expired.length+')</div>'+expired.map(function(a){return achCard(a,now);}).join('')+'</div>';
   return html;
+}
+function _adultDisplayLabel(key,showLast){
+  var a=(state.adults||{})[key]||{};
+  var fn=a.firstName,ln=a.lastName;
+  if(fn===undefined||fn===null||fn===''){
+    var parts=String(key).trim().split(/\s+/);
+    fn=parts[0]||key;ln=parts.slice(1).join(' ')||'';
+  }
+  var label=(a.isCoach?'Coach ':'')+fn;
+  if(showLast!==false&&ln)label+=' '+ln;
+  return label;
+}
+// Works for BOTH athletes and adults. Pass any object with {athlete, showLastName}.
+function _achAthleteLabel(rec){
+  var adultRec=state.adults&&state.adults[rec.athlete];
+  if(adultRec)return _adultDisplayLabel(rec.athlete,rec.showLastName);
+  if(rec.showLastName===false){
+    var parts=String(rec.athlete||'').trim().split(/\s+/);
+    return parts[0]||rec.athlete;
+  }
+  return rec.athlete;
 }
 function updateAchDropdown(){
   var dd=document.getElementById('ach-dropdown');if(!dd)return;
   achDdOpen=true;dd.style.display='block';
   var q=(achAthQ||'').toLowerCase();var qRaw=(achAthQ||'').trim();
-  var pool=achIsGuest?(state.guests||[]):(state.athletes||[]);
-  var list=pool.filter(function(a){return !q||a.toLowerCase().includes(q);}).sort();
-  var items=list.map(function(a){var safe=a.replace(/&/g,'&amp;').replace(/"/g,'&quot;');return '<div class="ath-dd-item" onmousedown="selectAchAthlete(this.dataset.n)" data-n="'+safe+'">'+a+'</div>';}).join('');
-  if(achIsGuest&&qRaw&&!pool.some(function(a){return a.toLowerCase()===q;})){items+='<div class="ath-dd-item" style="color:var(--accent);font-weight:600" onmousedown="addAndSelectGuest(this.dataset.n)" data-n="'+_esc(qRaw)+'">+ Add &ldquo;'+qRaw+'&rdquo;</div>';}
-  dd.innerHTML=items||'<div class="ath-dd-item" style="color:var(--muted)">'+(achIsGuest?'Type a name to add':'No matches')+'</div>';
+  var items,noMatch;
+  if(achIsGuest){
+    var keys=adultList(); // the real adult roster (state.adults ∪ legacy state.guests)
+    var withLabel=keys.map(function(k){return {key:k,label:_adultDisplayLabel(k)};});
+    var list=withLabel.filter(function(x){return !q||x.label.toLowerCase().includes(q);}).sort(function(a,b){return a.label.localeCompare(b.label);});
+    items=list.map(function(x){var safeKey=_esc(x.key);var safeLabel=x.label.replace(/&/g,'&amp;').replace(/"/g,'&quot;');return '<div class="ath-dd-item" onmousedown="selectAchAthlete(this.dataset.n)" data-n="'+safeKey+'">'+safeLabel+'</div>';}).join('');
+    noMatch=qRaw&&!withLabel.some(function(x){return x.label.toLowerCase()===q;});
+    if(noMatch){items+='<div class="ath-dd-item" style="color:var(--accent);font-weight:600" onmousedown="addAndSelectGuest(this.dataset.n)" data-n="'+_esc(qRaw)+'">+ Add &ldquo;'+qRaw+'&rdquo; to Adults roster</div>';}
+    dd.innerHTML=items||'<div class="ath-dd-item" style="color:var(--muted)">Type a name to add</div>';
+  }else{
+    var pool=state.athletes||[];
+    var list2=pool.filter(function(a){return !q||a.toLowerCase().includes(q);}).sort();
+    items=list2.map(function(a){var safe=a.replace(/&/g,'&amp;').replace(/"/g,'&quot;');return '<div class="ath-dd-item" onmousedown="selectAchAthlete(this.dataset.n)" data-n="'+safe+'">'+a+'</div>';}).join('');
+    dd.innerHTML=items||'<div class="ath-dd-item" style="color:var(--muted)">No matches</div>';
+  }
 }
 function closeAchDropdown(){achDdOpen=false;var dd=document.getElementById('ach-dropdown');if(dd)dd.style.display='none';}
 function selectAchAthlete(name){achAthlete=name;achAthQ='';achDdOpen=false;render();}
 function setAchSource(isGuest){if(achIsGuest!==isGuest){achIsGuest=isGuest;achAthlete='';achAthQ='';}render();}
 function clearAchAthlete(){achAthlete='';achAthQ='';render();}
-function addAndSelectGuest(name){if(!state.guests)state.guests=[];if(!state.guests.includes(name))state.guests.push(name);saveData();selectAchAthlete(name);}
+function addAndSelectGuest(name){
+  if(!state.guests)state.guests=[];
+  if(!state.guests.includes(name))state.guests.push(name);
+  if(!state.adults)state.adults={};
+  if(!state.adults[name]){
+    var parts=String(name).trim().split(/\s+/);
+    state.adults[name]={dob:'',firstName:parts[0]||name,lastName:parts.slice(1).join(' ')||'',isCoach:false};
+  }
+  saveData();selectAchAthlete(name);
+}
 function achCard(a,now){
   var exp=new Date(a.dateAdded+'T12:00:00');exp.setDate(exp.getDate()+a.durationWeeks*7);
   var isExpired=exp<=now,daysLeft=Math.ceil((exp-now)/86400000);
   var isEditing=achEditId===a.id;
+  var isAdultAch=!!(state.adults&&state.adults[a.athlete]); // retained: some callers may still check this
   var editForm='';
   if(isEditing){
     var wkE=[2,4,6,8].map(function(w){return '<button class="tog'+(achEditWeeks===w?' on':'')+'" data-wk="'+w+'" onclick="achEditWeeks=parseInt(this.dataset.wk);render()">'+w+' wks</button>';}).join('');
-    editForm='<div class="ach-edit-form"><div class="form-group"><div class="form-label">Achievement Text</div><input class="form-input" value="'+achEditText.replace(/"/g,'&quot;')+'" oninput="achEditText=this.value"/></div><div class="form-group"><div class="form-label">Duration</div><div class="toggle-group">'+wkE+'</div></div><div style="display:flex;gap:8px"><button class="btn btn-accent btn-sm" id="ach-save-edit-btn">Save</button><button class="btn btn-ghost btn-sm" onclick="achEditId=null;render()">Cancel</button></div></div>';
+    var lastNameChkE='<label style="display:flex;align-items:center;gap:6px;padding:6px 0;cursor:pointer;font-size:13px"><input type="checkbox" '+(achEditShowLastName?'checked':'')+' onchange="achEditShowLastName=this.checked;render()"/>Last name</label>';
+    editForm='<div class="ach-edit-form"><div class="form-group"><div class="form-label">Achievement Text</div><input class="form-input" value="'+achEditText.replace(/"/g,'&quot;')+'" oninput="achEditText=this.value"/></div><div class="form-group"><div class="form-label">Duration</div><div class="toggle-group">'+wkE+'</div></div>'+lastNameChkE+'<div style="display:flex;gap:8px"><button class="btn btn-accent btn-sm" id="ach-save-edit-btn">Save</button><button class="btn btn-ghost btn-sm" onclick="achEditId=null;render()">Cancel</button></div></div>';
   }
-  return '<div class="ach-item"><div class="ach-item-row"><div><div class="ach-name">'+a.athlete+'</div><div class="ach-detail">'+a.achievement+'</div><div class="ach-detail">'+(isExpired?'Expired':'Expires in '+daysLeft+' day'+(daysLeft!==1?'s':''))+'</div></div><div class="ach-btns"><button class="ach-btn" onclick="startAchEdit(this.dataset.id)" data-id="'+a.id+'">Edit</button><button class="ach-btn" style="color:var(--red)" onclick="endNowAch(this.dataset.id)" data-id="'+a.id+'">End Now</button></div></div>'+editForm+'</div>';
+  var achDispName=_achAthleteLabel(a);
+  return '<div class="ach-item"><div class="ach-item-row"><div><div class="ach-name">'+achDispName+'</div><div class="ach-detail">'+a.achievement+'</div><div class="ach-detail">'+(isExpired?'Expired':'Expires in '+daysLeft+' day'+(daysLeft!==1?'s':''))+'</div></div><div class="ach-btns"><button class="ach-btn" onclick="startAchEdit(this.dataset.id)" data-id="'+a.id+'">Edit</button><button class="ach-btn" style="color:var(--red)" onclick="endNowAch(this.dataset.id)" data-id="'+a.id+'">End Now</button></div></div>'+editForm+'</div>';
 }
 function addAch(){
   // Sync achText from DOM in case input delegation didn't fire (iPad Safari timing)
   var _achEl=document.getElementById('ach-text-input');if(_achEl&&_achEl.value.trim())achText=_achEl.value;
   // If adult mode and name typed but not formally selected, auto-commit it
   if(!achAthlete&&achIsGuest&&achAthQ.trim()){addAndSelectGuest(achAthQ.trim());return;}
-  if(!achAthlete||!achText.trim()){alert('Select a person and enter achievement.');return;}state.achievements=state.achievements.concat([{id:Date.now().toString(36),athlete:achAthlete,achievement:achText,dateAdded:new Date().toISOString().slice(0,10),durationWeeks:achWeeks,archived:false}]);saveData();showToast('Achievement added!');achText='';achAthlete='';achAthQ='';render();}
-function startAchEdit(id){var a=state.achievements.filter(function(x){return x.id===id;})[0];if(!a)return;achEditId=id;achEditText=a.achievement;achEditWeeks=a.durationWeeks;render();}
-function saveAchEdit(){var a=state.achievements.filter(function(x){return x.id===achEditId;})[0];if(!a)return;a.achievement=achEditText;a.durationWeeks=achEditWeeks;achEditId=null;saveData();showToast('Achievement updated!');render();}
+  if(!achAthlete||!achText.trim()){alert('Select a person and enter achievement.');return;}state.achievements=state.achievements.concat([{id:Date.now().toString(36),athlete:achAthlete,achievement:achText,dateAdded:new Date().toISOString().slice(0,10),durationWeeks:achWeeks,archived:false,showLastName:achShowLastName}]);saveData();showToast('Achievement added!');achText='';achAthlete='';achAthQ='';achShowLastName=true;render();}
+function startAchEdit(id){var a=state.achievements.filter(function(x){return x.id===id;})[0];if(!a)return;achEditId=id;achEditText=a.achievement;achEditWeeks=a.durationWeeks;achEditShowLastName=(a.showLastName!==false);render();}
+function saveAchEdit(){var a=state.achievements.filter(function(x){return x.id===achEditId;})[0];if(!a)return;a.achievement=achEditText;a.durationWeeks=achEditWeeks;a.showLastName=achEditShowLastName;achEditId=null;saveData();showToast('Achievement updated!');render();}
 
 function genAthleteReport(name,full){
   var p=state.profiles[name]||{};

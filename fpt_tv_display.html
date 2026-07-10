@@ -110,7 +110,7 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 <script>
 window._API_URL='https://script.google.com/macros/s/AKfycbwirWQw0-hVSwIwVl6RCWcclgRNKia7awlfUzImilUiKjNKtSapuCueOaTwWgTlJ6Uk/exec';
 const LOGO='/fpt_logo_dark.png';
-const SHOW_CHALLENGE_SLIDE=false; // TV Monthly Challenge slide — flip to true after talking with Chris
+const SHOW_CHALLENGE_SLIDE=true; // TV Monthly Challenge slide — enabled after confirming with Chris
 const SHREDMILL_URL='';
 let SLIDE_TIMES=[10,12,12,12,12,12,12,14,12,11,13];
 let TOTAL_SLIDES=11;
@@ -354,9 +354,14 @@ function buildShredmill(){
 
 function buildCongrats(){
   const active=activeAchs();
-  const items=active.length
-    ?active.map(a=>{const cgLogo=getSchoolLogo(a.athlete);return`<div class="cg-item"><div class="cg-name" style="display:flex;align-items:center;gap:8px">${cgLogo?'<img src="'+cgLogo+'" style="height:36px;width:auto;object-fit:contain;flex-shrink:0" onerror="this.style.display=\'none\'"/>':''}<span>${a.athlete}</span></div><div class="cg-ach">${a.achievement}</div></div>`;}).join('')
-    :`<div class="cg-empty">Add achievements in the coaching portal</div>`;
+  if(!active.length)return '';   // self-suppress when there's nothing active, same as birthdays/challenge
+  const items=active.map(a=>{
+    const cgLogo=getSchoolLogo(a.athlete);
+    const adultRec=state.adults&&state.adults[a.athlete];
+    const _anp=adultRec?_adultNameParts(a.athlete):null;
+    const dispName=adultRec?((adultRec.isCoach?'Coach ':'')+_anp.first+(a.showLastName!==false&&_anp.last?' '+_anp.last:'')):(a.showLastName===false?String(a.athlete||'').trim().split(/\s+/)[0]||a.athlete:a.athlete);
+    return`<div class="cg-item"><div class="cg-name" style="display:flex;align-items:center;gap:8px">${cgLogo?'<img src="'+cgLogo+'" style="height:36px;width:auto;object-fit:contain;flex-shrink:0" onerror="this.style.display=\'none\'"/>':''}<span>${dispName}</span></div><div class="cg-ach">${a.achievement}</div></div>`;
+  }).join('');
   return`<div class="slide slide-dark" id="s9">
     ${whiteBrush()}
     <div class="cg-body">
