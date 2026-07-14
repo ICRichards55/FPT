@@ -311,6 +311,18 @@ function sessionAvgs(entries,ath,id){
   return Object.values(Object.fromEntries(Object.entries(byDate).map(([d,vals])=>[d,{avg:vals.reduce((a,b)=>a+b,0)/vals.length,count:vals.length}])));
 }
 function _nameEq(a,b){return (a==null?'':String(a)).trim().toLowerCase()===(b==null?'':String(b)).trim().toLowerCase();}
+// Gym-wide records/PR-story "GYM RECORD" mode only: an athlete must have 2+ distinct
+// testing dates (any exercise) before they're eligible to be crowned a gym record holder.
+// Mirrors the same rule applied on the TV display. Does NOT affect coach-driven "Athlete PR"
+// story mode or Spotlight for a specifically-selected athlete — a coach choosing someone by
+// name is a deliberate action, not an automatic leaderboard/record surfacing.
+function _eligibleForGymRecord(ath){
+  var dates={};
+  state.entries.forEach(function(e){
+    if(_nameEq(e.athlete,ath))dates[e.date]=true;
+  });
+  return Object.keys(dates).length>=2;
+}
 function getAthletesPR(ath,id){
   const vals=state.entries
     .filter(e=>_nameEq(e.athlete,ath)&&e.exercise===id)
@@ -336,18 +348,18 @@ function getAthleteIntakeBest(ath,id){
   return (id==='fly'||id==='fly510')?Math.min(...day):Math.max(...day);
 }
 function getGymPR(id){
-  const all=state.athletes.map(a=>getAthletesPR(a,id)).filter(v=>v!=null);
+  const all=state.athletes.filter(a=>_eligibleForGymRecord(a)).map(a=>getAthletesPR(a,id)).filter(v=>v!=null);
   if(!all.length)return null;
   return (id==='fly'||id==='fly510')?Math.min(...all):Math.max(...all);
 }
 function getGymPRHolder(id){
   const pr=getGymPR(id);if(pr==null)return'—';
-  return state.athletes.find(a=>{const p=getAthletesPR(a,id);return p!=null&&Math.abs(p-pr)<0.0001;})||'—';
+  return state.athletes.find(a=>{if(!_eligibleForGymRecord(a))return false;const p=getAthletesPR(a,id);return p!=null&&Math.abs(p-pr)<0.0001;})||'—';
 }
 function getGymPrevRecord(id){
   const holder=getGymPRHolder(id);
   const pr=getGymPR(id);if(pr==null)return null;
-  const others=state.athletes.filter(a=>a!==holder).map(a=>getAthletesPR(a,id)).filter(v=>v!=null);
+  const others=state.athletes.filter(a=>a!==holder&&_eligibleForGymRecord(a)).map(a=>getAthletesPR(a,id)).filter(v=>v!=null);
   if(!others.length)return null;
   return (id==='fly'||id==='fly510')?Math.min(...others):Math.max(...others);
 }

@@ -17,9 +17,6 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 
 /* LOGO — all slides: top right, below wave banner */
 .slide-logo{position:absolute;z-index:10;right:3%;top:14%}
-.logo-dark{height:10vh}
-.logo-light{height:9vh}
-.logo-cover{height:13vh}
 
 /* WELCOME */
 .welcome-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;padding:5vw 6vw}
@@ -210,7 +207,7 @@ function blackBrush(){
 function buildWelcome(){
   return`<div class="slide slide-dark" id="s0">
     ${whiteBrush()}
-    <img class="slide-logo logo-cover" src="${LOGO}" alt="FPT"/>
+    <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(95px,15.4vw,259px)"/>
     <div class="welcome-body">
       <div class="welcome-title">Frye<br>Performance<br>Training</div>
       <div class="welcome-tag-wrap">
@@ -257,7 +254,7 @@ function buildLeaderboard(slideId,ex,gender,entries){
   const mon=getMonthName();
   return`<div class="slide slide-light" id="s${slideId}">
     ${blackBrush()}
-    <img class="slide-logo logo-light" src="${LOGO}" alt="FPT"/>
+    <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(84px,14.7vw,245px)"/>
     <div class="lb-body">
       <div class="lb-ex-name">${ex.name}</div>
       <div class="lb-columns">
@@ -293,7 +290,7 @@ function buildBigBoysBoard(entries){
   }).join('');
   return`<div class="slide slide-light" id="s8">
     ${blackBrush()}
-    <img class="slide-logo logo-light" src="${LOGO}" alt="FPT"/>
+    <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(62px,10.5vw,182px)"/>
     <div class="lb-body">
       <div class="lb-ex-name" style="font-size:clamp(44px,7.5vw,130px)">Big Boys<br>Board</div>
       <div class="lb-columns" style="grid-template-columns:1fr 1fr 1fr">
@@ -318,7 +315,7 @@ function buildMonthlyPRs(entries){
   }
   return`<div class="slide slide-light" id="s7">
     ${blackBrush()}
-    <img class="slide-logo logo-light" src="${LOGO}" alt="FPT"/>
+    <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(84px,13.3vw,224px)"/>
     <div class="pr-body">
       <div class="pr-title">${mon}<br>Leaderboard</div>
       <div class="pr-cols">
@@ -336,7 +333,7 @@ function buildShredmill(){
   const vid=`<video src="${SHREDMILL_URL}" autoplay muted loop playsinline></video>`;
   return`<div class="slide slide-light" id="s8">
     ${blackBrush()}
-    <img class="slide-logo logo-light" src="${LOGO}" alt="FPT"/>
+    <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(84px,13.3vw,217px)"/>
     <div class="sh-body">
       <div class="sh-left"><div class="sh-title">Gear 2<br>Shredmill</div></div>
       <div class="sh-right">
@@ -429,7 +426,7 @@ function buildBirthdays(){
       +'</div>';
   }).join('');
   return '<div class="slide slide-dark">'+whiteBrush()
-    +'<img class="slide-logo logo-cover" src="'+LOGO+'" alt="FPT"/>'
+    +'<img class="slide-logo" src="'+LOGO+'" alt="FPT" style="height:clamp(91px,16.9vw,273px)"/>'
     +'<div class="bd-body">'
     +'<div class="bd-title">Birthdays</div>'
     +'<div class="bd-sub">In the Gym This Week</div>'
@@ -534,7 +531,7 @@ function buildChallengeSlide(){
   }).join('');
 
   return '<div class="slide slide-light">'+blackBrush()
-    +'<img class="slide-logo logo-light" src="'+LOGO+'" alt="FPT"/>'
+    +'<img class="slide-logo" src="'+LOGO+'" alt="FPT" style="height:clamp(84px,14.7vw,245px)"/>'
     +'<div class="lb-body">'
     +'<div class="lb-ex-name">'+monName+'<br>Challenge</div>'
     +'<div class="lb-col-head">'+ch.name+(ch.unit?' &mdash; '+ch.unit:'')+'</div>'
@@ -559,19 +556,37 @@ async function loadData(){
   renderBoard();
 }
 
+// Hides "one-and-done" intake-only athletes from TV leaderboards: an athlete's results
+// don't appear until they've logged a 2nd DISTINCT session date (any exercise counts;
+// multiple exercises logged on the same day still count as one session). Once they cross
+// that threshold, ALL of their entries become eligible — including the first session's.
+function _eligibleTvEntries(allEntries){
+  var datesByAthlete={};
+  allEntries.forEach(function(e){
+    var key=e.athlete;
+    if(!datesByAthlete[key])datesByAthlete[key]={};
+    datesByAthlete[key][e.date]=true;
+  });
+  var eligible={};
+  Object.keys(datesByAthlete).forEach(function(a){
+    if(Object.keys(datesByAthlete[a]).length>=2)eligible[a]=true;
+  });
+  return allEntries.filter(function(e){return eligible[e.athlete];});
+}
 function renderBoard(){
   const{entries=[]}=state;
+  const tvEntries=_eligibleTvEntries(entries);
   var slides=[];
   function add(html,time){if(html)slides.push({html:html,time:time});}
   add(buildWelcome(),10);
-  add(buildLeaderboard(1,EX[0],'male',entries),12);
-  add(buildLeaderboard(2,EX[0],'female',entries),12);
-  add(buildLeaderboard(3,EX[1],'male',entries),12);
-  add(buildLeaderboard(4,EX[1],'female',entries),12);
-  add(buildLeaderboard(5,EX[2],'male',entries),12);
-  add(buildLeaderboard(6,EX[2],'female',entries),12);
-  add(buildMonthlyPRs(entries),14);
-  add(buildBigBoysBoard(entries),12);
+  add(buildLeaderboard(1,EX[0],'male',tvEntries),12);
+  add(buildLeaderboard(2,EX[0],'female',tvEntries),12);
+  add(buildLeaderboard(3,EX[1],'male',tvEntries),12);
+  add(buildLeaderboard(4,EX[1],'female',tvEntries),12);
+  add(buildLeaderboard(5,EX[2],'male',tvEntries),12);
+  add(buildLeaderboard(6,EX[2],'female',tvEntries),12);
+  add(buildMonthlyPRs(tvEntries),14);
+  add(buildBigBoysBoard(tvEntries),12);
   add(buildShredmill(),11);
   add(buildBirthdays(),13);
   if(SHOW_CHALLENGE_SLIDE)add(buildChallengeSlide(),13);
