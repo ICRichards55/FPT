@@ -178,6 +178,8 @@ var achAthlete='',achAthQ='',achDdOpen=false,achText='',achWeeks=4,achIsGuest=fa
 var adultSection='roster',newAdultFirst='',newAdultLast='',newAdultDob='',challAdult='',challValue='',challDate=TODAY,cdName='',cdUnit='',cdDir='lower',challEditing=false;
 var achEditId=null,achEditText='',achEditWeeks=4,achEditShowLastName=true;
 var settingsSection='logolib';
+var newActivityName='',newActivityUnit='',newActivityLower=false;
+var activityEditId=null,activityEditName='',activityEditUnit='',activityEditLower=false;
 var logoSchool='',logoUrl='';
 var exportAllAths=true,exportSelAths=[],exportAllExs=true,exportSelExs=[],exportAllDates=true,exportStart='',exportEnd=TODAY;
 var importJson='',importParsed=null,importReport=null,importDone=false;
@@ -1231,11 +1233,12 @@ function viewPendingIntake(id){
 }
 
 function renderSettings(){
-  var sections=['logolib','export','intake','history','backup','bulkimport','bulkedit'];
-  var labels=['Logo Library','Data Export','Intake','History','Backup & Restore','Bulk Import','Bulk Editor'];
+  var sections=['activities','logolib','export','intake','history','backup','bulkimport','bulkedit'];
+  var labels=['Activities','Logo Library','Data Export','Intake','History','Backup & Restore','Bulk Import','Bulk Editor'];
   var nav=sections.map(function(s,i){return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';bulkEdits={};render()">'+labels[i]+(s==='intake'?'<span id="pending-badge" style="display:none;margin-left:6px;background:var(--accent);color:#111;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700"></span>':'')+'</button>';}).join('');
   var content='';
-  if(settingsSection==='logolib')content=renderLogoLib();
+  if(settingsSection==='activities')content=renderActivities();
+  else if(settingsSection==='logolib')content=renderLogoLib();
   else if(settingsSection==='export')content=renderDataExport();
   else if(settingsSection==='intake')content=renderPendingIntakes()+renderIntake();
   else if(settingsSection==='history')content=renderHist();
@@ -1243,6 +1246,73 @@ function renderSettings(){
   else if(settingsSection==='bulkimport')content=renderBulkImport();
   else if(settingsSection==='bulkedit')content=renderBulkEditor();
   return '<div class="sn-nav">'+nav+'</div>'+content;
+}
+function _slugifyActivityName(name){
+  var base='custom_'+String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+  if(!base||base==='custom_')base='custom_activity';
+  var id=base,n=2;
+  var existing=(state.customActivities||[]).map(function(a){return a.id;});
+  while(existing.indexOf(id)>=0){id=base+'_'+n;n++;}
+  return id;
+}
+function addCustomActivity(){
+  var name=(newActivityName||'').trim();
+  var unit=(newActivityUnit||'').trim();
+  if(!name){alert('Enter an activity name.');return;}
+  if(!state.customActivities)state.customActivities=[];
+  if(state.customActivities.some(function(a){return a.name.toLowerCase()===name.toLowerCase();})){alert('An activity named "'+name+'" already exists.');return;}
+  var id=_slugifyActivityName(name);
+  state.customActivities.push({id:id,name:name,unit:unit,lower:!!newActivityLower,color:'var(--muted)',createdAt:TODAY});
+  newActivityName='';newActivityUnit='';newActivityLower=false;
+  saveData();showToast(name+' added.');render();
+}
+function removeCustomActivity(id){
+  var act=(state.customActivities||[]).filter(function(a){return a.id===id;})[0];
+  if(!act)return;
+  if(!confirm('Remove "'+act.name+'"? This cannot be undone, and any logged results for it would become orphaned.'))return;
+  state.customActivities=(state.customActivities||[]).filter(function(a){return a.id!==id;});
+  saveData();showToast('Removed.');render();
+}
+function startActivityEdit(id){
+  var a=(state.customActivities||[]).filter(function(x){return x.id===id;})[0];if(!a)return;
+  activityEditId=id;activityEditName=a.name;activityEditUnit=a.unit;activityEditLower=a.lower;render();
+}
+function saveActivityEdit(){
+  var a=(state.customActivities||[]).filter(function(x){return x.id===activityEditId;})[0];if(!a)return;
+  var name=(activityEditName||'').trim();
+  if(!name){alert('Name cannot be empty.');return;}
+  a.name=name;a.unit=(activityEditUnit||'').trim();a.lower=!!activityEditLower;
+  activityEditId=null;saveData();showToast('Updated.');render();
+}
+function cancelActivityEdit(){activityEditId=null;render();}
+function renderActivities(){
+  var acts=(state.customActivities||[]).slice().sort(function(a,b){return a.name.localeCompare(b.name);});
+  var rows=acts.map(function(a){
+    if(activityEditId===a.id){
+      return '<div style="padding:12px 0;border-bottom:1px solid var(--border)"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+        +'<div><div class="form-label">Name</div><input class="form-input" style="width:170px" value="'+activityEditName.replace(/"/g,'&quot;')+'" oninput="activityEditName=this.value"/></div>'
+        +'<div><div class="form-label">Unit</div><input class="form-input" style="width:120px" value="'+activityEditUnit.replace(/"/g,'&quot;')+'" oninput="activityEditUnit=this.value"/></div>'
+        +'<div class="toggle-group"><button class="tog'+(!activityEditLower?' on':'')+'" onclick="activityEditLower=false;render()">Higher is Better</button><button class="tog'+(activityEditLower?' on':'')+'" onclick="activityEditLower=true;render()">Lower is Better</button></div>'
+        +'<button class="btn btn-accent btn-sm" onclick="saveActivityEdit()">Save</button>'
+        +'<button class="btn btn-ghost btn-sm" onclick="cancelActivityEdit()">Cancel</button>'
+        +'</div></div>';
+    }
+    return '<div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="flex:1;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:16px">'+a.name+'</div>'
+      +'<div style="font-size:13px;color:var(--muted);min-width:100px">'+(a.unit?a.unit:'<span style="opacity:.5">no unit</span>')+'</div>'
+      +'<div style="font-size:12px;color:var(--muted2);min-width:120px">'+(a.lower?'Lower is better':'Higher is better')+'</div>'
+      +'<button class="action-btn" data-id="'+a.id+'" onclick="startActivityEdit(this.dataset.id)">Edit</button>'
+      +'<button class="action-btn" style="color:var(--red)" data-id="'+a.id+'" onclick="removeCustomActivity(this.dataset.id)">Remove</button>'
+      +'</div>';
+  }).join('');
+  return '<div class="panel"><div class="panel-title">Activities <span style="font-size:14px;color:var(--muted);font-weight:400">('+acts.length+' custom)</span></div>'
+    +'<div style="font-size:13px;color:var(--muted);margin-bottom:14px">The core 5 tests — 10-10 Fly, Broad Jump, Skyhook, 5-10 Fly, 4/2 RSI — are fixed and can\'t be changed here. Add a new activity below to start testing something new; define it once and it becomes available everywhere the existing activities do.</div>'
+    +'<div class="row" style="gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap">'
+    +'<div class="form-group"><div class="form-label">Activity Name</div><input class="form-input" style="width:200px" placeholder="e.g. Med Ball Throw" value="'+newActivityName.replace(/"/g,'&quot;')+'" oninput="newActivityName=this.value" onkeydown="if(event.key===\'Enter\')addCustomActivity()"/></div>'
+    +'<div class="form-group"><div class="form-label">Unit</div><input class="form-input" style="width:130px" placeholder="e.g. feet" value="'+newActivityUnit.replace(/"/g,'&quot;')+'" oninput="newActivityUnit=this.value" onkeydown="if(event.key===\'Enter\')addCustomActivity()"/></div>'
+    +'<div class="form-group"><div class="form-label">Direction</div><div class="toggle-group"><button class="tog'+(!newActivityLower?' on':'')+'" onclick="newActivityLower=false;render()">Higher is Better</button><button class="tog'+(newActivityLower?' on':'')+'" onclick="newActivityLower=true;render()">Lower is Better</button></div></div>'
+    +'<button class="btn btn-accent btn-sm" onclick="addCustomActivity()">Add Activity</button></div>'
+    +(rows||'<div class="empty">No custom activities yet — the core 5 tests are always available in the log.</div>')+'</div>';
 }
 function renderLogoLib(){
   var logos=state.schoolLogos||{};var schools=Object.keys(logos).sort();
@@ -1486,7 +1556,7 @@ function renderHist(){
 }
 var _loadedOK=false;
 function _setLoadWarning(show){var el=document.getElementById('load-warning');if(show){if(!el){el=document.createElement('div');el.id='load-warning';el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;padding:11px 14px;font-family:sans-serif;font-size:14px;font-weight:700;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.45)';el.innerHTML='Could not load data from the server. Do NOT add or edit anything - your changes will not save. <button onclick="loadData()" style="margin-left:10px;background:#fff;color:#b91c1c;border:none;border-radius:5px;padding:5px 14px;font-weight:800;cursor:pointer">Retry</button>';document.body.appendChild(el);}el.style.display='block';}else if(el){el.style.display='none';}}
-async function loadData(){var loaded=await _apiLoad();if(loaded){if(Array.isArray(loaded.athletes))state=loaded;_loadedOK=true;_setLoadWarning(false);var _ob=_obAll();if(_ob.length){var _ids={};(state.entries||[]).forEach(function(e){_ids[e.id]=true;});_ob.forEach(function(e){if(!_ids[e.id])state.entries.push(e);});setTimeout(function(){_obRetry(false);},400);}}else if(!_loadedOK){_setLoadWarning(true);}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];if(!state.adults)state.adults={};if(!state.challenges)state.challenges={};if(!state.challengeEntries)state.challengeEntries=[];if(_loadedOK&&_migrateAdultNames())saveData();render();}
+async function loadData(){var loaded=await _apiLoad();if(loaded){if(Array.isArray(loaded.athletes))state=loaded;_loadedOK=true;_setLoadWarning(false);var _ob=_obAll();if(_ob.length){var _ids={};(state.entries||[]).forEach(function(e){_ids[e.id]=true;});_ob.forEach(function(e){if(!_ids[e.id])state.entries.push(e);});setTimeout(function(){_obRetry(false);},400);}}else if(!_loadedOK){_setLoadWarning(true);}if(!state.profiles)state.profiles={};if(!state.achievements)state.achievements=[];if(!state.guests)state.guests=[];if(!state.schoolLogos)state.schoolLogos={};if(!state.pendingIntakes)state.pendingIntakes=[];if(!state.adults)state.adults={};if(!state.challenges)state.challenges={};if(!state.challengeEntries)state.challengeEntries=[];if(!state.customActivities)state.customActivities=[];if(_loadedOK&&_migrateAdultNames())saveData();render();}
 function _uid(){try{if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();}catch(e){}return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10)+'-'+Math.random().toString(36).slice(2,10);}
 function saveData(){
   if(!_loadedOK){_setLoadWarning(true);showToast('Data has not loaded yet - refresh before making changes.');return;}
