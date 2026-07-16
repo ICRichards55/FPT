@@ -31,11 +31,12 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .lb-columns{display:grid;grid-template-columns:1fr 1fr;gap:3vw;flex:1;padding-top:2vh;border-top:3px solid #222;margin-top:1.5vh}
 .lb-columns>div{display:flex;flex-direction:column}
 .lb-col-head{font-family:'Barlow Condensed',sans-serif;font-size:clamp(14px,1.8vw,28px);font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#555;margin-bottom:1.2vh;padding-bottom:.8vh;border-bottom:2px solid #ccc}
-.lb-row{display:flex;align-items:center;gap:1.5vw;padding:.4vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex:1}
+.lb-row{display:flex;align-items:center;gap:1.5vw;padding:.4vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex:1;container-type:size}
 .lb-row:last-child{border-bottom:none}
-.lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,3.5vw,56px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1}
-.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,2.5vw,40px);flex:1;color:#111;line-height:1.1}
-.lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,3vw,48px);color:#111;line-height:1}
+.lb-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
+.lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,42cqh,70px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1;flex-shrink:0}
+.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(6.8cqw,30cqh),60px);flex:1;min-width:0;color:#111;line-height:1.1}
+.lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,37.5cqh,64px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
 .lb-empty{font-size:clamp(14px,1.6vw,26px);color:#aaa;padding:2vh 0;font-style:italic;flex:1;display:flex;align-items:center}
 
 /* MONTHLY PRS */
@@ -86,19 +87,19 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .bd-date{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(15px,1.9vw,32px);color:rgba(255,255,255,.6);white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
 .bd-today .bd-name,.bd-today .bd-date{color:#ffd34d}
 /* MONTHLY CHALLENGE (light slide) */
-.ch-row{display:flex;align-items:center;gap:1vw;padding:.35vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex:1}
+.ch-row{display:flex;align-items:center;gap:1vw;padding:.35vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex:1;container-type:size}
 .ch-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#111;line-height:1.15;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ch-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;color:#111;line-height:1;flex-shrink:0}
 .ch-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
-.ch-cols-1 .ch-rank{font-size:clamp(24px,3.5vw,56px);min-width:clamp(48px,6vw,90px)}
-.ch-cols-1 .ch-name{font-size:clamp(18px,2.5vw,40px)}
-.ch-cols-1 .ch-score{font-size:clamp(22px,3vw,48px)}
-.ch-cols-2 .ch-rank{font-size:clamp(20px,1.9vw,38px);min-width:clamp(38px,3.4vw,60px)}
-.ch-cols-2 .ch-name{font-size:clamp(15px,1.45vw,27px)}
-.ch-cols-2 .ch-score{font-size:clamp(17px,1.7vw,32px)}
-.ch-cols-3 .ch-rank{font-size:clamp(17px,1.4vw,28px);min-width:clamp(30px,2.4vw,44px)}
-.ch-cols-3 .ch-name{font-size:clamp(13px,1.05vw,20px)}
-.ch-cols-3 .ch-score{font-size:clamp(14px,1.25vw,23px)}
+.ch-cols-1 .ch-rank{font-size:clamp(24px,42cqh,70px);min-width:clamp(48px,6vw,90px)}
+.ch-cols-1 .ch-name{font-size:clamp(18px,min(6.8cqw,30cqh),60px)}
+.ch-cols-1 .ch-score{font-size:clamp(22px,37.5cqh,64px)}
+.ch-cols-2 .ch-rank{font-size:clamp(20px,38cqh,52px);min-width:clamp(38px,3.4vw,60px)}
+.ch-cols-2 .ch-name{font-size:clamp(15px,min(5cqw,26cqh),44px)}
+.ch-cols-2 .ch-score{font-size:clamp(17px,34cqh,48px)}
+.ch-cols-3 .ch-rank{font-size:clamp(17px,36cqh,40px);min-width:clamp(30px,2.4vw,44px)}
+.ch-cols-3 .ch-name{font-size:clamp(13px,min(4cqw,24cqh),34px)}
+.ch-cols-3 .ch-score{font-size:clamp(14px,32cqh,36px)}
 </style>
 </head>
 <body>
@@ -610,6 +611,23 @@ function activateSlide(idx){
   document.querySelectorAll('.slide').forEach((s,i)=>s.classList.toggle('active',i===idx));
   document.querySelectorAll('.nd').forEach((d,i)=>d.classList.toggle('on',i===idx));
   startProgress(SLIDE_TIMES[idx]);
+  requestAnimationFrame(_constrainLogoHeights);
+}
+// Keeps the logo's bottom edge a bit above the header divider line, whatever the actual
+// rendered position of that line is on this screen — measured live, not hardcoded, so it
+// stays correct regardless of title length, screen size, or row count.
+function _constrainLogoHeights(){
+  document.querySelectorAll('.slide.active').forEach(function(slide){
+    var logo=slide.querySelector('.slide-logo');
+    var divider=slide.querySelector('.lb-columns');
+    if(!logo||!divider)return;
+    logo.style.maxHeight='';
+    var logoTop=logo.getBoundingClientRect().top;
+    var dividerTop=divider.getBoundingClientRect().top;
+    var margin=Math.max(10,dividerTop*0.015);
+    var maxH=dividerTop-logoTop-margin;
+    if(maxH>20)logo.style.maxHeight=maxH+'px';
+  });
 }
 
 function startProgress(secs){
