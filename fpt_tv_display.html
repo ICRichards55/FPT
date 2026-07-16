@@ -30,14 +30,15 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .lb-ex-name{font-family:'Permanent Marker',cursive;font-size:clamp(60px,10.5vw,175px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
 .lb-columns{display:grid;grid-template-columns:1fr 1fr;gap:3vw;flex:1;padding-top:2vh;border-top:3px solid #222;margin-top:1.5vh}
 .lb-columns>div{display:flex;flex-direction:column}
+.lb-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
 .lb-col-head{font-family:'Barlow Condensed',sans-serif;font-size:clamp(14px,1.8vw,28px);font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#555;margin-bottom:1.2vh;padding-bottom:.8vh;border-bottom:2px solid #ccc}
-.lb-row{display:flex;align-items:center;gap:1.5vw;padding:.4vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex:1;container-type:size}
+.lb-row{display:flex;align-items:center;gap:1.5vw;padding:.4vh 0;border-bottom:1px solid rgba(0,0,0,.08);height:20%;flex-shrink:0;container-type:size}
 .lb-row:last-child{border-bottom:none}
 .lb-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
 .lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,42cqh,70px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1;flex-shrink:0}
 .lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(6.8cqw,30cqh),60px);flex:1;min-width:0;color:#111;line-height:1.1}
 .lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,37.5cqh,64px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
-.lb-empty{font-size:clamp(14px,1.6vw,26px);color:#aaa;padding:2vh 0;font-style:italic;flex:1;display:flex;align-items:center}
+.lb-empty{font-size:clamp(14px,1.6vw,26px);color:#aaa;padding:2vh 0;font-style:italic;flex:1;display:flex;align-items:center;width:100%}
 
 /* MONTHLY PRS */
 .pr-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 2vw}
@@ -236,7 +237,7 @@ function getSchoolLogo(name){
 }
 
 function lbRowsEx(arr,exId){
-  if(!arr.length)return`<div class="lb-empty">No entries yet</div>`;
+  if(!arr.length)return`<div class="lb-rows-wrap"><div class="lb-empty">No entries yet</div></div>`;
   let rank=1,html='';
   arr.slice(0,5).forEach((r,i)=>{
     if(i>0&&arr[i].v!==arr[i-1].v)rank=i+1;
@@ -247,7 +248,7 @@ function lbRowsEx(arr,exId){
       <div class="lb-score">${fmtScore(exId,r.v)}</div>
     </div>`;
   });
-  return html;
+  return`<div class="lb-rows-wrap">${html}</div>`;
 }
 
 function buildLeaderboard(slideId,ex,gender,entries){
