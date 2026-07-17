@@ -30,14 +30,15 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .lb-ex-name{font-family:'Permanent Marker',cursive;font-size:clamp(60px,10.5vw,175px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
 .lb-columns{display:grid;grid-template-columns:1fr 1fr;gap:3vw;flex:1;padding-top:2vh;border-top:3px solid #222;margin-top:1.5vh}
 .lb-columns>div{display:flex;flex-direction:column}
+.ch-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
 .lb-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
 .lb-col-head{font-family:'Barlow Condensed',sans-serif;font-size:clamp(14px,1.8vw,28px);font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#555;margin-bottom:1.2vh;padding-bottom:.8vh;border-bottom:2px solid #ccc}
 .lb-row{display:flex;align-items:center;gap:1.5vw;padding:.4vh 0;border-bottom:1px solid rgba(0,0,0,.08);height:20%;flex-shrink:0;container-type:size}
 .lb-row:last-child{border-bottom:none}
 .lb-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
-.lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,65cqh,90px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1;flex-shrink:0}
-.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(6.8cqw,40cqh),55px);flex:1;min-width:0;color:#111;line-height:1.1}
-.lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,58cqh,80px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
+.lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,85cqh,130px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1;flex-shrink:0}
+.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(10cqw,50cqh),62px);flex:1;min-width:0;color:#111;line-height:1.1}
+.lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,78cqh,115px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
 .lb-empty{font-size:clamp(14px,1.6vw,26px);color:#aaa;padding:2vh 0;font-style:italic;flex:1;display:flex;align-items:center;width:100%}
 
 /* MONTHLY PRS */
@@ -69,8 +70,8 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .cg-word{font-family:'Permanent Marker',cursive;font-size:clamp(80px,16vw,260px);line-height:.82;color:#fff;text-transform:uppercase;white-space:nowrap;margin-left:-1vw;margin-bottom:2.5vh;flex-shrink:0}
 .cg-right{flex:1;display:flex;flex-direction:column;gap:2.5vh;justify-content:center;padding-left:0.5vw}
 .cg-item{border-left:4px solid #fff;padding-left:2vw}
-.cg-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(26px,4.2vw,68px);color:#fff;letter-spacing:1.5px;text-transform:uppercase}
-.cg-ach{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:clamp(20px,3.2vw,54px);color:rgba(255,255,255,.7);margin-top:2px;letter-spacing:.5px;text-transform:uppercase}
+.cg-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:calc(clamp(30px,5.5vw,88px) * var(--cg-scale,1));color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.cg-ach{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:calc(clamp(24px,4.2vw,70px) * var(--cg-scale,1));color:rgba(255,255,255,.7);margin-top:2px;letter-spacing:.5px;text-transform:uppercase}
 .cg-empty{color:rgba(255,255,255,.3);font-size:clamp(14px,1.6vw,26px);font-style:italic}
 
 /* NAV */
@@ -88,19 +89,19 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .bd-date{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(15px,1.9vw,32px);color:rgba(255,255,255,.6);white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
 .bd-today .bd-name,.bd-today .bd-date{color:#ffd34d}
 /* MONTHLY CHALLENGE (light slide) */
-.ch-row{display:flex;align-items:center;gap:1vw;padding:.35vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex:1;container-type:size}
+.ch-row{display:flex;align-items:center;gap:1vw;padding:.35vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0;container-type:size}
 .ch-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#111;line-height:1.15;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ch-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;color:#111;line-height:1;flex-shrink:0}
 .ch-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
-.ch-cols-1 .ch-rank{font-size:clamp(24px,42cqh,70px);min-width:clamp(48px,6vw,90px)}
-.ch-cols-1 .ch-name{font-size:clamp(18px,min(6.8cqw,30cqh),60px)}
-.ch-cols-1 .ch-score{font-size:clamp(22px,37.5cqh,64px)}
-.ch-cols-2 .ch-rank{font-size:clamp(20px,38cqh,52px);min-width:clamp(38px,3.4vw,60px)}
-.ch-cols-2 .ch-name{font-size:clamp(15px,min(5cqw,26cqh),44px)}
-.ch-cols-2 .ch-score{font-size:clamp(17px,34cqh,48px)}
-.ch-cols-3 .ch-rank{font-size:clamp(17px,36cqh,40px);min-width:clamp(30px,2.4vw,44px)}
-.ch-cols-3 .ch-name{font-size:clamp(13px,min(4cqw,24cqh),34px)}
-.ch-cols-3 .ch-score{font-size:clamp(14px,32cqh,36px)}
+.ch-cols-1 .ch-rank{font-size:clamp(24px,55cqh,92px);min-width:clamp(48px,6vw,90px)}
+.ch-cols-1 .ch-name{font-size:clamp(18px,min(10cqw,37cqh),75px)}
+.ch-cols-1 .ch-score{font-size:clamp(22px,49cqh,84px)}
+.ch-cols-2 .ch-rank{font-size:clamp(20px,50cqh,68px);min-width:clamp(38px,3.4vw,60px)}
+.ch-cols-2 .ch-name{font-size:clamp(15px,min(7.5cqw,32cqh),55px)}
+.ch-cols-2 .ch-score{font-size:clamp(17px,44cqh,63px)}
+.ch-cols-3 .ch-rank{font-size:clamp(17px,47cqh,52px);min-width:clamp(30px,2.4vw,44px)}
+.ch-cols-3 .ch-name{font-size:clamp(13px,min(6cqw,30cqh),42px)}
+.ch-cols-3 .ch-score{font-size:clamp(14px,42cqh,47px)}
 </style>
 </head>
 <body>
@@ -110,6 +111,7 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 <script>
 window._API_URL='https://script.google.com/macros/s/AKfycbwirWQw0-hVSwIwVl6RCWcclgRNKia7awlfUzImilUiKjNKtSapuCueOaTwWgTlJ6Uk/exec';
 const LOGO='/fpt_logo_dark.png';
+const LOGO_WHITE='/fpt_logo.webp'; // used on dark-background slides — dark logo is invisible there
 const SHOW_CHALLENGE_SLIDE=true; // TV Monthly Challenge slide — enabled after confirming with Chris
 const SHREDMILL_URL='';
 let SLIDE_TIMES=[10,12,12,12,12,12,12,14,12,11,13];
@@ -210,7 +212,7 @@ function blackBrush(){
 function buildWelcome(){
   return`<div class="slide slide-dark" id="s0">
     ${whiteBrush()}
-    <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(95px,15.4vw,259px)"/>
+    <img class="slide-logo" src="${LOGO_WHITE}" alt="FPT" style="height:clamp(95px,15.4vw,259px)"/>
     <div class="welcome-body">
       <div class="welcome-title">Frye<br>Performance<br>Training</div>
       <div class="welcome-tag-wrap">
@@ -244,7 +246,7 @@ function lbRowsEx(arr,exId){
     const logo_=getSchoolLogo(r.athlete);
     html+=`<div class="lb-row">
       <div class="lb-rank">${rankStr(rank)}</div>
-      <div class="lb-name" style="display:flex;align-items:center;gap:8px">${logo_?'<img src="'+logo_+'" style="height:36px;width:auto;object-fit:contain;flex-shrink:0" onerror="this.style.display=&apos;none&apos;"/>':''}<span>${r.athlete}</span></div>
+      <div class="lb-name" style="display:flex;align-items:center;gap:8px">${logo_?'<img src="'+logo_+'" style="height:clamp(28px,55cqh,84px);width:auto;object-fit:contain;flex-shrink:0" onerror="this.style.display=&apos;none&apos;"/>':''}<span>${r.athlete}</span></div>
       <div class="lb-score">${fmtScore(exId,r.v)}</div>
     </div>`;
   });
@@ -359,7 +361,7 @@ function buildCongrats(){
     const adultRec=state.adults&&state.adults[a.athlete];
     const _anp=adultRec?_adultNameParts(a.athlete):null;
     const dispName=adultRec?((adultRec.isCoach?'Coach ':'')+_anp.first+(a.showLastName!==false&&_anp.last?' '+_anp.last:'')):(a.showLastName===false?String(a.athlete||'').trim().split(/\s+/)[0]||a.athlete:a.athlete);
-    return`<div class="cg-item"><div class="cg-name" style="display:flex;align-items:center;gap:8px">${cgLogo?'<img src="'+cgLogo+'" style="height:36px;width:auto;object-fit:contain;flex-shrink:0" onerror="this.style.display=\'none\'"/>':''}<span>${dispName}</span></div><div class="cg-ach">${a.achievement}</div></div>`;
+    return`<div class="cg-item"><div class="cg-name" style="display:flex;align-items:center;gap:8px">${cgLogo?'<img src="'+cgLogo+'" style="height:calc(clamp(38px,6vw,90px) * var(--cg-scale,1));width:auto;object-fit:contain;flex-shrink:0" onerror="this.style.display=\'none\'"/>':''}<span>${dispName}</span></div><div class="cg-ach">${a.achievement}</div></div>`;
   }).join('');
   return`<div class="slide slide-dark" id="s9">
     ${whiteBrush()}
@@ -429,7 +431,7 @@ function buildBirthdays(){
       +'</div>';
   }).join('');
   return '<div class="slide slide-dark">'+whiteBrush()
-    +'<img class="slide-logo" src="'+LOGO+'" alt="FPT" style="height:clamp(91px,16.9vw,273px)"/>'
+    +'<img class="slide-logo" src="'+LOGO_WHITE+'" alt="FPT" style="height:clamp(91px,16.9vw,273px)"/>'
     +'<div class="bd-body">'
     +'<div class="bd-title">Birthdays</div>'
     +'<div class="bd-sub">In the Gym This Week</div>'
@@ -522,15 +524,18 @@ function buildChallengeSlide(){
 
   var dispLabels=_chDisplayLabels(rows.map(function(r){return r.adult;}));
 
+  var maxRowsInAnyCol=Math.max.apply(null,cols.map(function(c){return c.length;}).concat([5]));
+  var rowHeightPct=(100/maxRowsInAnyCol).toFixed(2);
+
   var colsHtml=cols.map(function(colRows){
     var rowsHtml=colRows.map(function(x){
-      return '<div class="ch-row">'
+      return '<div class="ch-row" style="height:'+rowHeightPct+'%">'
         +'<div class="ch-rank">'+rankStr(x.rank)+'</div>'
         +'<div class="ch-name">'+(dispLabels[x.r.adult]||x.r.adult)+'</div>'
         +'<div class="ch-score">'+round3(x.r.current)+unitSfx+'</div>'
         +'</div>';
     }).join('');
-    return '<div>'+rowsHtml+'</div>';
+    return '<div class="ch-rows-wrap">'+rowsHtml+'</div>';
   }).join('');
 
   return '<div class="slide slide-light">'+blackBrush()
@@ -613,6 +618,28 @@ function activateSlide(idx){
   document.querySelectorAll('.nd').forEach((d,i)=>d.classList.toggle('on',i===idx));
   startProgress(SLIDE_TIMES[idx]);
   requestAnimationFrame(_constrainLogoHeights);
+  requestAnimationFrame(_fitCongratsItems);
+}
+// Congrats has no cap on simultaneous achievements (unlike the 5-max leaderboard), so text
+// size is only shrunk from its big default if the actual current items would genuinely
+// overflow the slide — most of the time (1-3 items) it stays at full, uncompromised size.
+function _fitCongratsItems(){
+  document.querySelectorAll('.slide.active .cg-right').forEach(function(container){
+    var items=container.querySelectorAll('.cg-item');
+    if(!items.length)return;
+    var slide=container.closest('.slide');
+    if(!slide)return;
+    container.style.removeProperty('--cg-scale');
+    var slideBox=slide.getBoundingClientRect();
+    var scale=1,guard=0;
+    while(guard++<24){
+      var first=items[0].getBoundingClientRect(),last=items[items.length-1].getBoundingClientRect();
+      if(last.bottom<=slideBox.bottom-4&&first.top>=slideBox.top+4)break;
+      scale-=0.04;
+      if(scale<0.4)break;
+      container.style.setProperty('--cg-scale',scale);
+    }
+  });
 }
 // Keeps the logo's bottom edge a bit above the header divider line, whatever the actual
 // rendered position of that line is on this screen — measured live, not hardcoded, so it
