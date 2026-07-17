@@ -26,32 +26,33 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .welcome-sub{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:rgba(255,255,255,.65);font-size:clamp(12px,1.6vw,26px);letter-spacing:4px;text-transform:uppercase;margin-top:.8vh}
 
 /* LEADERBOARD */
-.lb-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 2.5vw}
+.lb-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 14vh}
 .lb-ex-name{font-family:'Permanent Marker',cursive;font-size:clamp(60px,12.5vw,240px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
 .lb-columns{display:grid;grid-template-columns:1fr 1fr;gap:3vw;flex:1;padding-top:2vh;border-top:3px solid #222;margin-top:1.5vh}
 .lb-columns>div{display:flex;flex-direction:column}
 .ch-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
 .lb-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
 .lb-col-head{font-family:'Barlow Condensed',sans-serif;font-size:clamp(14px,1.8vw,28px);font-weight:900;letter-spacing:3px;text-transform:uppercase;color:#555;margin-bottom:1.2vh;padding-bottom:.8vh;border-bottom:2px solid #ccc}
-.lb-row{display:flex;align-items:center;gap:1.5vw;padding:.4vh 0;border-bottom:1px solid rgba(0,0,0,.08);height:20%;flex-shrink:0;container-type:size}
+.lb-row{display:flex;align-items:center;gap:1.5vw;padding:.12vh 0;border-bottom:1px solid rgba(0,0,0,.08);height:20%;flex-shrink:0;container-type:size}
 .lb-row:last-child{border-bottom:none}
 .lb-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
-.lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,85cqh,130px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1;flex-shrink:0}
-.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(10cqw,50cqh),62px);flex:1;min-width:0;color:#111;line-height:1.1}
-.lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,78cqh,115px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
+.lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,95cqh,150px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1;flex-shrink:0}
+.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(10.5cqw,65cqh),64px);flex:1;min-width:0;color:#111;line-height:1.1}
+.lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,88cqh,130px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
 .lb-empty{font-size:clamp(14px,1.6vw,26px);color:#aaa;padding:2vh 0;font-style:italic;flex:1;display:flex;align-items:center;width:100%}
 
 /* MONTHLY PRS */
-.pr-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 2vw}
-.pr-title{font-family:'Permanent Marker',cursive;font-size:clamp(60px,9.5vw,160px);line-height:.85;text-transform:uppercase;color:#111;flex-shrink:0;margin-bottom:2vh}
+.pr-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 14vh}
+.pr-title{font-family:'Permanent Marker',cursive;font-size:clamp(60px,8.33vw,320px);line-height:.85;text-transform:uppercase;color:#111;flex-shrink:0;margin-bottom:2vh}
 .pr-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:2vw;flex:1}
 .pr-col{border:2.5px solid #222;border-radius:16px;padding:1.8vh 2vw;display:flex;flex-direction:column}
-.pr-col-head{font-family:'Barlow Condensed',sans-serif;font-size:clamp(16px,2vw,32px);font-weight:900;letter-spacing:2px;text-transform:uppercase;text-align:center;color:#111;padding-bottom:1.2vh;border-bottom:2px solid #222;margin-bottom:1.2vh;flex-shrink:0}
-.pr-entry{font-family:'Barlow Condensed',sans-serif;font-size:clamp(13px,1.6vw,26px);font-weight:700;color:#111;padding:.3vh 0;border-bottom:1px solid rgba(0,0,0,.1);display:flex;justify-content:space-between;gap:1vw}
+.pr-col-head{font-family:'Barlow Condensed',sans-serif;font-size:clamp(18px,2.6vw,42px);font-weight:900;letter-spacing:2px;text-transform:uppercase;text-align:center;color:#111;padding-bottom:1.2vh;border-bottom:2px solid #222;margin-bottom:1.2vh;flex-shrink:0}
+.pr-entries-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
+.pr-entry{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#111;padding:.3vh 0;border-bottom:1px solid rgba(0,0,0,.1);display:flex;justify-content:space-between;gap:1vw;flex-shrink:0;container-type:size}
 .pr-entry:last-child{border-bottom:none}
-.pr-ath-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pr-ath-val{font-weight:900;white-space:nowrap;color:#333}
-.pr-empty{font-size:clamp(13px,1.5vw,22px);color:#aaa;font-style:italic;padding:1vh 0}
+.pr-ath-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(14px,min(9cqw,45cqh),34px)}
+.pr-ath-val{font-weight:900;white-space:nowrap;color:#333;font-size:clamp(13px,40cqh,30px)}
+.pr-empty{font-size:clamp(16px,2vw,28px);color:#aaa;font-style:italic;padding:1vh 0}
 
 /* SHREDMILL */
 .sh-body{position:relative;z-index:2;flex:1;display:flex;align-items:stretch;padding:14vh 4vw 3vw}
@@ -66,12 +67,12 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .sh-bullet::before{content:'';width:10px;height:10px;border-radius:50%;background:#111;flex-shrink:0}
 
 /* CONGRATS */
-.cg-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 3vw;overflow:visible}
+.cg-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 14vh;overflow:visible}
 .cg-word{font-family:'Permanent Marker',cursive;font-size:clamp(80px,16vw,260px);line-height:.82;color:#fff;text-transform:uppercase;white-space:nowrap;margin-left:-1vw;margin-bottom:2.5vh;flex-shrink:0}
-.cg-right{flex:1;display:flex;flex-direction:column;gap:2.5vh;justify-content:center;padding-left:0.5vw}
+.cg-right{flex:1;display:flex;flex-direction:column;gap:1.4vh;justify-content:center;padding-left:0.5vw}
 .cg-item{border-left:4px solid #fff;padding-left:2vw}
-.cg-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:calc(clamp(30px,5.5vw,88px) * var(--cg-scale,1));color:#fff;letter-spacing:1.5px;text-transform:uppercase}
-.cg-ach{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:calc(clamp(24px,4.2vw,70px) * var(--cg-scale,1));color:rgba(255,255,255,.7);margin-top:2px;letter-spacing:.5px;text-transform:uppercase}
+.cg-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:calc(clamp(30px,6.5vw,104px) * var(--cg-scale,1));color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.cg-ach{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:calc(clamp(24px,5vw,84px) * var(--cg-scale,1));color:rgba(255,255,255,.7);margin-top:2px;letter-spacing:.5px;text-transform:uppercase}
 .cg-empty{color:rgba(255,255,255,.3);font-size:clamp(14px,1.6vw,26px);font-style:italic}
 
 /* NAV */
@@ -80,22 +81,22 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .nd.on{background:rgba(255,255,255,.85)}
 .prog-bar{position:fixed;bottom:0;left:0;height:3px;background:rgba(255,255,255,.5);z-index:300}
 /* BIRTHDAYS (dark slide) */
-.bd-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 3vw}
+.bd-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 14vh}
 .bd-title{font-family:'Permanent Marker',cursive;font-size:clamp(70px,13vw,210px);line-height:.82;color:#fff;text-transform:uppercase;margin-bottom:.4vh;flex-shrink:0}
 .bd-sub{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(18px,2.6vw,44px);letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:3vh;flex-shrink:0}
 .bd-list{display:grid;grid-template-columns:repeat(2,1fr);gap:.6vh 4vw;align-content:start;flex:1}
-.bd-item{display:flex;justify-content:space-between;align-items:baseline;gap:1vw;padding:.9vh 0;border-bottom:1px solid rgba(255,255,255,.15)}
-.bd-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(20px,2.6vw,44px);color:#fff;letter-spacing:1px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bd-date{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(15px,1.9vw,32px);color:rgba(255,255,255,.6);white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
+.bd-item{display:flex;justify-content:space-between;align-items:baseline;gap:1vw;padding:.3vh 0;border-bottom:1px solid rgba(255,255,255,.15)}
+.bd-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(20px,3.1vw,53px);color:#fff;letter-spacing:1px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-date{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(15px,2.3vw,39px);color:rgba(255,255,255,.6);white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
 .bd-today .bd-name,.bd-today .bd-date{color:#ffd34d}
 /* MONTHLY CHALLENGE (light slide) */
-.ch-row{display:flex;align-items:center;gap:1vw;padding:.35vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0;container-type:size}
+.ch-row{display:flex;align-items:center;gap:1vw;padding:.12vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0;container-type:size}
 .ch-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#111;line-height:1.15;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ch-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;color:#111;line-height:1;flex-shrink:0}
 .ch-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
-.ch-cols-1 .ch-rank{font-size:clamp(24px,55cqh,92px);min-width:clamp(48px,6vw,90px)}
-.ch-cols-1 .ch-name{font-size:clamp(18px,min(10cqw,37cqh),75px)}
-.ch-cols-1 .ch-score{font-size:clamp(22px,49cqh,84px)}
+.ch-cols-1 .ch-rank{font-size:clamp(24px,65cqh,105px);min-width:clamp(48px,6vw,90px)}
+.ch-cols-1 .ch-name{font-size:clamp(18px,min(10.5cqw,42cqh),80px)}
+.ch-cols-1 .ch-score{font-size:clamp(22px,58cqh,95px)}
 .ch-cols-2 .ch-rank{font-size:clamp(20px,50cqh,68px);min-width:clamp(38px,3.4vw,60px)}
 .ch-cols-2 .ch-name{font-size:clamp(15px,min(7.5cqw,32cqh),55px)}
 .ch-cols-2 .ch-score{font-size:clamp(17px,44cqh,63px)}
@@ -195,16 +196,16 @@ function whiteBrush(){
   return`<svg class="brush" viewBox="0 0 1920 1080" preserveAspectRatio="none">
     <path d="M-80,0 C120,-15 380,38 600,12 C820,-14 1060,42 1290,16 C1520,-10 1730,32 2000,5 L2000,100 C1700,124 1460,76 1230,100 C1000,124 780,68 550,94 C320,120 70,76 -80,94Z" fill="white" opacity=".82"/>
     <path d="M500,0 C720,-22 980,18 1200,-6 C1420,-30 1680,14 2000,-8 L2000,52 C1700,72 1440,32 1210,56 C980,80 730,38 500,56Z" fill="white" opacity=".52"/>
-    <path d="M-80,980 C180,960 440,1000 700,985 C920,972 1100,1005 1320,992 L1320,1080 L-80,1080Z" fill="white" opacity=".78"/>
-    <path d="M0,1005 C200,980 420,1015 660,1000 C840,988 1000,1010 1140,1003 L1250,1080 L0,1080Z" fill="white" opacity=".5"/>
+    <path d="M-80,980 C180,960 440,1000 700,985 C920,972 1100,1005 1320,992 C1550,979 1780,1010 2000,996 L2000,1080 L-80,1080Z" fill="white" opacity=".78"/>
+    <path d="M0,1005 C200,980 420,1015 660,1000 C840,988 1000,1010 1140,1003 C1320,997 1500,1020 1700,1006 C1850,997 1950,1010 2000,1003 L2000,1080 L0,1080Z" fill="white" opacity=".5"/>
   </svg>`;
 }
 function blackBrush(){
   return`<svg class="brush" viewBox="0 0 1920 1080" preserveAspectRatio="none">
     <path d="M-80,0 C120,-18 380,40 600,12 C820,-16 1060,42 1290,16 C1520,-10 1730,34 2000,6 L2000,108 C1700,130 1460,80 1230,104 C1000,128 780,72 550,98 C320,124 70,80 -80,98Z" fill="black" opacity=".86"/>
     <path d="M1100,-6 C1320,-28 1580,16 1820,-8 L2000,-16 L2000,62 C1770,82 1520,38 1280,64 C1060,90 880,46 730,56Z" fill="black" opacity=".52"/>
-    <path d="M-80,982 C200,960 460,1002 720,988 C920,976 1090,1007 1320,994 L1320,1080 L-80,1080Z" fill="black" opacity=".80"/>
-    <path d="M0,1004 C200,980 400,1016 640,1002 C820,990 970,1010 1120,1004 L1220,1080 L0,1080Z" fill="black" opacity=".52"/>
+    <path d="M-80,982 C200,960 460,1002 720,988 C920,976 1090,1007 1320,994 C1550,981 1780,1012 2000,998 L2000,1080 L-80,1080Z" fill="black" opacity=".80"/>
+    <path d="M0,1004 C200,980 400,1016 640,1002 C820,990 970,1010 1120,1004 C1320,998 1500,1020 1700,1008 C1850,999 1950,1012 2000,1005 L2000,1080 L0,1080Z" fill="black" opacity=".52"/>
   </svg>`;
 }
 
@@ -212,7 +213,7 @@ function blackBrush(){
 function buildWelcome(){
   return`<div class="slide slide-dark" id="s0">
     ${whiteBrush()}
-    <img class="slide-logo" src="${LOGO_WHITE}" alt="FPT" style="height:clamp(95px,15.4vw,259px)"/>
+    <img class="slide-logo" src="${LOGO_WHITE}" alt="FPT" style="height:clamp(95px,17.19vw,660px)"/>
     <div class="welcome-body">
       <div class="welcome-title">Frye<br>Performance<br>Training</div>
       <div class="welcome-tag-wrap">
@@ -307,26 +308,29 @@ function buildBigBoysBoard(entries){
 
 function buildMonthlyPRs(entries){
   const mon=getMonthName();
-  function col(ex){
-    const rows=getMonthlyImprovers(entries,ex.id);
+  const perExRows=EX.map(ex=>getMonthlyImprovers(entries,ex.id));
+  const maxRowsInAnyCol=Math.max.apply(null,perExRows.map(r=>r.length).concat([5]));
+  const rowHeightPct=(100/maxRowsInAnyCol).toFixed(2);
+  function col(ex,rows){
     if(!rows.length)return`<div class="pr-empty">No PRs this month yet</div>`;
-    return rows.map(r=>{
+    const entriesHtml=rows.map(r=>{
       const prev=r.prev!=null?fmtScore(ex.id,r.prev):'First';
-      return`<div class="pr-entry">
+      return`<div class="pr-entry" style="height:${rowHeightPct}%">
         <span class="pr-ath-name">${r.athlete}</span>
         <span class="pr-ath-val">${prev}→${fmtScore(ex.id,r.curr)}</span>
       </div>`;
     }).join('');
+    return`<div class="pr-entries-wrap">${entriesHtml}</div>`;
   }
   return`<div class="slide slide-light" id="s7">
     ${blackBrush()}
-    <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(84px,13.3vw,224px)"/>
+    <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(84px,11.67vw,448px)"/>
     <div class="pr-body">
       <div class="pr-title">${mon}<br>Leaderboard</div>
       <div class="pr-cols">
-        ${EX.map(ex=>`<div class="pr-col">
+        ${EX.map((ex,i)=>`<div class="pr-col">
           <div class="pr-col-head">${ex.name}</div>
-          ${col(ex)}
+          ${col(ex,perExRows[i])}
         </div>`).join('')}
       </div>
     </div>
@@ -631,10 +635,12 @@ function _fitCongratsItems(){
     if(!slide)return;
     container.style.removeProperty('--cg-scale');
     var slideBox=slide.getBoundingClientRect();
+    var safeTop=slideBox.top+slideBox.height*(130/1080)+15;
+    var safeBottom=slideBox.top+slideBox.height*(960/1080)-15;
     var scale=1,guard=0;
     while(guard++<24){
       var first=items[0].getBoundingClientRect(),last=items[items.length-1].getBoundingClientRect();
-      if(last.bottom<=slideBox.bottom-4&&first.top>=slideBox.top+4)break;
+      if(last.bottom<=safeBottom&&first.top>=safeTop)break;
       scale-=0.04;
       if(scale<0.4)break;
       container.style.setProperty('--cg-scale',scale);
