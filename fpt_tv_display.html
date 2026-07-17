@@ -27,7 +27,7 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 
 /* LEADERBOARD */
 .lb-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 2.5vw}
-.lb-ex-name{font-family:'Permanent Marker',cursive;font-size:clamp(60px,10.5vw,175px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
+.lb-ex-name{font-family:'Permanent Marker',cursive;font-size:clamp(60px,12.5vw,240px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
 .lb-columns{display:grid;grid-template-columns:1fr 1fr;gap:3vw;flex:1;padding-top:2vh;border-top:3px solid #222;margin-top:1.5vh}
 .lb-columns>div{display:flex;flex-direction:column}
 .ch-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
@@ -297,7 +297,7 @@ function buildBigBoysBoard(entries){
     ${blackBrush()}
     <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(62px,10.5vw,182px)"/>
     <div class="lb-body">
-      <div class="lb-ex-name" style="font-size:clamp(44px,7.5vw,130px)">Big Boys<br>Board</div>
+      <div class="lb-ex-name">Big Boys<br>Board</div>
       <div class="lb-columns" style="grid-template-columns:1fr 1fr 1fr">
         ${tabs}
       </div>
