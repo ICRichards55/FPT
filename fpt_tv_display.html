@@ -37,7 +37,7 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .lb-row:last-child{border-bottom:none}
 .lb-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
 .lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,98cqh,150px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1;flex-shrink:0}
-.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(10.8cqw,65cqh),65px);flex:1;min-width:0;color:#111;line-height:1.1}
+.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(15cqw,85cqh),90px);flex:1;min-width:0;color:#111;line-height:1.1}
 .lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,98cqh,140px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
 .lb-empty{font-size:clamp(14px,1.6vw,26px);color:#aaa;padding:2vh 0;font-style:italic;flex:1;display:flex;align-items:center;width:100%}
 
@@ -189,6 +189,77 @@ function activeAchs(){
     exp.setDate(exp.getDate()+a.durationWeeks*7);
     return exp>now;
   });
+}
+
+// ── AUTO-DETECTED PRs / GYM RECORDS FOR CONGRATS ────────────────
+// Computed live from entries each render — no stored state, no explicit "take it down"
+// logic needed. A gym record simply stops appearing on its own once someone else becomes
+// the current #1 (since we always look up who holds #1 *right now*, not a saved snapshot).
+const AUTO_PR_EXERCISES=['fly','broad','vert']; // core 3 the TV already tracks elsewhere
+const AUTO_PR_DAYS=7;
+const AUTO_GYM_RECORD_DAYS=28;
+// Tested against the slide's actual text-scaling floor (readability limit, not arbitrary):
+// 5 items renders safely with real margin; 6 is technically survivable but razor-thin;
+// 7+ genuinely overflows the slide. 5 is the real, measured ceiling, not a guess.
+const CONGRATS_ROOM_CAP=5;
+
+function _daysAgo(dateStr){
+  const then=new Date(dateStr+'T12:00:00');
+  return(new Date()-then)/86400000;
+}
+function _findPRDate(entries,athlete,exId,prValue){
+  const matches=entries.filter(e=>e.athlete===athlete&&e.exercise===exId&&(exId==='broad'?e.total:e.value)===prValue);
+  if(!matches.length)return null;
+  return matches.map(e=>e.date).sort()[0];
+}
+function getAutoAchievements(entries){
+  const result=[];
+  const alreadyCovered=new Set(activeAchs().map(a=>a.athlete)); // don't duplicate an athlete already manually congratulated
+  ['male','female'].forEach(gender=>{
+    AUTO_PR_EXERCISES.forEach(exId=>{
+      const ranked=getPRsGender(entries,exId,gender);
+      if(!ranked.length)return;
+      const top=ranked[0];
+      if(!alreadyCovered.has(top.athlete)){
+        const date=_findPRDate(entries,top.athlete,exId,top.v);
+        if(date&&_daysAgo(date)<=AUTO_GYM_RECORD_DAYS)
+          result.push({athlete:top.athlete,exId,v:top.v,type:'gym-record',date});
+      }
+      ranked.slice(1).forEach(r=>{
+        if(alreadyCovered.has(r.athlete))return;
+        const date=_findPRDate(entries,r.athlete,exId,r.v);
+        if(date&&_daysAgo(date)<=AUTO_PR_DAYS)
+          result.push({athlete:r.athlete,exId,v:r.v,type:'pr',date});
+      });
+    });
+  });
+  // one auto-achievement per athlete: prefer gym-record over plain PR, then most recent
+  const byAthlete={};
+  result.forEach(r=>{
+    const existing=byAthlete[r.athlete];
+    if(!existing||(r.type==='gym-record'&&existing.type!=='gym-record')||(r.type===existing.type&&r.date>existing.date))
+      byAthlete[r.athlete]=r;
+  });
+  return Object.values(byAthlete).sort((a,b)=>{
+    if((a.type==='gym-record')!==(b.type==='gym-record'))return a.type==='gym-record'?-1:1;
+    return b.date.localeCompare(a.date);
+  });
+}
+function _exerciseDisplayName(exId){
+  const ex=EX.find(e=>e.id===exId);
+  return ex?ex.name:exId;
+}
+function autoAchievementsAsRecords(entries){
+  const room=CONGRATS_ROOM_CAP-activeAchs().length;
+  if(room<=0)return[];
+  return getAutoAchievements(entries).slice(0,room).map(a=>({
+    id:'auto_'+a.athlete+'_'+a.exId,
+    athlete:a.athlete,
+    achievement:(a.type==='gym-record'?'Gym Record — ':'New PR — ')+_exerciseDisplayName(a.exId)+' ('+fmtScore(a.exId,a.v)+')',
+    dateAdded:a.date,
+    durationWeeks:a.type==='gym-record'?4:1,
+    archived:false
+  }));
 }
 
 // ── BRUSHSTROKES ─────────────────────────────────────────────────
@@ -357,8 +428,8 @@ function buildShredmill(){
   </div>`;
 }
 
-function buildCongrats(){
-  const active=activeAchs();
+function buildCongrats(entries){
+  const active=activeAchs().concat(autoAchievementsAsRecords(entries||[]));
   if(!active.length)return '';   // self-suppress when there's nothing active, same as birthdays/challenge
   const items=active.map(a=>{
     const cgLogo=getSchoolLogo(a.athlete);
@@ -369,7 +440,7 @@ function buildCongrats(){
   }).join('');
   return`<div class="slide slide-dark" id="s9">
     ${whiteBrush()}
-    <img class="slide-logo" src="${LOGO_WHITE}" alt="FPT" style="height:clamp(91px,16.9vw,273px)"/>
+    <img class="slide-logo" src="${LOGO_WHITE}" alt="FPT" style="height:clamp(91px,32vw,700px)"/>
     <div class="cg-body">
       <div class="cg-word">Congrats</div>
       <div class="cg-right">${items}</div>
@@ -603,7 +674,7 @@ function renderBoard(){
   add(buildShredmill(),11);
   add(buildBirthdays(),13);
   if(SHOW_CHALLENGE_SLIDE)add(buildChallengeSlide(),13);
-  add(buildCongrats(),13);
+  add(buildCongrats(tvEntries),13);
   TOTAL_SLIDES=slides.length;
   SLIDE_TIMES=slides.map(function(s){return s.time;});
   document.getElementById('board').innerHTML=slides.map(function(s){return s.html;}).join('');
@@ -624,6 +695,7 @@ function activateSlide(idx){
   startProgress(SLIDE_TIMES[idx]);
   requestAnimationFrame(_constrainLogoHeights);
   requestAnimationFrame(_fitCongratsItems);
+  requestAnimationFrame(_growCongratsLogo);
 }
 // Congrats has no cap on simultaneous achievements (unlike the 5-max leaderboard), so text
 // size is only shrunk from its big default if the actual current items would genuinely
@@ -662,6 +734,47 @@ function _constrainLogoHeights(){
     var margin=Math.max(10,dividerTop*0.015);
     var maxH=dividerTop-logoTop-margin;
     if(maxH>20)logo.style.maxHeight=maxH+'px';
+  });
+}
+// Congrats has no divider line to measure against (unlike Leaderboard/BigBoys/Challenge),
+// so instead of a static guess, grow the logo toward the ribbon-safe zone, then check for
+// real overlap against whatever achievement items actually happen to be on screen — and
+// only back off if a genuine collision is found, rather than capping it small by default.
+function _growCongratsLogo(){
+  document.querySelectorAll('.slide.active').forEach(function(slide){
+    var logo=slide.querySelector('.slide-logo');
+    var cgRight=slide.querySelector('.cg-right');
+    if(!logo||!cgRight)return; // only applies to Congrats
+    logo.style.maxHeight='';
+    var slideBox=slide.getBoundingClientRect();
+    var ribbonSafeY=slideBox.top+slideBox.height*(960/1080)-15;
+    var logoTop=logo.getBoundingClientRect().top;
+    var candidateMax=ribbonSafeY-logoTop;
+    if(candidateMax<20)return;
+    logo.style.maxHeight=candidateMax+'px';
+    var canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+    function textRight(el){
+      var cs=getComputedStyle(el);
+      ctx.font=cs.fontWeight+' '+cs.fontSize+' '+cs.fontFamily;
+      var box=el.getBoundingClientRect();
+      return box.left+ctx.measureText(el.textContent).width;
+    }
+    var guard=0;
+    while(guard++<30){
+      var logoBox=logo.getBoundingClientRect();
+      var items=cgRight.querySelectorAll('.cg-item');
+      var overlapsAnyItem=Array.from(items).some(function(it){
+        var nameSpan=it.querySelector('.cg-name span'),ach=it.querySelector('.cg-ach');
+        var itemTop=it.getBoundingClientRect().top,itemBottom=it.getBoundingClientRect().bottom;
+        var rightEdge=Math.max(nameSpan?textRight(nameSpan):0, ach?textRight(ach):0);
+        var verticalOverlap=!(itemBottom<logoBox.top||itemTop>logoBox.bottom);
+        return verticalOverlap&&rightEdge>logoBox.left;
+      });
+      if(!overlapsAnyItem)break;
+      candidateMax-=25;
+      if(candidateMax<20)break;
+      logo.style.maxHeight=candidateMax+'px';
+    }
   });
 }
 
