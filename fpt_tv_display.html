@@ -27,8 +27,8 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 
 /* LEADERBOARD */
 .lb-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 14vh}
-.lb-ex-name{font-family:'Permanent Marker',cursive;font-size:clamp(60px,12.5vw,240px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
-.lb-columns{display:grid;grid-template-columns:1fr 1fr;gap:3vw;flex:1;padding-top:2vh;border-top:3px solid #222;margin-top:1.5vh}
+.lb-ex-name{font-family:'Permanent Marker',cursive;font-size:clamp(60px,10.94vw,210px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
+.lb-columns{display:grid;grid-template-columns:1fr 1fr;gap:3vw;flex:1;padding-top:2vh;border-top:3px solid #222;margin-top:.7vh}
 .lb-columns>div{display:flex;flex-direction:column}
 .ch-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
 .lb-rows-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
@@ -41,7 +41,7 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 /* BigBoys has 3 narrower columns (vs Leaderboard's 2 wider ones) sharing this same row
    markup — the shared formula above is calibrated for Leaderboard's wider columns and was
    never actually width-tested for this narrower case. Dedicated, measured-safe override. */
-.lb-columns-3 .lb-name{font-size:clamp(16px,min(8cqw,75cqh),48px)}
+.lb-columns-3 .lb-name{font-size:clamp(16px,min(7.8cqw,62cqh),46px)}
 .lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,98cqh,140px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
 .lb-empty{font-size:clamp(14px,1.6vw,26px);color:#aaa;padding:2vh 0;font-style:italic;flex:1;display:flex;align-items:center;width:100%}
 
