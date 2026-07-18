@@ -480,13 +480,23 @@ function renderStoryPreview(){
   updateOverlay();
 }
 
-// Shared PNG saver — desktop uses <a download>; iOS Safari can't, so open in a new
-// tab with long-press-to-save instructions (same proven pattern as downloadFrame).
-function _savePng(dataUrl, filename){
-  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
-  if(isIOS){
-    const w=window.open('','_blank');
+// Shared PNG saver — iOS Safari only allows window.open() synchronously inside the
+// tap gesture, so callers must pre-open the tab via _saveWinPreOpen() BEFORE any await,
+// then pass it here to be filled once the PNG is ready. Desktop uses <a download>.
+function _isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;}
+function _saveWinPreOpen(){
+  if(!_isIOS())return null;
+  const w=window.open('','_blank');
+  if(w){
+    w.document.write('<html><head><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}p{color:#fff;opacity:.7;font-size:15px}</style></head><body><p>Generating image&hellip;</p></body></html>');
+  }
+  return w;
+}
+function _savePng(dataUrl, filename, preWin){
+  if(_isIOS()){
+    const w=(preWin&&!preWin.closed)?preWin:window.open('','_blank');
     if(w){
+      w.document.open();
       w.document.write(`<html><head><title>${filename}</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="${dataUrl}"/><p>Long-press the image &rarr; Tap "Add to Photos" or "Save Image"</p></body></html>`);
       w.document.close();
     } else {
@@ -501,24 +511,12 @@ function _savePng(dataUrl, filename){
 async function downloadFrame(){
   const stage=document.getElementById('story-stage');if(!stage)return;
   if(!window.html2canvas){alert('Save function loading — try again in a moment.');return;}
+  const _w=_saveWinPreOpen();
   try{
     const canvas=await window.html2canvas(stage,{scale:4,useCORS:true,backgroundColor:null,logging:false});
     const dataUrl=canvas.toDataURL('image/png');
-    const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
-    if(isIOS){
-      // iOS Safari can't trigger <a download> — open image in new tab, prompt to save
-      const w=window.open('','_blank');
-      if(w){
-        w.document.write(`<html><head><title>FPT PR Story</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="${dataUrl}"/><p>Long-press the image → Tap "Add to Photos" or "Save Image"</p></body></html>`);
-        w.document.close();
-      } else {
-        alert('Pop-up blocked. Try: Go Fullscreen → Screen Record → the frame is saved to your camera roll automatically.');
-      }
-    } else {
-      const a=document.createElement('a');a.href=dataUrl;
-      a.download=`FPT_PR_Story_${storyExId}_${new Date().toISOString().slice(0,10)}.png`;a.click();
-    }
-  }catch(e){alert('Tip: Use the Fullscreen button then screen record for video content.');}
+    _savePng(dataUrl, `FPT_PR_Story_${storyExId}_${new Date().toISOString().slice(0,10)}.png`, _w);
+  }catch(e){if(_w)try{_w.close();}catch(_){}alert('Tip: Use the Fullscreen button then screen record for video content.');}
 }
 
 var _fsControlsTimer=null;
@@ -999,25 +997,18 @@ function buildMPRCanvas(ex, athletes, year, month) {
 
 async function downloadTop5(exId, gender, ranked) {
   if (!ranked.length) { alert('No eligible athletes for this exercise yet.'); return; }
+  const _w=_saveWinPreOpen();
   const _logo = document.querySelector('img.logo-img');
   if (_logo && !(_logo.complete && _logo.naturalWidth > 0)) {
     await new Promise(r => { _logo.onload = r; _logo.onerror = r; setTimeout(r, 2000); });
   }
   const canvas = buildTop5Canvas(exId, ranked);
   const dataUrl = canvas.toDataURL('image/png');
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  if (isIOS) {
-    const w = window.open('','_blank');
-    if (w) {
-      w.document.write(`<html><head><title>FPT Top 5 All-Time — ${exId} (${gender})</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="${dataUrl}"/><p>Long-press → Save Image to Camera Roll</p></body></html>`);
-      w.document.close();
-    }
-  } else {
-    _savePng(dataUrl, 'FPT_Top5_AllTime_'+exId+'_'+gender+'.png');
-  }
+  _savePng(dataUrl, 'FPT_Top5_AllTime_'+exId+'_'+gender+'.png', _w);
 }
 async function downloadMPR(ex, athletes, year, month, pageNum, pageCount) {
   if (!athletes.length) { alert('No PRs for this exercise this month.'); return; }
+  const _w=_saveWinPreOpen();
   // Ensure logo is loaded BEFORE building canvas (canvas draws logo synchronously)
   const _logo = document.querySelector('img.logo-img');
   if (_logo && !(_logo.complete && _logo.naturalWidth > 0)) {
@@ -1028,16 +1019,7 @@ async function downloadMPR(ex, athletes, year, month, pageNum, pageCount) {
   const monStr = MONTH_SHORT[month]+year;
   const pageSuffix = (pageCount && pageCount > 1) ? ('_p'+pageNum) : '';
   const pageTitleSuffix = (pageCount && pageCount > 1) ? (' (Page '+pageNum+'/'+pageCount+')') : '';
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  if (isIOS) {
-    const w = window.open('','_blank');
-    if (w) {
-      w.document.write(`<html><head><title>FPT ${monStr} PRs${pageTitleSuffix}</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="${dataUrl}"/><p>Long-press → Save Image to Camera Roll</p></body></html>`);
-      w.document.close();
-    }
-  } else {
-    _savePng(dataUrl, 'FPT_'+monStr+'_PRs_'+ex+pageSuffix+'.png');
-  }
+  _savePng(dataUrl, 'FPT_'+monStr+'_PRs_'+ex+pageSuffix+'.png', _w);
 }
 
 // ── ADULT MONTHLY CHALLENGE GRAPHIC ──────────────────────────────
@@ -1146,19 +1128,14 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
 
 async function downloadChallenge(year, month, rows, ch, pageNum, pageCount){
   if(!rows||!rows.length){alert('No challenge results to export.');return;}
+  const _w=_saveWinPreOpen();
   const _logo=document.querySelector('img.logo-img');
   if(_logo&&!(_logo.complete&&_logo.naturalWidth>0)){await new Promise(r=>{_logo.onload=r;_logo.onerror=r;setTimeout(r,2000);});}
   const canvas=buildChallengeCanvas(year,month,rows,ch,pageNum,pageCount);
   const dataUrl=canvas.toDataURL('image/png');
   const monStr=MONTH_SHORT[month]+year;
   const pageSuffix=(pageCount&&pageCount>1)?('_p'+pageNum):'';
-  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
-  if(isIOS){
-    const w=window.open('','_blank');
-    if(w){w.document.write('<html><head><title>FPT '+monStr+' Challenge</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="'+dataUrl+'"/><p>Long-press \u2192 Save Image to Camera Roll</p></body></html>');w.document.close();}
-  }else{
-    _savePng(dataUrl,'FPT_'+monStr+'_Challenge'+pageSuffix+'.png');
-  }
+  _savePng(dataUrl,'FPT_'+monStr+'_Challenge'+pageSuffix+'.png', _w);
 }
 
 function renderChallenge(){
@@ -1772,11 +1749,12 @@ async function dlCard(wrapId,filename){
   try{_fitCoverName();}catch(e){}
   const cardEl=el.querySelector('[style*="width:540px"],[style*="width:480px"],.x-card,.x-chart-card');if(!cardEl)return;
   if(!window.html2canvas){alert('Loading download function — try again in a moment.');return;}
+  const _w=_saveWinPreOpen();
   try{
     const s=cardEl.style.width.includes('480')?2.5:2;
     const c=await window.html2canvas(cardEl,{scale:s,useCORS:true,backgroundColor:null,logging:false});
-    _savePng(c.toDataURL('image/png'), filename);
-  }catch(e){alert('Could not generate the image. Try again, or screenshot the card.');}
+    _savePng(c.toDataURL('image/png'), filename, _w);
+  }catch(e){if(_w)try{_w.close();}catch(_){}alert('Could not generate the image. Try again, or screenshot the card.');}
 }
 
 setInterval(loadData,60000);
