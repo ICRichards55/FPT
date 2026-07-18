@@ -20,10 +20,10 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 
 /* WELCOME */
 .welcome-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;padding:5vw 6vw}
-.welcome-title{font-family:'Permanent Marker',cursive;font-size:clamp(68px,11vw,185px);line-height:.88;color:#fff;text-transform:uppercase;letter-spacing:-2px}
+.welcome-title{font-family:'Permanent Marker',cursive;font-size:clamp(68px,9.7vw,186px);line-height:.88;color:#fff;text-transform:uppercase;letter-spacing:-2px}
 .welcome-tag-wrap{text-align:right;padding-right:2vw;margin-top:3vh}
-.welcome-motto{font-family:'Permanent Marker',cursive;font-size:clamp(28px,4vw,62px);color:#fff;letter-spacing:2px;text-transform:uppercase}
-.welcome-sub{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:rgba(255,255,255,.65);font-size:clamp(14px,2.2vw,36px);letter-spacing:4px;text-transform:uppercase;margin-top:.8vh}
+.welcome-motto{font-family:'Permanent Marker',cursive;font-size:clamp(28px,4.43vw,85px);color:#fff;letter-spacing:2px;text-transform:uppercase}
+.welcome-sub{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:rgba(255,255,255,.65);font-size:clamp(14px,2.5vw,48px);letter-spacing:4px;text-transform:uppercase;margin-top:.8vh}
 
 /* LEADERBOARD */
 .lb-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 14vh}
@@ -38,6 +38,10 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .lb-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
 .lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,98cqh,150px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1;flex-shrink:0}
 .lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(15cqw,85cqh),90px);flex:1;min-width:0;color:#111;line-height:1.1}
+/* BigBoys has 3 narrower columns (vs Leaderboard's 2 wider ones) sharing this same row
+   markup — the shared formula above is calibrated for Leaderboard's wider columns and was
+   never actually width-tested for this narrower case. Dedicated, measured-safe override. */
+.lb-columns-3 .lb-name{font-size:clamp(16px,min(8cqw,75cqh),48px)}
 .lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,98cqh,140px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
 .lb-empty{font-size:clamp(14px,1.6vw,26px);color:#aaa;padding:2vh 0;font-style:italic;flex:1;display:flex;align-items:center;width:100%}
 
@@ -370,7 +374,7 @@ function buildBigBoysBoard(entries){
     <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(62px,24vw,500px)"/>
     <div class="lb-body">
       <div class="lb-ex-name">Big Boys<br>Board</div>
-      <div class="lb-columns" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="lb-columns lb-columns-3" style="grid-template-columns:1fr 1fr 1fr">
         ${tabs}
       </div>
     </div>
@@ -432,11 +436,10 @@ function buildCongrats(entries){
   const active=activeAchs().concat(autoAchievementsAsRecords(entries||[]));
   if(!active.length)return '';   // self-suppress when there's nothing active, same as birthdays/challenge
   const items=active.map(a=>{
-    const cgLogo=getSchoolLogo(a.athlete);
     const adultRec=state.adults&&state.adults[a.athlete];
     const _anp=adultRec?_adultNameParts(a.athlete):null;
     const dispName=adultRec?((adultRec.isCoach?'Coach ':'')+_anp.first+(a.showLastName!==false&&_anp.last?' '+_anp.last:'')):(a.showLastName===false?String(a.athlete||'').trim().split(/\s+/)[0]||a.athlete:a.athlete);
-    return`<div class="cg-item"><div class="cg-name" style="display:flex;align-items:center;gap:8px">${cgLogo?'<img src="'+cgLogo+'" style="height:calc(clamp(38px,6vw,90px) * var(--cg-scale,1));width:auto;object-fit:contain;flex-shrink:0" onerror="this.style.display=\'none\'"/>':''}<span>${dispName}</span></div><div class="cg-ach">${a.achievement}</div></div>`;
+    return`<div class="cg-item"><div class="cg-name"><span>${dispName}</span></div><div class="cg-ach">${a.achievement}</div></div>`;
   }).join('');
   return`<div class="slide slide-dark" id="s9">
     ${whiteBrush()}
