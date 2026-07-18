@@ -27,6 +27,7 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 
 /* LEADERBOARD */
 .lb-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 14vh}
+.lb-ex-name.lb-title-main{font-size:clamp(60px,9.64vw,185px)}
 .lb-ex-name{font-family:'Permanent Marker',cursive;font-size:clamp(60px,10.94vw,210px);line-height:.82;text-transform:uppercase;color:#111;flex-shrink:0}
 .lb-columns{display:grid;grid-template-columns:1fr 1fr;gap:3vw;flex:1;padding-top:2vh;border-top:3px solid #222;margin-top:.7vh}
 .lb-columns>div{display:flex;flex-direction:column}
@@ -37,11 +38,17 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .lb-row:last-child{border-bottom:none}
 .lb-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
 .lb-rank{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(24px,98cqh,150px);min-width:clamp(48px,6vw,90px);color:#111;line-height:1;flex-shrink:0}
-.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(15cqw,85cqh),90px);flex:1;min-width:0;color:#111;line-height:1.1}
+.lb-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(18px,min(15cqw,85cqh),100px);flex:1;min-width:0;color:#111;line-height:1.1}
 /* BigBoys has 3 narrower columns (vs Leaderboard's 2 wider ones) sharing this same row
    markup — the shared formula above is calibrated for Leaderboard's wider columns and was
    never actually width-tested for this narrower case. Dedicated, measured-safe override. */
-.lb-columns-3 .lb-name{font-size:clamp(16px,min(7.8cqw,62cqh),46px)}
+/* Big Boys rebalance (measured w/ real Barlow Condensed, July 2026): rank+score shrink
+   from the inherited 98cqh to 72cqh, freeing ~81px/row width; name grows into it.
+   Name is height-bound at 74cqh (~51px @1080p, +19% vs old 43px); 9.4cqw width guard
+   verified against reclaimed span width w/ >25px margin; ellipsis remains final guard. */
+.lb-columns-3 .lb-rank{font-size:clamp(20px,72cqh,100px);min-width:clamp(40px,3.2vw,124px)}
+.lb-columns-3 .lb-score{font-size:clamp(20px,72cqh,100px)}
+.lb-columns-3 .lb-name{font-size:clamp(16px,min(9.4cqw,74cqh),104px)}
 .lb-score{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(22px,98cqh,140px);color:#111;line-height:1;flex-shrink:0;white-space:nowrap}
 .lb-empty{font-size:clamp(14px,1.6vw,26px);color:#aaa;padding:2vh 0;font-style:italic;flex:1;display:flex;align-items:center;width:100%}
 
@@ -337,7 +344,7 @@ function buildLeaderboard(slideId,ex,gender,entries){
     ${blackBrush()}
     <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(84px,14.7vw,245px)"/>
     <div class="lb-body">
-      <div class="lb-ex-name">${ex.name}</div>
+      <div class="lb-ex-name lb-title-main">${ex.name}</div>
       <div class="lb-columns">
         <div>
           <div class="lb-col-head">${mon} Leaderboard</div>
@@ -438,7 +445,7 @@ function buildCongrats(entries){
   const items=active.map(a=>{
     const adultRec=state.adults&&state.adults[a.athlete];
     const _anp=adultRec?_adultNameParts(a.athlete):null;
-    const dispName=adultRec?((adultRec.isCoach?'Coach ':'')+_anp.first+(a.showLastName!==false&&_anp.last?' '+_anp.last:'')):(a.showLastName===false?String(a.athlete||'').trim().split(/\s+/)[0]||a.athlete:a.athlete);
+    const dispName=adultRec?(_anp.first+(a.showLastName!==false&&_anp.last?' '+_anp.last:'')):(a.showLastName===false?String(a.athlete||'').trim().split(/\s+/)[0]||a.athlete:a.athlete);
     return`<div class="cg-item"><div class="cg-name"><span>${dispName}</span></div><div class="cg-ach">${a.achievement}</div></div>`;
   }).join('');
   return`<div class="slide slide-dark" id="s9">
@@ -471,7 +478,7 @@ function birthdaysThisWeek(){
   Object.keys(ad).forEach(function(n){
     if(!ad[n]||!ad[n].dob)return;
     var fp=_adultNameParts(n);
-    var disp=(ad[n].isCoach?'Coach ':'')+fp.first;
+    var disp=fp.first;
     cands.push({name:disp,dob:ad[n].dob});
   });
   var out=[],seen={};
@@ -530,31 +537,12 @@ function _adultNameParts(key){
 // Given the adult keys appearing on a slide, return {key: displayLabel} using first name,
 // disambiguated by progressively longer last-name-initial prefixes only when first names collide.
 function _chDisplayLabels(adultKeys){
-  var parts={}; adultKeys.forEach(function(k){parts[k]=_adultNameParts(k);});
-  var groups={};
-  adultKeys.forEach(function(k){
-    var fnLow=parts[k].first.toLowerCase();
-    (groups[fnLow]=groups[fnLow]||[]).push(k);
-  });
+  // Full first + last names (July 2026, per Chris/Kailey). Width-verified with real fonts
+  // for 1/2/3-column layouts; .ch-name ellipsis remains the final overflow guard.
   var labels={};
-  Object.keys(groups).forEach(function(fnLow){
-    var keys=groups[fnLow];
-    var first=parts[keys[0]].first;
-    if(keys.length===1){labels[keys[0]]=first;return;}
-    var maxLen=Math.max.apply(null,keys.map(function(k){return parts[k].last.length;}));
-    var n=1,unique=false,prefixes;
-    while(n<=Math.max(maxLen,1)){
-      prefixes=keys.map(function(k){return parts[k].last.slice(0,n).toLowerCase();});
-      unique=(new Set(prefixes)).size===prefixes.length;
-      if(unique)break;
-      n++;
-    }
-    keys.forEach(function(k){
-      var last=parts[k].last;
-      if(!last){labels[k]=first;return;}
-      var pre=last.slice(0,Math.min(n,last.length));
-      labels[k]=first+' '+pre+(pre.length<last.length?'.':'');
-    });
+  adultKeys.forEach(function(k){
+    var p=_adultNameParts(k);
+    labels[k]=p.first+(p.last?' '+p.last:'');
   });
   return labels;
 }

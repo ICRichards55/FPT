@@ -480,6 +480,23 @@ function renderStoryPreview(){
   updateOverlay();
 }
 
+// Shared PNG saver — desktop uses <a download>; iOS Safari can't, so open in a new
+// tab with long-press-to-save instructions (same proven pattern as downloadFrame).
+function _savePng(dataUrl, filename){
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
+  if(isIOS){
+    const w=window.open('','_blank');
+    if(w){
+      w.document.write(`<html><head><title>${filename}</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="${dataUrl}"/><p>Long-press the image &rarr; Tap "Add to Photos" or "Save Image"</p></body></html>`);
+      w.document.close();
+    } else {
+      alert('Pop-up blocked. Allow pop-ups for this site in Settings, then try again.');
+    }
+  } else {
+    const a=document.createElement('a');a.href=dataUrl;a.download=filename;a.click();
+  }
+}
+
 // Download current frame
 async function downloadFrame(){
   const stage=document.getElementById('story-stage');if(!stage)return;
@@ -996,10 +1013,7 @@ async function downloadTop5(exId, gender, ranked) {
       w.document.close();
     }
   } else {
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = 'FPT_Top5_AllTime_'+exId+'_'+gender+'.png';
-    a.click();
+    _savePng(dataUrl, 'FPT_Top5_AllTime_'+exId+'_'+gender+'.png');
   }
 }
 async function downloadMPR(ex, athletes, year, month, pageNum, pageCount) {
@@ -1022,10 +1036,7 @@ async function downloadMPR(ex, athletes, year, month, pageNum, pageCount) {
       w.document.close();
     }
   } else {
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = 'FPT_'+monStr+'_PRs_'+ex+pageSuffix+'.png';
-    a.click();
+    _savePng(dataUrl, 'FPT_'+monStr+'_PRs_'+ex+pageSuffix+'.png');
   }
 }
 
@@ -1146,7 +1157,7 @@ async function downloadChallenge(year, month, rows, ch, pageNum, pageCount){
     const w=window.open('','_blank');
     if(w){w.document.write('<html><head><title>FPT '+monStr+' Challenge</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="'+dataUrl+'"/><p>Long-press \u2192 Save Image to Camera Roll</p></body></html>');w.document.close();}
   }else{
-    const a=document.createElement('a');a.href=dataUrl;a.download='FPT_'+monStr+'_Challenge'+pageSuffix+'.png';a.click();
+    _savePng(dataUrl,'FPT_'+monStr+'_Challenge'+pageSuffix+'.png');
   }
 }
 
@@ -1764,8 +1775,8 @@ async function dlCard(wrapId,filename){
   try{
     const s=cardEl.style.width.includes('480')?2.5:2;
     const c=await window.html2canvas(cardEl,{scale:s,useCORS:true,backgroundColor:null,logging:false});
-    const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download=filename;a.click();
-  }catch(e){alert('Right-click the card and save as image.');}
+    _savePng(c.toDataURL('image/png'), filename);
+  }catch(e){alert('Could not generate the image. Try again, or screenshot the card.');}
 }
 
 setInterval(loadData,60000);
