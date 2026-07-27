@@ -114,15 +114,22 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .ch-cols-3 .ch-rank{font-size:clamp(17px,47cqh,52px);min-width:clamp(30px,2.4vw,44px)}
 .ch-cols-3 .ch-name{font-size:clamp(13px,min(6cqw,30cqh),42px)}
 .ch-cols-3 .ch-score{font-size:clamp(14px,42cqh,47px)}
-/* Improvement chip (2nd-test delta vs baseline): green better, red worse. Width-verified
-   with real fonts: >=32px name margin even in 3-col with longest current adult names. */
-.ch-imp{font-family:'Barlow Condensed',sans-serif;font-weight:800;line-height:1;flex-shrink:0;white-space:nowrap}
-.ch-imp.up{color:#15803d}
-.ch-imp.down{color:#dc2626}
-.ch-imp.flat{color:#999}
-.ch-cols-1 .ch-imp{font-size:clamp(14px,32cqh,52px)}
-.ch-cols-2 .ch-imp{font-size:clamp(12px,24cqh,35px)}
-.ch-cols-3 .ch-imp{font-size:clamp(11px,22cqh,26px)}
+/* 2nd-test display: baseline -> colored arrow -> current (green = improved, red = worse,
+   gray = even; direction-aware for lower/higher-better challenges). Unit lives in the
+   subtitle, not the rows — that's what keeps 3-col width-safe with full names
+   (measured: >=54px name margin, real Barlow Condensed). One-result adults show only
+   their single number, no arrow. */
+.ch-base{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#555;line-height:1;flex-shrink:0;white-space:nowrap}
+.ch-arrow{font-family:'Barlow Condensed',sans-serif;font-weight:900;line-height:1;flex-shrink:0}
+.ch-arrow.up{color:#15803d}
+.ch-arrow.down{color:#dc2626}
+.ch-arrow.flat{color:#999}
+.ch-cols-1 .ch-base{font-size:clamp(16px,38cqh,64px)}
+.ch-cols-1 .ch-arrow{font-size:clamp(16px,44cqh,72px)}
+.ch-cols-2 .ch-base{font-size:clamp(13px,28cqh,40px)}
+.ch-cols-2 .ch-arrow{font-size:clamp(13px,34cqh,48px)}
+.ch-cols-3 .ch-base{font-size:clamp(12px,26cqh,30px)}
+.ch-cols-3 .ch-arrow{font-size:clamp(12px,32cqh,36px)}
 </style>
 </head>
 <body>
@@ -561,14 +568,6 @@ function _chDisplayLabels(adultKeys){
   });
   return labels;
 }
-// Delta vs baseline once a 2nd result exists: direction-aware (improvement>0 is always
-// "better" regardless of lower/higher scoring). Empty until the 2nd test is logged.
-function _chImpChip(imp){
-  if(imp==null)return '';
-  var cls=imp>0?'up':(imp<0?'down':'flat');
-  var arrow=imp>0?'\u25B2':(imp<0?'\u25BC':'\u2013');
-  return '<div class="ch-imp '+cls+'">'+arrow+round3(Math.abs(imp))+'</div>';
-}
 function challengeLeaderboard(m,ch){
   var ents=(state.challengeEntries||[]).filter(function(e){return e.month===m;});
   var byAdult={};
@@ -597,8 +596,8 @@ function buildChallengeSlide(){
   if(!ch)return '';                     // no challenge defined this month
   var rows=challengeLeaderboard(mm,ch);
   if(!rows.length)return '';            // no results logged yet
-  var monName=et.toLocaleString('en-US',{month:'long'}).toUpperCase();
   var unitSfx=ch.unit?(' '+ch.unit):'';
+  var monName=et.toLocaleString('en-US',{month:'long'}).toUpperCase();
 
   // Rank the FULL list first (tie-aware), then split into columns so numbering stays continuous.
   var rankNum=1;
@@ -619,11 +618,19 @@ function buildChallengeSlide(){
 
   var colsHtml=cols.map(function(colRows){
     var rowsHtml=colRows.map(function(x){
+      var resultCells;
+      if(x.r.latest!=null){
+        var dirCls=x.r.improvement>0?'up':(x.r.improvement<0?'down':'flat');
+        resultCells='<div class="ch-base">'+round3(x.r.baseline)+unitSfx+'</div>'
+          +'<div class="ch-arrow '+dirCls+'">\u2192</div>'
+          +'<div class="ch-score">'+round3(x.r.current)+unitSfx+'</div>';
+      }else{
+        resultCells='<div class="ch-score">'+round3(x.r.current)+unitSfx+'</div>';
+      }
       return '<div class="ch-row" style="height:'+rowHeightPct+'%">'
         +'<div class="ch-rank">'+rankStr(x.rank)+'</div>'
         +'<div class="ch-name">'+(dispLabels[x.r.adult]||x.r.adult)+'</div>'
-        +'<div class="ch-score">'+round3(x.r.current)+unitSfx+'</div>'
-        +_chImpChip(x.r.improvement)
+        +resultCells
         +'</div>';
     }).join('');
     return '<div class="ch-rows-wrap">'+rowsHtml+'</div>';
