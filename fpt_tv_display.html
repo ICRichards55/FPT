@@ -115,20 +115,14 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .ch-cols-3 .ch-name{font-size:clamp(13px,min(6cqw,30cqh),42px)}
 .ch-cols-3 .ch-score{font-size:clamp(14px,42cqh,47px)}
 /* 2nd-test display: baseline -> colored arrow -> current (green = improved, red = worse,
-   gray = even; direction-aware for lower/higher-better challenges). Unit lives in the
-   subtitle, not the rows — that's what keeps 3-col width-safe with full names
-   (measured: >=54px name margin, real Barlow Condensed). One-result adults show only
-   their single number, no arrow. */
-.ch-base{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#555;line-height:1;flex-shrink:0;white-space:nowrap}
+   gray = even; direction-aware for lower/higher-better challenges). Both values render
+   identically via .ch-score. One-result adults show only their single number, no arrow. */
 .ch-arrow{font-family:'Barlow Condensed',sans-serif;font-weight:900;line-height:1;flex-shrink:0}
 .ch-arrow.up{color:#15803d}
 .ch-arrow.down{color:#dc2626}
 .ch-arrow.flat{color:#999}
-.ch-cols-1 .ch-base{font-size:clamp(16px,38cqh,64px)}
 .ch-cols-1 .ch-arrow{font-size:clamp(16px,44cqh,72px)}
-.ch-cols-2 .ch-base{font-size:clamp(13px,28cqh,40px)}
 .ch-cols-2 .ch-arrow{font-size:clamp(13px,34cqh,48px)}
-.ch-cols-3 .ch-base{font-size:clamp(12px,26cqh,30px)}
 .ch-cols-3 .ch-arrow{font-size:clamp(12px,32cqh,36px)}
 </style>
 </head>
@@ -621,7 +615,7 @@ function buildChallengeSlide(){
       var resultCells;
       if(x.r.latest!=null){
         var dirCls=x.r.improvement>0?'up':(x.r.improvement<0?'down':'flat');
-        resultCells='<div class="ch-base">'+round3(x.r.baseline)+unitSfx+'</div>'
+        resultCells='<div class="ch-score">'+round3(x.r.baseline)+unitSfx+'</div>'
           +'<div class="ch-arrow '+dirCls+'">\u2192</div>'
           +'<div class="ch-score">'+round3(x.r.current)+unitSfx+'</div>';
       }else{
