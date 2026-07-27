@@ -26,6 +26,8 @@ var IAN_EMAIL   = 'ic.richards55@gmail.com';
 // ══════════════════════════════════════════════════════════════════════════
 
 function getHistoricalFile_() {
+  var pinned = _fileById_(FILE_IDS_.historical);
+  if (pinned) return pinned;
   var files = DriveApp.getRootFolder().getFilesByName('fpt_historical.json');
   if (files.hasNext()) return files.next();
   DriveApp.getRootFolder().createFile('fpt_historical.json',
@@ -33,7 +35,26 @@ function getHistoricalFile_() {
   return DriveApp.getRootFolder().getFilesByName('fpt_historical.json').next();
 }
 
+// Known Drive file IDs — pinned July 2026 after a stray Google Docs copy named
+// 'fpt_live.json' shadowed the real file in the by-name lookup and blinded the
+// whole system. ID lookup is authoritative; name search is creation-fallback only.
+var FILE_IDS_ = {
+  live:      '13tg4W-10_MH-jFk_A4BvyLujOjpAgJwh',
+  historical:'1s6X6yWkpzVzkTHPmRk2RdbfgIuMuOH6Z',
+  teamsLive: '1FQYJ0z5v7TsN4nJWXkatUfK7V9zIQUy6',
+  teamsHist: '1846vxaWLcFlm4TGumdmFGB2fEtacjKEf'
+};
+function _fileById_(id) {
+  try {
+    var f = DriveApp.getFileById(id);
+    if (f && !f.isTrashed()) return f;
+  } catch (e) {}
+  return null;
+}
+
 function getLiveFile_() {
+  var pinned = _fileById_(FILE_IDS_.live);
+  if (pinned) return pinned;
   var files = DriveApp.getRootFolder().getFilesByName('fpt_live.json');
   if (files.hasNext()) return files.next();
   var empty = JSON.stringify({
@@ -84,6 +105,8 @@ function _ensureIntakeIds_(live){
 // ══════════════════════════════════════════════════════════════════════════
 
 function getTeamsHistoricalFile_() {
+  var pinned = _fileById_(FILE_IDS_.teamsHist);
+  if (pinned) return pinned;
   var files = DriveApp.getRootFolder().getFilesByName('fpt_teams_historical.json');
   if (files.hasNext()) return files.next();
   DriveApp.getRootFolder().createFile('fpt_teams_historical.json',
@@ -92,6 +115,8 @@ function getTeamsHistoricalFile_() {
 }
 
 function getTeamsLiveFile_() {
+  var pinned = _fileById_(FILE_IDS_.teamsLive);
+  if (pinned) return pinned;
   var files = DriveApp.getRootFolder().getFilesByName('fpt_teams_live.json');
   if (files.hasNext()) return files.next();
   var empty = JSON.stringify({
@@ -274,13 +299,21 @@ function doPost(e) {
       return handleCopyAthleteToGym_(payload);
     }
 
-    // ── Team portal state save ────────────────────────────────────────────
-    if (payload.type === 'teams') {
-      return handleTeamsPost_(payload);
-    }
-
-    // ── Gym portal state save (default) ──────────────────────────────────
-    return handleGymPost_(payload);
+    // ── Full-state saves: serialize via script lock so two devices saving at
+    // the same moment queue up instead of interleaving read-merge-write. Without
+    // this, save B can read the file before save A's write lands, and B's merge
+    // runs against stale data — a seconds-wide race that can still drop entries
+    // even with union-merge. Same LockService pattern as the intake paths above.
+    var lockS = LockService.getScriptLock();
+    try { lockS.waitLock(30000); } catch (eL) {}
+    try {
+      // ── Team portal state save ──────────────────────────────────────────
+      if (payload.type === 'teams') {
+        return handleTeamsPost_(payload);
+      }
+      // ── Gym portal state save (default) ────────────────────────────────
+      return handleGymPost_(payload);
+    } finally { try { lockS.releaseLock(); } catch (eL2) {} }
 
   } catch(err) {
     return ContentService
@@ -310,6 +343,8 @@ function handleGymPost_(payload) {
   var histById = {};
   (historical.entries || []).forEach(function(e) { if (e && e.id != null) histById[e.id] = e; });
 
+  var _curLive = readLive_();
+
   var incoming = payload.entries || [];
   var seenLive = {};
   var liveEntries = [];
@@ -336,6 +371,21 @@ function handleGymPost_(payload) {
     }
   }
 
+  // ── Stale-tab protection (union-merge, July 2026): keep existing live entries
+  // the saving client didn't know about. Before this, live entries were whatever
+  // the last device sent — two devices logging simultaneously wiped each other's
+  // recent sets (and the portal's idle auto-reload made the loss permanent).
+  // Incoming wins on id conflicts (edits propagate); entries already migrated to
+  // historical are skipped to avoid duplication; explicit deletions are handled
+  // by the deletedIds tombstones below, exactly like challenge entries.
+  (_curLive.entries || []).forEach(function(e) {
+    if (!e || e.id == null) return;
+    if (seenLive[e.id]) return;        // client sent a (possibly edited) copy — it wins
+    if (histById[e.id]) return;        // lives in historical now
+    seenLive[e.id] = true;
+    liveEntries.push(e);
+  });
+
   // ── Explicit deletions (cross-day): remove these ids from historical + live ──
   var deletedIds = payload.deletedIds || [];
   if (deletedIds.length) {
@@ -357,8 +407,6 @@ function handleGymPost_(payload) {
   // approve), NOT the coach's full-state save — preserve whatever the backend
   // currently holds so routine gym saves can never clobber a submission or
   // undo a reject.
-  var _curLive = readLive_();
-
   // GUARD: never let a save empty a populated roster (blocks empty-state overwrite / wipe)
   if ((payload.athletes || []).length === 0 && (_curLive.athletes || []).length > 0) {
     sendGuardAlert_('GYM roster');
@@ -376,7 +424,7 @@ function handleGymPost_(payload) {
     pendingIntakes: (_curLive.pendingIntakes || []),
     adults:         payload.adults         || {},
     challenges:     payload.challenges     || {},
-    challengeEntries: payload.challengeEntries || [],
+    challengeEntries: mergeChallengeEntries_(payload, _curLive),
     entries:        liveEntries
   };
 
@@ -385,6 +433,30 @@ function handleGymPost_(payload) {
     .createTextOutput(JSON.stringify({ ok: true, liveCount: liveEntries.length,
                                        histUpdated: histChanged, deleted: deletedIds.length }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── Challenge entries: stale-tab protection ───────────────────────────────
+// Union-merge by id: incoming wins on conflicts (edits propagate), but entries
+// present on the server and absent from the payload SURVIVE — a tab that loaded
+// before another device's save can no longer silently clobber those results.
+// Deletions therefore require explicit tombstones (payload.deletedChallengeIds),
+// mirroring the athlete-entry deletedIds pattern above.
+function mergeChallengeEntries_(payload, curLive) {
+  var seen = {};
+  var merged = [];
+  (payload.challengeEntries || []).forEach(function(e) {
+    if (e && e.id != null && !seen[e.id]) { seen[e.id] = true; merged.push(e); }
+  });
+  (curLive.challengeEntries || []).forEach(function(e) {
+    if (e && e.id != null && !seen[e.id]) { seen[e.id] = true; merged.push(e); }
+  });
+  var del = payload.deletedChallengeIds || [];
+  if (del.length) {
+    var delSet = {};
+    del.forEach(function(id) { if (id != null) delSet[id] = true; });
+    merged = merged.filter(function(e) { return !delSet[e.id]; });
+  }
+  return merged;
 }
 
 // ── Team post handler ─────────────────────────────────────────────────────

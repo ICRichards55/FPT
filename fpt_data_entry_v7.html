@@ -1141,7 +1141,9 @@ function logChallengeResult(){
 function deleteChallengeResult(id){
   if(!confirm('Delete this result?'))return;
   state.challengeEntries=(state.challengeEntries||[]).filter(function(e){return e.id!==id;});
-  saveData();showToast('Deleted.');render();
+  if(_pendingChallengeDeletes.indexOf(id)===-1)_pendingChallengeDeletes.push(id);
+  render();
+  _saveWithDeletes().then(function(ok){showToast(ok?'Deleted.':'Delete failed to save \u2014 retry');});
 }
 function challImprovement(m,adult){
   var es=(state.challengeEntries||[]).filter(function(e){return e.month===m&&e.adult===adult;}).slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
@@ -1573,7 +1575,7 @@ function saveData(){
       a.archived=true;
     }
   });
-  _debounceSave(state);
+  _debounceSave(Object.assign({},state,{deletedIds:_pendingDeletes.slice(),deletedChallengeIds:_pendingChallengeDeletes.slice()}));
 }
 (function(){if(window._API_URL&&window._API_URL.startsWith('https://script.google.com')){localStorage.setItem('fpt_api_url',window._API_URL);return;}var stored=localStorage.getItem('fpt_api_url');if(stored&&stored.startsWith('https://'))window._API_URL=stored;})();
 var _saveTimer=null;
@@ -1614,7 +1616,8 @@ async function _logConfirmed(newEntries,okMsg){
   else{showToast('NOT saved \u2014 kept locally, will retry. Check connection.');_obBadge();}
 }
 var _pendingDeletes=[];
-async function _saveWithDeletes(){var payload=Object.assign({},state,{deletedIds:_pendingDeletes.slice()});var ok=await _saveNowConfirmed(payload);if(ok)_pendingDeletes=[];return ok;}
+var _pendingChallengeDeletes=[];
+async function _saveWithDeletes(){var payload=Object.assign({},state,{deletedIds:_pendingDeletes.slice(),deletedChallengeIds:_pendingChallengeDeletes.slice()});var ok=await _saveNowConfirmed(payload);if(ok){_pendingDeletes=[];_pendingChallengeDeletes=[];}return ok;}
 setInterval(function(){if(sessionRows.length||todayEditId!=null||(typeof editDataEditId!=='undefined'&&editDataEditId!=null))return;loadData();},300000);
 try{_obBadge();}catch(e){}
 if(_isAuthed())loadData();

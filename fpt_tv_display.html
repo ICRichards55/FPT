@@ -61,8 +61,8 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .pr-entries-wrap{flex:1;display:flex;flex-direction:column;justify-content:flex-start}
 .pr-entry{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:#111;padding:.3vh 0;border-bottom:1px solid rgba(0,0,0,.1);display:flex;justify-content:space-between;gap:1vw;flex-shrink:0;container-type:size}
 .pr-entry:last-child{border-bottom:none}
-.pr-ath-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(14px,min(9cqw,45cqh),34px)}
-.pr-ath-val{font-weight:900;white-space:nowrap;color:#333;font-size:clamp(13px,40cqh,30px)}
+.pr-ath-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(14px,min(9cqw,45cqh),80px)}
+.pr-ath-val{font-weight:900;white-space:nowrap;color:#333;font-size:clamp(13px,40cqh,72px)}
 .pr-empty{font-size:clamp(16px,2vw,28px);color:#aaa;font-style:italic;padding:1vh 0}
 
 /* SHREDMILL */
@@ -114,6 +114,15 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .ch-cols-3 .ch-rank{font-size:clamp(17px,47cqh,52px);min-width:clamp(30px,2.4vw,44px)}
 .ch-cols-3 .ch-name{font-size:clamp(13px,min(6cqw,30cqh),42px)}
 .ch-cols-3 .ch-score{font-size:clamp(14px,42cqh,47px)}
+/* Improvement chip (2nd-test delta vs baseline): green better, red worse. Width-verified
+   with real fonts: >=32px name margin even in 3-col with longest current adult names. */
+.ch-imp{font-family:'Barlow Condensed',sans-serif;font-weight:800;line-height:1;flex-shrink:0;white-space:nowrap}
+.ch-imp.up{color:#15803d}
+.ch-imp.down{color:#dc2626}
+.ch-imp.flat{color:#999}
+.ch-cols-1 .ch-imp{font-size:clamp(14px,32cqh,52px)}
+.ch-cols-2 .ch-imp{font-size:clamp(12px,24cqh,35px)}
+.ch-cols-3 .ch-imp{font-size:clamp(11px,22cqh,26px)}
 </style>
 </head>
 <body>
@@ -388,32 +397,38 @@ function buildBigBoysBoard(entries){
   </div>`;
 }
 
-function buildMonthlyPRs(entries){
+// One slide per exercise (July 2026, replaces the combined 3-column month slide):
+// slotted directly after that exercise's M/F leaderboard pair. Interior columns adapt
+// to improver count (<=6 -> 1, <=12 -> 2, else 3) so text scales up dramatically in the
+// common case; 3-col worst case is exactly the old geometry (stress-tested 0-30 rows).
+// Self-suppresses when the exercise has no improvers this month.
+function buildMonthlyPRsEx(ex,entries,slideId){
   const mon=getMonthName();
-  const perExRows=EX.map(ex=>getMonthlyImprovers(entries,ex.id));
-  const maxRowsInAnyCol=Math.max.apply(null,perExRows.map(r=>r.length).concat([5]));
-  const rowHeightPct=(100/maxRowsInAnyCol).toFixed(2);
-  function col(ex,rows){
-    if(!rows.length)return`<div class="pr-empty">No PRs this month yet</div>`;
-    const entriesHtml=rows.map(r=>{
+  const rows=getMonthlyImprovers(entries,ex.id);
+  if(!rows.length)return '';
+  const nCols=rows.length<=6?1:(rows.length<=12?2:3);
+  const perCol=Math.ceil(rows.length/nCols);
+  const rowHeightPct=(100/Math.max(perCol,5)).toFixed(2);
+  const cols=[];
+  for(let c=0;c<nCols;c++)cols.push(rows.slice(c*perCol,(c+1)*perCol));
+  const colsHtml=cols.map(colRows=>{
+    const entriesHtml=colRows.map(r=>{
       const prev=r.prev!=null?fmtScore(ex.id,r.prev):'First';
       return`<div class="pr-entry" style="height:${rowHeightPct}%">
         <span class="pr-ath-name">${r.athlete}</span>
-        <span class="pr-ath-val">${prev}→${fmtScore(ex.id,r.curr)}</span>
+        <span class="pr-ath-val">${prev}\u2192${fmtScore(ex.id,r.curr)}</span>
       </div>`;
     }).join('');
-    return`<div class="pr-entries-wrap">${entriesHtml}</div>`;
-  }
-  return`<div class="slide slide-light" id="s7">
+    return`<div class="pr-col"><div class="pr-entries-wrap">${entriesHtml}</div></div>`;
+  }).join('');
+  return`<div class="slide slide-light" id="s${slideId}">
     ${blackBrush()}
     <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(84px,11.67vw,448px)"/>
     <div class="pr-body">
       <div class="pr-title">${mon}<br>Leaderboard</div>
-      <div class="pr-cols">
-        ${EX.map((ex,i)=>`<div class="pr-col">
-          <div class="pr-col-head">${ex.name}</div>
-          ${col(ex,perExRows[i])}
-        </div>`).join('')}
+      <div class="pr-col-head" style="margin-bottom:1.6vh">${ex.name}</div>
+      <div class="pr-cols" style="grid-template-columns:repeat(${nCols},1fr)">
+        ${colsHtml}
       </div>
     </div>
   </div>`;
@@ -546,6 +561,14 @@ function _chDisplayLabels(adultKeys){
   });
   return labels;
 }
+// Delta vs baseline once a 2nd result exists: direction-aware (improvement>0 is always
+// "better" regardless of lower/higher scoring). Empty until the 2nd test is logged.
+function _chImpChip(imp){
+  if(imp==null)return '';
+  var cls=imp>0?'up':(imp<0?'down':'flat');
+  var arrow=imp>0?'\u25B2':(imp<0?'\u25BC':'\u2013');
+  return '<div class="ch-imp '+cls+'">'+arrow+round3(Math.abs(imp))+'</div>';
+}
 function challengeLeaderboard(m,ch){
   var ents=(state.challengeEntries||[]).filter(function(e){return e.month===m;});
   var byAdult={};
@@ -600,6 +623,7 @@ function buildChallengeSlide(){
         +'<div class="ch-rank">'+rankStr(x.rank)+'</div>'
         +'<div class="ch-name">'+(dispLabels[x.r.adult]||x.r.adult)+'</div>'
         +'<div class="ch-score">'+round3(x.r.current)+unitSfx+'</div>'
+        +_chImpChip(x.r.improvement)
         +'</div>';
     }).join('');
     return '<div class="ch-rows-wrap">'+rowsHtml+'</div>';
@@ -656,11 +680,13 @@ function renderBoard(){
   add(buildWelcome(),10);
   add(buildLeaderboard(1,EX[0],'male',tvEntries),12);
   add(buildLeaderboard(2,EX[0],'female',tvEntries),12);
+  add(buildMonthlyPRsEx(EX[0],tvEntries,71),12);
   add(buildLeaderboard(3,EX[1],'male',tvEntries),12);
   add(buildLeaderboard(4,EX[1],'female',tvEntries),12);
+  add(buildMonthlyPRsEx(EX[1],tvEntries,72),12);
   add(buildLeaderboard(5,EX[2],'male',tvEntries),12);
   add(buildLeaderboard(6,EX[2],'female',tvEntries),12);
-  add(buildMonthlyPRs(tvEntries),14);
+  add(buildMonthlyPRsEx(EX[2],tvEntries,73),12);
   add(buildBigBoysBoard(tvEntries),12);
   add(buildShredmill(),11);
   add(buildBirthdays(),13);
@@ -717,7 +743,7 @@ function _fitCongratsItems(){
 function _constrainLogoHeights(){
   document.querySelectorAll('.slide.active').forEach(function(slide){
     var logo=slide.querySelector('.slide-logo');
-    var divider=slide.querySelector('.lb-columns');
+    var divider=slide.querySelector('.lb-columns')||slide.querySelector('.pr-cols');
     if(!logo||!divider)return;
     logo.style.maxHeight='';
     var logoTop=logo.getBoundingClientRect().top;
