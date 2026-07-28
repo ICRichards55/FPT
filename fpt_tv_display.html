@@ -573,9 +573,21 @@ function challengeLeaderboard(m,ch){
     var improvement=latest!=null?(dir==='higher'?latest-baseline:baseline-latest):null;
     // Rank by baseline until a 2nd entry exists, then rank by their latest (current) result
     var current=latest!=null?latest:baseline;
-    return {adult:a,baseline:baseline,latest:latest,improvement:improvement,current:current};
+    // Best-ever across ALL their entries (not just first/last) — used as the tie-breaker
+    var vals=es.map(function(e){return e.value;});
+    var best=dir==='higher'?Math.max.apply(null,vals):Math.min.apply(null,vals);
+    return {adult:a,baseline:baseline,latest:latest,improvement:improvement,current:current,best:best};
   });
-  rows.sort(function(x,y){return dir==='higher'?y.current-x.current:x.current-y.current;});
+  // Sort: current result first; tied current -> better best-ever wins (someone who has
+  // demonstrated more doesn't stack below an equal-current peer); still tied -> name,
+  // so ordering is deterministic instead of entry-log accident.
+  rows.sort(function(x,y){
+    var byCur=dir==='higher'?y.current-x.current:x.current-y.current;
+    if(byCur!==0)return byCur;
+    var byBest=dir==='higher'?y.best-x.best:x.best-y.best;
+    if(byBest!==0)return byBest;
+    return String(x.adult).localeCompare(String(y.adult));
+  });
   return rows;
 }
 function _chColumnCount(n){
