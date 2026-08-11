@@ -476,6 +476,23 @@ function handleTeamsPost_(payload) {
   // preserve existing branding if the client didn't send it (stale-tab guard)
   var existingTeams_ = readTeamsLive_();
 
+  // ── Stale-tab protection (union-merge, Aug 2026): same pattern as gym entries.
+  // Keep existing team entries the saving client didn't know about; incoming wins
+  // on id conflicts; deletions require explicit deletedTeamEntryIds tombstones.
+  var _tSeen = {};
+  liveEntries.forEach(function(e) { if (e && e.id != null) _tSeen[e.id] = true; });
+  (existingTeams_.entries || []).forEach(function(e) {
+    if (!e || e.id == null || _tSeen[e.id]) return;
+    _tSeen[e.id] = true;
+    liveEntries.push(e);
+  });
+  var _tDel = payload.deletedTeamEntryIds || [];
+  if (_tDel.length) {
+    var _tDelSet = {};
+    _tDel.forEach(function(id) { if (id != null) _tDelSet[id] = true; });
+    liveEntries = liveEntries.filter(function(e) { return !_tDelSet[e.id]; });
+  }
+
   // GUARD: never let a save empty a populated teams roster (blocks empty-state overwrite / wipe)
   var _inTeams  = (payload.teams || []).length;
   var _curTeams = (existingTeams_.teams || []).length;

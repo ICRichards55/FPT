@@ -204,6 +204,8 @@ function _handleDelegatedClick(e, prevent){
   else if(id==='branding-save-btn'){ if(prevent)e.preventDefault(); _saveBranding(); }
   else if(id==='spot-dl-btn'){ if(prevent)e.preventDefault(); _downloadSpotlight(); }
   else if(id==='report-dl-btn'){ if(prevent)e.preventDefault(); _downloadReport(); }
+  else if(id==='parent-one-btn'){ if(prevent)e.preventDefault(); openParentReport(studioAthlete); }
+  else if(id==='parent-all-btn'){ if(prevent)e.preventDefault(); openAllParentReports(); }
 }
 document.addEventListener('click', function(e){ _handleDelegatedClick(e,false); });
 document.addEventListener('touchend', function(e){ _handleDelegatedClick(e,true); });
@@ -252,12 +254,13 @@ async function loadData(){
   render();
 }
 
+var _pendingTeamDeletes=[];
 function saveData(){
   if(!_loadedOK){_setLoadWarning(true);try{showToast('Data has not loaded yet - refresh before making changes.');}catch(e){alert('Data has not loaded yet - refresh before making changes.');}return;}
-  var payload = Object.assign({ type:'teams' }, state);
+  var payload = Object.assign({ type:'teams' }, state, { deletedTeamEntryIds:_pendingTeamDeletes.slice() });
   fetch(API_URL, { method:'POST', body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
-    .then(function(d){ if(!d.ok){ console.error('Save failed', d); try{showToast('Save was rejected by the server - your change may not be stored.');}catch(e){} } })
+    .then(function(d){ if(d.ok){ _pendingTeamDeletes=[]; } else { console.error('Save failed', d); try{showToast('Save was rejected by the server - your change may not be stored.');}catch(e){} } })
     .catch(function(e){ console.error('Save error', e); try{showToast('Save failed - check connection and retry.');}catch(e2){} });
 }
 
@@ -552,6 +555,7 @@ function saveEditEntry(sfx){
 function deleteEntry(id){
   if(!confirm('Delete this entry?')) return;
   state.entries = state.entries.filter(function(e){ return e.id!==id; });
+  if(_pendingTeamDeletes.indexOf(id)===-1)_pendingTeamDeletes.push(id);
   saveData(); showToast('Entry deleted.'); render();
 }
 
@@ -858,6 +862,36 @@ function getIntakeBest(ath, id){
   if(!vals.length) return null;
   return id==='fly' ? Math.min.apply(null,vals) : Math.max.apply(null,vals);
 }
+// ── Two-session comparison (Aug 2026, per Chris's feedback) ─────────────────
+// Compares the intake SESSION to the retest SESSION (earliest vs latest test date
+// per athlete+exercise), on two bases: session BEST and session AVERAGE of attempts.
+// Unlike the old all-time-PR basis, these can go negative — a retest slower than
+// intake reads as a regression instead of silently clamping to 0. Athletes with
+// only one session return null and drop out of team math entirely.
+var REPORT_EXCLUDE = ['Maya Haag']; // injured during retest window — out of team stats
+function getSessionComparison(ath, id){
+  var byDate = {};
+  state.entries.forEach(function(e){
+    if(e.athlete!==ath || e.exercise!==id || !e.date) return;
+    var v = (id==='broad') ? e.total : e.value;
+    if(v==null || isNaN(v)) return;
+    (byDate[e.date]=byDate[e.date]||[]).push(v);
+  });
+  var dates = Object.keys(byDate).sort();
+  if(dates.length < 2) return null;
+  function stats(vals){
+    var best = (id==='fly') ? Math.min.apply(null,vals) : Math.max.apply(null,vals);
+    var avg = vals.reduce(function(s,v){return s+v;},0)/vals.length;
+    return {best:best, avg:avg};
+  }
+  var t1 = stats(byDate[dates[0]]), t2 = stats(byDate[dates[dates.length-1]]);
+  function impPct(a,b){ if(!a) return 0; return (id==='fly' ? (a-b)/a : (b-a)/a)*100; }
+  return {
+    intakeBest:t1.best, retestBest:t2.best, bestImpPct:impPct(t1.best,t2.best),
+    intakeAvg:t1.avg,  retestAvg:t2.avg,  avgImpPct:impPct(t1.avg,t2.avg),
+    intakeDate:dates[0], retestDate:dates[dates.length-1]
+  };
+}
 function getImprovementPct(ath, id){
   var intake = getIntakeBest(ath,id), best = getPR(ath,id);
   if(intake==null || best==null || intake===0) return null;
@@ -873,20 +907,30 @@ function _spotVal(id, v){
 function _spotBoxes(ath, P){
   var muted = _hexA(P.text, 0.55);
   var defs = [
-    ['broad','Broad Jump Best','Broad Increase'],
-    ['fly','10-10 Fly Best','Fly Improvement'],
-    ['vert','Skyhook Best','Skyhook Increase']
+    ['broad','Broad Jump'],
+    ['fly','10-10 Fly'],
+    ['vert','Skyhook']
   ];
+  // Per exercise: BEST box + AVERAGE box, each with a colored delta chip vs test 1
+  // (green = improved, red = regressed) once a retest session exists. Direction-aware.
+  function chip(id, pct){
+    if(pct==null) return '<div style="color:'+muted+';font-size:9px;font-weight:700;margin-top:2px">\u2014</div>';
+    var col = pct>0 ? '#22c55e' : (pct<0 ? '#ef4444' : muted);
+    var arrow = pct>0 ? '\u25B2' : (pct<0 ? '\u25BC' : '\u2013');
+    return '<div style="color:'+col+';font-size:10px;font-weight:900;margin-top:2px">'+arrow+' '+(pct>=0?'+':'')+pct.toFixed(1)+'% vs test 1</div>';
+  }
   var html = '';
   defs.forEach(function(d){
     var id=d[0];
-    var best = _spotVal(id, getPR(ath,id));
-    var imp = getImprovementPct(ath,id);
-    var impStr = (imp==null) ? '--' : (imp>=0?'+':'')+Math.round(imp)+'%';
-    [[d[1],best],[d[2],impStr]].forEach(function(pair){
+    var c = getSessionComparison(ath, id);
+    var bestVal = _spotVal(id, c ? c.retestBest : getPR(ath,id));
+    var avgVal  = c ? _spotVal(id, c.retestAvg) : '--';
+    [[d[1]+' Best', bestVal, c?c.bestImpPct:null],
+     [d[1]+' Avg',  avgVal,  c?c.avgImpPct:null]].forEach(function(t){
       html += '<div style="border:1.5px solid '+P.accent+';padding:7px 9px;background:'+_hexA('#000000',0.30)+'">'+
-        '<div style="color:'+muted+';font-size:8px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px">'+pair[0]+'</div>'+
-        '<div style="color:'+P.text+';font-size:28px;font-weight:900;line-height:1;letter-spacing:-1px">'+pair[1]+'</div></div>';
+        '<div style="color:'+muted+';font-size:8px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px">'+t[0]+'</div>'+
+        '<div style="color:'+P.text+';font-size:26px;font-weight:900;line-height:1;letter-spacing:-1px">'+t[1]+'</div>'+
+        chip(id, t[2])+'</div>';
     });
   });
   return html;
@@ -962,6 +1006,123 @@ function _studioPhotoUpload(input){
 function _setStudioAthlete(a){ studioAthlete=a; studioPhoto=''; render(); }
 function _setStudioMode(m){ studioMode=m; render(); }
 
+// iOS Safari only allows window.open() synchronously inside the tap gesture, so the
+// tab must be pre-opened BEFORE the async canvas render, then filled when the PNG is
+// ready. Same pattern already proven in fpt_social_studio (July 2026).
+function _isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;}
+function _saveWinPreOpen(){
+  if(!_isIOS())return null;
+  var w=window.open('','_blank');
+  if(w){ w.document.write('<html><head><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}p{color:#fff;opacity:.7;font-size:15px}</style></head><body><p>Generating image&hellip;</p></body></html>'); }
+  return w;
+}
+function _savePng(dataUrl, filename, preWin){
+  if(_isIOS()){
+    var w=(preWin&&!preWin.closed)?preWin:window.open('','_blank');
+    if(w){
+      w.document.open();
+      w.document.write('<html><head><title>'+filename+'</title><meta name="viewport" content="width=device-width"/><style>body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif}img{max-width:100%;max-height:85vh;object-fit:contain}p{color:#fff;font-size:14px;text-align:center;padding:16px;opacity:.7}</style></head><body><img src="'+dataUrl+'"/><p>Long-press the image &rarr; Tap "Add to Photos" or "Save Image"</p></body></html>');
+      w.document.close();
+    } else { alert('Pop-up blocked. Allow pop-ups for this site in Settings, then try again.'); }
+  } else {
+    var a=document.createElement('a'); a.href=dataUrl; a.download=filename; a.click();
+  }
+}
+
+
+// ── Parent Reports (Aug 2026): printable one-pager per athlete ─────────────
+// Built synchronously from state (no canvas), so window.open stays inside the tap
+// gesture and works on iOS. Parents print / save-as-PDF from the browser.
+function _teamPercentileBest(ath, id){
+  var peers=[];
+  (state.athletes[currentTeam]||[]).forEach(function(a){
+    if(REPORT_EXCLUDE.indexOf(a)>-1) return;
+    var c=getSessionComparison(a,id);
+    if(c) peers.push({ath:a, imp:c.bestImpPct});
+  });
+  if(peers.length<2) return null;
+  var mine=peers.filter(function(p){return p.ath===ath;})[0];
+  if(!mine) return null;
+  var below=peers.filter(function(p){return p.imp<mine.imp;}).length;
+  return Math.round(below/(peers.length-1)*100);
+}
+function _parentAthleteBlock(ath, pageBreak){
+  var EXN={broad:'Broad Jump',fly:'10-10 Fly',vert:'Skyhook'};
+  var rows='';
+  ['broad','fly','vert'].forEach(function(id){
+    var c=getSessionComparison(ath,id);
+    if(!c){
+      rows+='<tr><td style="padding:10px 8px;font-weight:800">'+EXN[id]+'</td><td colspan="5" style="padding:10px 8px;color:#888">Only one testing session recorded</td></tr>';
+      return;
+    }
+    function cell(v){ return _spotVal(id,v); }
+    function delta(pct){
+      var col=pct>0?'#15803d':(pct<0?'#b91c1c':'#777');
+      var arrow=pct>0?'\u25B2':(pct<0?'\u25BC':'\u2013');
+      return '<span style="color:'+col+';font-weight:900">'+arrow+' '+(pct>=0?'+':'')+pct.toFixed(1)+'%</span>';
+    }
+    var pctile=_teamPercentileBest(ath,id);
+    rows+='<tr style="border-top:1px solid #ddd">'+
+      '<td style="padding:10px 8px;font-weight:800;white-space:nowrap">'+EXN[id]+'</td>'+
+      '<td style="padding:10px 8px;text-align:center">'+cell(c.intakeBest)+'<div style="font-size:9px;color:#888">avg '+cell(c.intakeAvg)+'</div></td>'+
+      '<td style="padding:10px 8px;text-align:center;color:#888">\u2192</td>'+
+      '<td style="padding:10px 8px;text-align:center;font-weight:900">'+cell(c.retestBest)+'<div style="font-size:9px;color:#888">avg '+cell(c.retestAvg)+'</div></td>'+
+      '<td style="padding:10px 8px;text-align:center">'+delta(c.bestImpPct)+'<div style="font-size:9px;color:#888">avg '+(c.avgImpPct>=0?'+':'')+c.avgImpPct.toFixed(1)+'%</div></td>'+
+      '<td style="padding:10px 8px;text-align:center;font-size:11px;color:#555">'+(pctile==null?'\u2014':'Improved more than<br><b>'+pctile+'%</b> of the team')+'</td>'+
+    '</tr>';
+  });
+  var dates=_reportDates();
+  return '<div style="'+(pageBreak?'page-break-after:always;':'')+'max-width:720px;margin:0 auto;padding:34px 26px;font-family:\'Barlow Condensed\',Arial,sans-serif;color:#111">'+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px solid #111;padding-bottom:8px">'+
+      '<div>'+
+        '<div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#a02020">'+currentTeam+'</div>'+
+        '<div style="font-size:34px;font-weight:900;text-transform:uppercase;letter-spacing:-1px;line-height:.95">'+ath+'</div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:#555;text-align:right">Summer Performance Report<br>'+fmtDate(dates.intake)+' \u2192 '+fmtDate(dates.retest)+'</div>'+
+    '</div>'+
+    '<table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:15px">'+
+      '<tr style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#888">'+
+        '<td style="padding:4px 8px">Exercise</td><td style="padding:4px 8px;text-align:center">Test 1 Best</td><td></td>'+
+        '<td style="padding:4px 8px;text-align:center">Test 2 Best</td><td style="padding:4px 8px;text-align:center">Change (best)</td>'+
+        '<td style="padding:4px 8px;text-align:center">Vs. Team</td></tr>'+
+      rows+
+    '</table>'+
+    '<div style="margin-top:20px;padding:12px 14px;background:#f4f4f4;border-left:4px solid #a02020;font-size:13px;line-height:1.45">'+
+      'This summer\u2019s training was built to make athletes faster, stronger, and more explosive \u2014 and the numbers above are '+
+      ath.split(' ')[0]+'\u2019s. Consistent off-season training is how these gains keep compounding.'+
+    '</div>'+
+    '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#888">'+
+      '<span>Questions or continued training: Frye Performance Training \u00b7 Fryeperformance@gmail.com</span>'+
+      '<span style="font-weight:800;letter-spacing:1px;text-transform:uppercase">Powered by FPT</span>'+
+    '</div>'+
+  '</div>';
+}
+function _openParentDoc(title, body){
+  var w=window.open('','_blank');
+  if(!w){ alert('Pop-up blocked. Allow pop-ups for this site, then try again.'); return; }
+  w.document.write('<html><head><title>'+title+'</title><meta name="viewport" content="width=device-width, initial-scale=1"/>'+
+    '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;800;900&display=swap" rel="stylesheet"/>'+
+    '<style>body{margin:0;background:#fff}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>'+
+    '</head><body>'+body+
+    '<div style="text-align:center;padding:18px;font-family:Arial,sans-serif;font-size:12px;color:#888" class="noprint"><style>@media print{.noprint{display:none}}</style>'+
+    'Use your browser\u2019s Print (\u2318P / Share \u2192 Print) to print or save as PDF.</div>'+
+    '</body></html>');
+  w.document.close();
+}
+function openParentReport(ath){
+  if(!ath){ alert('Pick an athlete first.'); return; }
+  _openParentDoc('FPT Report \u2014 '+ath, _parentAthleteBlock(ath, false));
+}
+function openAllParentReports(){
+  var list=(state.athletes[currentTeam]||[]).filter(function(a){
+    if(REPORT_EXCLUDE.indexOf(a)>-1) return false;
+    return getSessionComparison(a,'broad')||getSessionComparison(a,'fly')||getSessionComparison(a,'vert');
+  }).sort(function(a,b){ return lastName(a).localeCompare(lastName(b)); });
+  if(!list.length){ alert('No retested athletes yet.'); return; }
+  var body=list.map(function(a,i){ return _parentAthleteBlock(a, i<list.length-1); }).join('');
+  _openParentDoc('FPT Parent Reports \u2014 '+currentTeam+' ('+list.length+')', body);
+}
+
 async function _downloadSpotlight(){
   if(!window.html2canvas){ alert('Still loading — try again in a moment.'); return; }
   var card=document.getElementById('spot-card'); if(!card){ alert('Pick an athlete first.'); return; }
@@ -971,19 +1132,12 @@ async function _downloadSpotlight(){
   var clone=card.cloneNode(true);
   holder.appendChild(clone); document.body.appendChild(holder);
   function cleanup(){ if(holder.parentNode) document.body.removeChild(holder); }
+  var _w=_saveWinPreOpen();
   try {
     var canvas=await window.html2canvas(clone,{scale:2,useCORS:true,backgroundColor:null,logging:false});
     cleanup();
-    var dataUrl=canvas.toDataURL('image/png');
-    var fname='FPT_'+(studioAthlete||'athlete').replace(/\s+/g,'_')+'_Spotlight.png';
-    var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
-    if(isIOS){
-      var w=window.open('','_blank');
-      if(w) w.document.write('<title>'+fname+'</title><img src="'+dataUrl+'" style="width:100%"/><p style="font-family:sans-serif;text-align:center">Long-press the image → Add to Photos</p>');
-    } else {
-      var a=document.createElement('a'); a.href=dataUrl; a.download=fname; a.click();
-    }
-  } catch(e){ cleanup(); console.error(e); alert('Could not generate the image.'); }
+    _savePng(canvas.toDataURL('image/png'), 'FPT_'+(studioAthlete||'athlete').replace(/\s+/g,'_')+'_Spotlight.png', _w);
+  } catch(e){ cleanup(); if(_w)try{_w.close();}catch(_x){} console.error(e); alert('Could not generate the image.'); }
 }
 
 // ── Studio — Team Report ──────────────────────────────────────────────────
@@ -992,24 +1146,36 @@ function _reportDates(){
   var arr=Object.keys(seen).sort();
   return { intake:arr[0]||null, retest:arr[arr.length-1]||null, count:arr.length };
 }
+function _fmtDelta(id, d){
+  var mag = (id==='broad') ? Math.round(Math.abs(d))+'\u2033' : (id==='fly' ? Math.abs(d).toFixed(2)+'s' : Math.abs(d).toFixed(1)+'\u2033');
+  return (d>=0?'+':'\u2212')+mag;
+}
 function _teamReportData(){
   var roster=state.athletes[currentTeam]||[];
-  var out={};
+  var out={ retested:{} };
   ['broad','fly','vert'].forEach(function(id){
     var rows=[];
     roster.forEach(function(ath){
-      var imp=getImprovementPct(ath,id);
-      if(imp==null) return;
-      rows.push({ath:ath, imp:imp});
+      if(REPORT_EXCLUDE.indexOf(ath)>-1) return;              // injured etc.
+      var c=getSessionComparison(ath,id);
+      if(c==null) return;                                     // didn't test twice
+      rows.push({ath:ath, c:c});
+      out.retested[ath]=1;
     });
     var n=rows.length;
+    function mean(f){ return n? rows.reduce(function(s,r){return s+f(r.c);},0)/n : 0; }
     out[id]={
-      avg: n? rows.reduce(function(s,r){return s+r.imp;},0)/n : 0,
-      prd: rows.filter(function(r){return r.imp>0;}).length,
       n: n,
-      top5: rows.slice().sort(function(a,b){return b.imp-a.imp;}).slice(0,5)
+      teamAvgT1:   mean(function(c){return c.intakeAvg;}),
+      teamAvgT2:   mean(function(c){return c.retestAvg;}),
+      avgImp:      mean(function(c){return c.avgImpPct;}),    // headline: avg-of-attempts basis
+      improvedBest:rows.filter(function(r){return r.c.bestImpPct>0;}).length,
+      improvedAvg: rows.filter(function(r){return r.c.avgImpPct>0;}).length,
+      top5: rows.slice().sort(function(a,b){return b.c.bestImpPct-a.c.bestImpPct;}).slice(0,5)
+             .map(function(r){return {ath:r.ath, imp:r.c.bestImpPct};})
     };
   });
+  out.nRetested=Object.keys(out.retested).length;
   return out;
 }
 function _studioTeamPhotoUpload(input){
@@ -1036,19 +1202,37 @@ function _teamReportCardHtml(){
         '<span style="color:'+P.text+';font-size:13.5px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.ath+'</span>'+
         '<span style="color:'+P.accent+';font-size:13.5px;font-weight:900;flex-shrink:0">'+(r.imp>=0?'+':'')+Math.round(r.imp)+'%</span></div>';
     });
-    if(!d.top5.length) rows='<div style="color:'+muted+';font-size:12px;padding-top:3px">No data yet</div>';
+    if(!d.top5.length) rows='<div style="color:'+muted+';font-size:12px;padding-top:3px">No retest data yet</div>';
+    var delta = d.teamAvgT2-d.teamAvgT1;
+    var better = (id==='fly') ? delta<0 : delta>0;
+    var arrowColor = better ? '#22c55e' : (delta===0 ? muted : '#ef4444');
+    var impDisp = (id==='fly') ? -delta : delta;   // improvement-signed for the label
     return '<div style="display:flex;gap:18px;padding:7px 0;'+(last?'':'border-bottom:1px solid '+line)+'">'+
-      '<div style="width:150px;flex-shrink:0">'+
+      '<div style="width:165px;flex-shrink:0">'+
         '<div style="color:'+P.text+';font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:-.3px">'+EXN[id]+'</div>'+
-        '<div style="color:'+P.accent+';font-size:29px;font-weight:900;line-height:1;margin-top:1px">'+(d.avg>=0?'+':'')+d.avg.toFixed(1)+'%</div>'+
-        '<div style="color:'+muted+';font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">team avg improvement</div>'+
-        '<div style="color:'+P.text+';font-size:18px;font-weight:900;line-height:1;margin-top:5px">'+d.prd+'/'+d.n+'</div>'+
-        '<div style="color:'+muted+';font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">set personal records</div>'+
+        '<div style="display:flex;align-items:baseline;gap:5px;margin-top:2px">'+
+          '<span style="color:'+P.text+';font-size:20px;font-weight:900;line-height:1">'+_spotVal(id,d.teamAvgT1)+'</span>'+
+          '<span style="color:'+arrowColor+';font-size:18px;font-weight:900;line-height:1">\u2192</span>'+
+          '<span style="color:'+P.text+';font-size:20px;font-weight:900;line-height:1">'+_spotVal(id,d.teamAvgT2)+'</span>'+
+        '</div>'+
+        '<div style="color:'+arrowColor+';font-size:11px;font-weight:900;margin-top:1px">'+_fmtDelta(id,impDisp)+' ('+(d.avgImp>=0?'+':'')+d.avgImp.toFixed(1)+'%)</div>'+
+        '<div style="color:'+muted+';font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">team average \u00b7 test 1 \u2192 test 2</div>'+
+        '<div style="color:'+P.text+';font-size:13px;font-weight:900;line-height:1.35;margin-top:5px">'+d.improvedBest+'/'+d.n+' <span style="color:'+muted+';font-weight:700;font-size:9px;text-transform:uppercase">beat their best</span></div>'+
+        '<div style="color:'+P.text+';font-size:13px;font-weight:900;line-height:1.35">'+d.improvedAvg+'/'+d.n+' <span style="color:'+muted+';font-weight:700;font-size:9px;text-transform:uppercase">raised their average</span></div>'+
       '</div>'+
       '<div style="flex:1;min-width:0;padding-top:1px">'+
-        '<div style="color:'+muted+';font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">Top 5 Improvements</div>'+rows+
+        '<div style="color:'+muted+';font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">Top 5 Improvements (best)</div>'+rows+
       '</div></div>';
   }
+  var _rosterWithData={}; state.entries.forEach(function(e){ if((state.athletes[currentTeam]||[]).indexOf(e.athlete)>-1) _rosterWithData[e.athlete]=1; });
+  var _noRetest=Object.keys(_rosterWithData).filter(function(a){ return !R.retested[a] && REPORT_EXCLUDE.indexOf(a)===-1; }).length;
+  var _nExcl=(REPORT_EXCLUDE||[]).filter(function(a){ return _rosterWithData[a]; }).length;
+  var footnoteParts=[];
+  if(_noRetest) footnoteParts.push(_noRetest+' athlete'+(_noRetest>1?'s':'')+' without a retest');
+  if(_nExcl)   footnoteParts.push(_nExcl+' injured');
+  var footnote = footnoteParts.length
+    ? '<div style="color:'+muted+';font-size:8px;letter-spacing:.4px;margin-top:4px">Not included: '+footnoteParts.join(' \u00b7 ')+'</div>'
+    : '';
   var banner = studioTeamPhoto
     ? '<div style="height:172px;border-radius:3px;overflow:hidden;border:1px solid '+line+'"><img src="'+studioTeamPhoto+'" style="width:100%;height:100%;object-fit:cover;display:block"/></div>'
     : '';
@@ -1058,11 +1242,11 @@ function _teamReportCardHtml(){
       '<div style="flex:1;min-width:0">'+
         '<div style="color:'+P.accent+';font-size:10.5px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase">'+currentTeam+'</div>'+
         '<div style="color:'+P.text+';font-size:27px;font-weight:900;text-transform:uppercase;letter-spacing:-1px;line-height:.95">Team Report</div>'+
-        '<div style="color:'+muted+';font-size:9.5px;letter-spacing:.4px">'+period+' \u00b7 '+roster.length+' athletes</div>'+
+        '<div style="color:'+muted+';font-size:9.5px;letter-spacing:.4px">'+period+' \u00b7 '+R.nRetested+' athletes tested twice</div>'+
       '</div>'+
     '</div>'+
     banner+
-    '<div style="margin-top:'+(studioTeamPhoto?'5':'12')+'px">'+section('broad')+section('fly')+section('vert',true)+'</div>'+
+    '<div style="margin-top:'+(studioTeamPhoto?'5':'12')+'px">'+section('broad')+section('fly')+section('vert',true)+footnote+'</div>'+
     '<div style="position:absolute;bottom:12px;left:32px;right:32px;display:flex;align-items:center;justify-content:flex-end;gap:10px;border-top:1px solid '+line+';padding-top:8px">'+
       '<span style="color:'+muted+';font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase">Powered by</span>'+
       '<img src="'+fptLogo+'" crossorigin="anonymous" style="height:44px;width:auto;object-fit:contain"/>'+
@@ -1077,17 +1261,12 @@ async function _downloadReport(){
   holder.style.cssText='position:fixed;left:-9999px;top:0;width:540px;height:675px';
   var clone=card.cloneNode(true); holder.appendChild(clone); document.body.appendChild(holder);
   function cleanup(){ if(holder.parentNode) document.body.removeChild(holder); }
+  var _w=_saveWinPreOpen();
   try {
     var canvas=await window.html2canvas(clone,{scale:2,useCORS:true,backgroundColor:null,logging:false});
     cleanup();
-    var dataUrl=canvas.toDataURL('image/png');
-    var fname='FPT_'+(currentTeam||'team').replace(/\s+/g,'_')+'_Report.png';
-    var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;
-    if(isIOS){
-      var w=window.open('','_blank');
-      if(w) w.document.write('<title>'+fname+'</title><img src="'+dataUrl+'" style="width:100%"/><p style="font-family:sans-serif;text-align:center">Long-press the image \u2192 Add to Photos</p>');
-    } else { var a=document.createElement('a'); a.href=dataUrl; a.download=fname; a.click(); }
-  } catch(e){ cleanup(); console.error(e); alert('Could not generate the image.'); }
+    _savePng(canvas.toDataURL('image/png'), 'FPT_'+(currentTeam||'team').replace(/\s+/g,'_')+'_Report.png', _w);
+  } catch(e){ cleanup(); if(_w)try{_w.close();}catch(_x){} console.error(e); alert('Could not generate the image.'); }
 }
 
 function renderStudio(){
@@ -1120,6 +1299,13 @@ function renderStudio(){
         '<div id="spot-stage-scale" style="transform-origin:top left;width:540px">'+_teamReportCardHtml()+'</div>'+
       '</div>';
     html += '<button class="btn btn-team" id="report-dl-btn" style="width:100%">Download Team Report (1080×1350)</button>';
+    html += '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">'+
+      '<div style="font-weight:800;font-size:13px;margin-bottom:6px">Parent Reports (printable)</div>'+
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">One-pager per athlete: test 1 \u2192 test 2, best + average, team percentile. Opens in a new tab \u2014 print or save as PDF from there.</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn" id="parent-one-btn" style="flex:1">This Athlete</button>'+
+        '<button class="btn btn-team" id="parent-all-btn" style="flex:1">All Retested Athletes</button>'+
+      '</div></div>';
     html += '</div>';
     _scheduleStudioFit();
     return html;
