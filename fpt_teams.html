@@ -101,6 +101,7 @@ canvas{max-width:100%;border-radius:8px;margin-top:8px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
@@ -1196,7 +1197,7 @@ function _parentAthleteBlock(ath, pageBreak){
     '</div>'+
     '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#888">'+
       '<span>Questions or continued training: Frye Performance Training \u00b7 Fryeperformance@gmail.com</span>'+
-      '<span style="display:inline-flex;align-items:center;gap:6px;font-weight:800;letter-spacing:1px;text-transform:uppercase">Powered by <img src="'+location.origin+'/fpt_logo_dark.png" style="height:30px;width:auto;vertical-align:middle" crossorigin="anonymous"/></span>'+
+      '<span style="display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px;font-weight:800;letter-spacing:1px;text-transform:uppercase">Powered by<img src="'+location.origin+'/fpt_logo_dark.png" style="height:48px;width:auto" crossorigin="anonymous"/></span>'+
     '</div>'+
   '</div>';
 }
@@ -1206,11 +1207,83 @@ function _seasonLabel(dateStr){
   var y = dateStr ? dateStr.slice(0,4) : String(new Date().getFullYear());
   return {season:season, year:y};
 }
-// ── Bulk parent-report PDFs (Aug 2026, per Chris): one real PDF per athlete,
-// zipped for the coach. Zip + inner folder: "{Season} {Year} {Team}";
-// each file: "{Athlete} {Year} {Sport} parent report.pdf".
+// ── Vector parent-report PDFs (Aug 2026): true selectable-text PDFs built with
+// jsPDF text/table APIs (no rasterizing) — these get emailed, so recipients can
+// select, search, and copy. Helvetica in the PDF body (core font); the FPT logo
+// image carries the branding. Layout verified via text-extraction test.
+var _logoCache=null;
+async function _fetchLogoDataUrl(){
+  if(_logoCache) return _logoCache;
+  var resp=await fetch(location.origin+'/fpt_logo_dark.png');
+  var blob=await resp.blob();
+  var dataUrl=await new Promise(function(r){ var fr=new FileReader(); fr.onload=function(){r(fr.result);}; fr.readAsDataURL(blob); });
+  var dims=await new Promise(function(r){ var im=new Image(); im.onload=function(){r({w:im.naturalWidth,h:im.naturalHeight});}; im.onerror=function(){r({w:1,h:1});}; im.src=dataUrl; });
+  _logoCache={dataUrl:dataUrl,w:dims.w,h:dims.h};
+  return _logoCache;
+}
+function _parentPdfDoc(ath, logo){
+  var EXN={broad:'Broad Jump',fly:'10-10 Fly',vert:'Skyhook'};
+  var doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'});
+  var M=40, W=612-2*M;
+  var sl=_seasonLabel(_reportDates().retest), dates=_reportDates();
+  doc.setTextColor(160,32,32); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+  doc.text((currentTeam||'').toUpperCase(), M, 50, {charSpace:1.2});
+  doc.setTextColor(17,17,17); doc.setFontSize(26);
+  doc.text(ath.toUpperCase(), M, 76);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(90,90,90);
+  doc.text(sl.season+' '+sl.year+' Performance Report', 612-M, 50, {align:'right'});
+  doc.text(fmtDate(dates.intake)+'  to  '+fmtDate(dates.retest), 612-M, 62, {align:'right'});
+  doc.setDrawColor(17,17,17); doc.setLineWidth(2); doc.line(M, 86, 612-M, 86);
+  var body=[], rowSigns=[];
+  ['broad','fly','vert'].forEach(function(id){
+    var c=getSessionComparison(ath,id);
+    if(!c){ body.push([EXN[id],'Only one testing session recorded','','','']); rowSigns.push(0); return; }
+    var p=_teamPercentileBest(ath,id);
+    body.push([
+      EXN[id],
+      _spotVal(id,c.intakeBest)+'\navg '+_spotVal(id,c.intakeAvg),
+      _spotVal(id,c.retestBest)+'\navg '+_spotVal(id,c.retestAvg),
+      (c.bestImpPct>=0?'+':'')+c.bestImpPct.toFixed(1)+'%\navg '+(c.avgImpPct>=0?'+':'')+c.avgImpPct.toFixed(1)+'%',
+      p==null?'\u2014':'Improved more than\n'+p+'% of the team'
+    ]);
+    rowSigns.push(c.bestImpPct>0?1:(c.bestImpPct<0?-1:0));
+  });
+  doc.autoTable({
+    startY:100, margin:{left:M,right:M}, theme:'plain',
+    head:[['EXERCISE','INTAKE BEST','FINAL BEST','CHANGE (BEST)','VS. TEAM']],
+    body:body,
+    styles:{font:'helvetica',fontSize:10,cellPadding:{top:8,bottom:8,left:6,right:6},textColor:[17,17,17],lineColor:[221,221,221]},
+    headStyles:{fontSize:7,textColor:[136,136,136],fontStyle:'bold'},
+    bodyStyles:{lineWidth:{top:0.5}},
+    columnStyles:{0:{fontStyle:'bold',cellWidth:95},1:{halign:'center'},2:{halign:'center'},3:{halign:'center'},4:{halign:'center',fontSize:8.5,textColor:[85,85,85]}},
+    didParseCell:function(d){
+      if(d.section==='body'&&d.column.index===3&&rowSigns[d.row.index]!==0){
+        d.cell.styles.textColor=rowSigns[d.row.index]>0?[21,128,61]:[185,28,28];
+        d.cell.styles.fontStyle='bold';
+      }
+    }
+  });
+  var y=doc.lastAutoTable.finalY+20;
+  doc.setFillColor(244,244,244); doc.rect(M, y, W, 58, 'F');
+  doc.setFillColor(160,32,32); doc.rect(M, y, 4, 58, 'F');
+  doc.setTextColor(30,30,30); doc.setFontSize(9.5); doc.setFont('helvetica','normal');
+  var blurb=doc.splitTextToSize('This '+sl.season.toLowerCase()+'\u2019s training was built to make athletes faster, stronger, and more explosive \u2014 and the numbers above are '+ath.split(' ')[0]+'\u2019s. Consistent off-season training is how these gains keep compounding.', W-30);
+  doc.text(blurb, M+16, y+18);
+  y+=84;
+  doc.setFontSize(8); doc.setTextColor(136,136,136);
+  doc.text('Questions or continued training: Frye Performance Training \u00b7 Fryeperformance@gmail.com', M, y);
+  if(logo&&logo.dataUrl){
+    var lh=40, lw=logo.w/logo.h*lh;
+    doc.setFont('helvetica','bold');
+    doc.text('POWERED BY', 612-M, y, {align:'right'});
+    doc.addImage(logo.dataUrl,'PNG', 612-M-lw, y+6, lw, lh);
+  } else {
+    doc.setFont('helvetica','bold'); doc.text('POWERED BY FPT', 612-M, y, {align:'right'});
+  }
+  return doc;
+}
 async function _bulkParentPdfs(){
-  if(!window.html2canvas || !window.JSZip || !window.jspdf){ alert('Still loading libraries \u2014 try again in a moment.'); return; }
+  if(!window.JSZip || !window.jspdf || !window.jspdf.jsPDF.API.autoTable){ alert('Still loading libraries \u2014 try again in a moment.'); return; }
   var list=(state.athletes[currentTeam]||[]).filter(function(a){
     if(REPORT_EXCLUDE.indexOf(a)>-1) return false;
     return getSessionComparison(a,'broad')||getSessionComparison(a,'fly')||getSessionComparison(a,'vert');
@@ -1221,25 +1294,16 @@ async function _bulkParentPdfs(){
   var sl=_seasonLabel(_reportDates().retest);
   var sport=(currentTeam||'').trim().split(/\s+/).pop()||'';
   var folderName=sl.season+' '+sl.year+' '+currentTeam;
-  var holder=document.createElement('div');
-  holder.style.cssText='position:fixed;left:-10000px;top:0;width:760px;background:#fff';
-  document.body.appendChild(holder);
+  var logo=null;
+  try{ logo=await _fetchLogoDataUrl(); }catch(e){ console.warn('logo fetch failed',e); }
   var zip=new JSZip(), folder=zip.folder(folderName);
   try{
     for(var i=0;i<list.length;i++){
       var ath=list[i];
-      if(btn) btn.textContent='Rendering '+(i+1)+'/'+list.length+'\u2026';
-      holder.innerHTML=_parentAthleteBlock(ath, false);
-      await Promise.all(Array.prototype.map.call(holder.querySelectorAll('img'),function(img){
-        return (img.complete&&img.naturalWidth>0)?null:new Promise(function(r){ img.onload=r; img.onerror=r; setTimeout(r,3000); });
-      }));
-      var canvas=await window.html2canvas(holder.firstElementChild,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false});
-      var pdf=new window.jspdf.jsPDF({unit:'pt',format:'letter',orientation:'portrait'});
-      var imgW=540, imgH=canvas.height/canvas.width*imgW;
-      if(imgH>720){ imgH=720; imgW=canvas.width/canvas.height*imgH; }
-      pdf.addImage(canvas.toDataURL('image/png'),'PNG',(612-imgW)/2,36,imgW,imgH);
+      if(btn) btn.textContent='Building '+(i+1)+'/'+list.length+'\u2026';
+      var pdf=_parentPdfDoc(ath, logo);
       folder.file(ath+' '+sl.year+' '+sport+' parent report.pdf', pdf.output('blob'));
-    }
+      if(i%5===4) await new Promise(function(r){ setTimeout(r,0); });   // keep UI responsive
     if(btn) btn.textContent='Building zip\u2026';
     var zipBlob=await zip.generateAsync({type:'blob'});
     var url=URL.createObjectURL(zipBlob);
@@ -1248,7 +1312,7 @@ async function _bulkParentPdfs(){
     setTimeout(function(){ URL.revokeObjectURL(url); },10000);
     showToast(list.length+' parent reports zipped.');
   }catch(e){ console.error(e); alert('Bulk PDF failed partway \u2014 try again.'); }
-  finally{ if(holder.parentNode) document.body.removeChild(holder); if(btn) btn.textContent=origLabel; }
+  finally{ if(btn) btn.textContent=origLabel; }
 }
 function _openParentDoc(title, body){
   var w=window.open('','_blank');
