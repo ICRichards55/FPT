@@ -168,6 +168,10 @@ function doGet(e) {
       profiles:     teamsLive.profiles     || {},
       achievements: teamsLive.achievements || [],
       branding:     teamsLive.branding     || {},
+      sessions:     teamsLive.sessions     || {},
+      teamMeta:     teamsLive.teamMeta     || {},
+      required:     teamsLive.required     || {},
+      attendance:   teamsLive.attendance   || [],
       entries:      (teamsHistorical.entries || []).concat(teamsLive.entries || [])
     };
 
@@ -493,6 +497,33 @@ function handleTeamsPost_(payload) {
     liveEntries = liveEntries.filter(function(e) { return !_tDelSet[e.id]; });
   }
 
+  // ── Attendance (Aug 2026): one row per check-in, union-merged by id with
+  // deletedAttendanceIds tombstones — same clobber protection as entries, so two
+  // coaches marking the same session from different phones merge cleanly.
+  var attendance = (payload.attendance || []).slice();
+  var _aSeen = {};
+  attendance.forEach(function(a) { if (a && a.id != null) _aSeen[a.id] = true; });
+  (existingTeams_.attendance || []).forEach(function(a) {
+    if (!a || a.id == null || _aSeen[a.id]) return;
+    _aSeen[a.id] = true;
+    attendance.push(a);
+  });
+  var _aDel = payload.deletedAttendanceIds || [];
+  if (_aDel.length) {
+    var _aDelSet = {};
+    _aDel.forEach(function(id) { if (id != null) _aDelSet[id] = true; });
+    attendance = attendance.filter(function(a) { return !_aDelSet[a.id]; });
+  }
+  var sessionsState = (payload.sessions !== undefined && payload.sessions !== null)
+                      ? payload.sessions
+                      : (existingTeams_.sessions || {});
+  var teamMetaState = (payload.teamMeta !== undefined && payload.teamMeta !== null)
+                      ? payload.teamMeta
+                      : (existingTeams_.teamMeta || {});
+  var requiredState = (payload.required !== undefined && payload.required !== null)
+                      ? payload.required
+                      : (existingTeams_.required || {});
+
   // GUARD: never let a save empty a populated teams roster (blocks empty-state overwrite / wipe)
   var _inTeams  = (payload.teams || []).length;
   var _curTeams = (existingTeams_.teams || []).length;
@@ -514,6 +545,10 @@ function handleTeamsPost_(payload) {
     profiles:     payload.profiles     || {},
     achievements: payload.achievements || [],
     branding:     brandingState,
+    sessions:     sessionsState,
+    teamMeta:     teamMetaState,
+    required:     requiredState,
+    attendance:   attendance,
     entries:      liveEntries
   };
 

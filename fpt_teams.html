@@ -131,6 +131,7 @@ canvas{max-width:100%;border-radius:8px;margin-top:8px}
     <button class="tab" id="tab-roster" data-tab="roster">Roster</button>
     <button class="tab" id="tab-ach" data-tab="ach">Achievements</button>
     <button class="tab" id="tab-studio" data-tab="studio">Studio</button>
+    <button class="tab" id="tab-att" data-tab="att">Attendance</button>
     <button class="tab" id="tab-settings" data-tab="settings">Settings</button>
   </div>
   <div id="app"></div>
@@ -142,7 +143,51 @@ canvas{max-width:100%;border-radius:8px;margin-top:8px}
 var API_URL = 'https://script.google.com/macros/s/AKfycbwirWQw0-hVSwIwVl6RCWcclgRNKia7awlfUzImilUiKjNKtSapuCueOaTwWgTlJ6Uk/exec';
 
 // ── STATE ─────────────────────────────────────────────────────────────────
-var state = { teams:[], athletes:{}, profiles:{}, entries:[], achievements:[], branding:{} };
+var state = { teams:[], athletes:{}, profiles:{}, entries:[], achievements:[], branding:{}, sessions:{}, attendance:[], teamMeta:{}, required:{} };
+
+// ── Org / sport / season identity model (Aug 2026) ──────────────────────────
+// A "team" entry is one SEASON of an organization's sport program. teamMeta[key] =
+// {org, sport, season, year, archived}. The key stays the storage identifier
+// (entries/attendance/etc. hang off it unchanged); org and sport are explicit
+// fields — multi-word sports like "Track & Field" are first-class, and the org is
+// ready to become an access-control scope (athletic director sees all of their
+// school's teams). Legacy teams are backfilled by splitting the name on load.
+function _meta(key){
+  var m=(state.teamMeta&&state.teamMeta[key]);
+  if(m&&m.org!=null) return m;
+  if(m&&m.name){ // transitional shape from an earlier draft — split it
+    var parts=m.name.trim().split(/\s+/);
+    return {org:parts.slice(0,-1).join(' ')||m.name, sport:parts.length>1?parts[parts.length-1]:'', season:m.season||'', year:m.year||'', archived:!!m.archived};
+  }
+  var parts=String(key).trim().split(/\s+/);
+  return {org:parts.slice(0,-1).join(' ')||key, sport:parts.length>1?parts[parts.length-1]:'', season:'', year:'', archived:false};
+}
+function _orgSport(m){ return (m.org+' '+m.sport).trim(); }
+function _teamDisplay(key){
+  var m=_meta(key);
+  return _orgSport(m)+(m.season||m.year?(' \u00b7 '+(m.season?m.season+' ':'')+(m.year||'')):'');
+}
+function _allOrgs(){
+  var o={}; (state.teams||[]).forEach(function(t){ var m=_meta(t); if(m.org) o[m.org]=1; });
+  return Object.keys(o).sort();
+}
+function _activeTeams(){ return (state.teams||[]).filter(function(t){ return !_meta(t).archived; }); }
+function _archivedTeams(){ return (state.teams||[]).filter(function(t){ return _meta(t).archived; }); }
+function _migrateTeamMeta(){
+  state.teamMeta=state.teamMeta||{}; state.required=state.required||{};
+  (state.teams||[]).forEach(function(t){
+    if(state.teamMeta[t]) return;
+    // derive season/year from this team's most recent data, if any
+    var dates=[];
+    (state.entries||[]).forEach(function(e){ if((state.athletes[t]||[]).indexOf(e.athlete)>-1&&e.date) dates.push(e.date); });
+    (state.attendance||[]).forEach(function(a){ if(a.team===t&&a.date) dates.push(a.date); });
+    dates.sort();
+    var sl=_seasonLabel(dates[dates.length-1]||new Date().toISOString().slice(0,10));
+    var parts=t.trim().split(/\s+/);
+    state.teamMeta[t]={org:parts.slice(0,-1).join(' ')||t, sport:parts.length>1?parts[parts.length-1]:'', season:sl.season, year:sl.year, archived:false};
+    if(state.required[t]==null) state.required[t]=2;
+  });
+}
 var currentTab = 'log';
 var currentTeam = '';
 var TODAY = (function(){
@@ -207,11 +252,10 @@ function _handleDelegatedClick(e, prevent){
   else if(id==='branding-save-btn'){ if(prevent)e.preventDefault(); _saveBranding(); }
   else if(id==='spot-dl-btn'){ if(prevent)e.preventDefault(); _downloadSpotlight(); }
   else if(id==='report-dl-btn'){ if(prevent)e.preventDefault(); _downloadReport(); }
-  else if(id==='parent-one-btn'){ if(prevent)e.preventDefault(); openParentReport(studioAthlete); }
+  else if(id==='parent-one-btn'){ if(prevent)e.preventDefault(); downloadParentPdf(studioAthlete); }
   else if(id==='bulk-all-btn'){ if(prevent)e.preventDefault(); _bulkDownloadCards(false); }
   else if(id==='bulk-pos-btn'){ if(prevent)e.preventDefault(); _bulkDownloadCards(true); }
   else if(id==='parent-zip-btn'){ if(prevent)e.preventDefault(); _bulkParentPdfs(); }
-  else if(id==='parent-all-btn'){ if(prevent)e.preventDefault(); openAllParentReports(); }
 }
 document.addEventListener('click', function(e){ _handleDelegatedClick(e,false); });
 document.addEventListener('touchend', function(e){ _handleDelegatedClick(e,true); });
@@ -255,18 +299,24 @@ async function loadData(){
       if(!state.branding) state.branding = {};
     }
   } catch(e){ console.error('Load failed', e); }
-  if(gotData){_loadedOK=true;_setLoadWarning(false);}
+  if(gotData){_loadedOK=true; _migrateTeamMeta();_setLoadWarning(false);}
   else if(!_loadedOK){_setLoadWarning(true);}
   render();
 }
 
 var _pendingTeamDeletes=[];
+var _pendingAttDeletes=[];
+var attDate=new Date().toISOString().slice(0,10);
+// Parent report content toggles (Studio checkboxes): which sections make the PDF
+var parentOpts={broad:true,fly:true,vert:true,attendance:true};
+function toggleParentOpt(k,v){ parentOpts[k]=!!v; }
+var attSession='';
 function saveData(){
   if(!_loadedOK){_setLoadWarning(true);try{showToast('Data has not loaded yet - refresh before making changes.');}catch(e){alert('Data has not loaded yet - refresh before making changes.');}return;}
-  var payload = Object.assign({ type:'teams' }, state, { deletedTeamEntryIds:_pendingTeamDeletes.slice() });
+  var payload = Object.assign({ type:'teams' }, state, { deletedTeamEntryIds:_pendingTeamDeletes.slice(), deletedAttendanceIds:_pendingAttDeletes.slice() });
   fetch(API_URL, { method:'POST', body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
-    .then(function(d){ if(d.ok){ _pendingTeamDeletes=[]; } else { console.error('Save failed', d); try{showToast('Save was rejected by the server - your change may not be stored.');}catch(e){} } })
+    .then(function(d){ if(d.ok){ _pendingTeamDeletes=[]; _pendingAttDeletes=[]; } else { console.error('Save failed', d); try{showToast('Save was rejected by the server - your change may not be stored.');}catch(e){} } })
     .catch(function(e){ console.error('Save error', e); try{showToast('Save failed - check connection and retry.');}catch(e2){} });
 }
 
@@ -334,6 +384,7 @@ function render(){
   else if(currentTab==='roster') app.innerHTML = renderRoster();
   else if(currentTab==='ach') app.innerHTML = renderAch();
   else if(currentTab==='studio') app.innerHTML = renderStudio();
+  else if(currentTab==='att') app.innerHTML = renderAttendance();
   else if(currentTab==='settings') app.innerHTML = renderSettings();
 }
 
@@ -342,8 +393,13 @@ function renderTeamSelector(){
   if(!state.teams.length){
     return '<div class="team-selector-wrap"><div class="team-selector-label">Team</div><div style="color:var(--muted);font-size:13px">No teams yet — add one in Settings.</div></div>';
   }
-  var chips = state.teams.map(function(t){
-    return '<button class="team-chip'+(t===currentTeam?' active':'')+'" onclick="selectTeam(\''+_esc(t)+'\')">'+t+'</button>';
+  var vis=_activeTeams().slice();
+  if(currentTeam && vis.indexOf(currentTeam)===-1 && state.teams.indexOf(currentTeam)>-1) vis.push(currentTeam); // opened archive
+  var chips = vis.map(function(t){
+    var m=_meta(t);
+    var label=_esc(_orgSport(m))+(m.archived?' <span style="font-size:10px;opacity:.7">('+(m.season?m.season+' ':'')+m.year+' \u00b7 archived)</span>'
+      : (vis.filter(function(x){return _orgSport(_meta(x))===_orgSport(m);}).length>1?' <span style="font-size:10px;opacity:.7">'+(m.season?m.season+' ':'')+m.year+'</span>':''));
+    return '<button class="team-chip'+(t===currentTeam?' active':'')+'" onclick="selectTeam(\''+_esc(t)+'\')">'+label+'</button>';
   }).join('');
   return '<div class="team-selector-wrap"><div class="team-selector-label">Team</div><div class="team-chips">'+chips+'</div></div>';
 }
@@ -588,13 +644,21 @@ function renameTeamAthlete(oldName){
 }
 function deleteTeamAthlete(name){
   var n = state.entries.filter(function(e){ return e.athlete===name; }).length;
-  if(!confirm('Delete '+name+' and their '+n+' entr'+(n===1?'y':'ies')+'? This cannot be undone.')) return;
+  var na = _attFor(currentTeam).filter(function(a){ return a.athlete===name; }).length;
+  if(!confirm('Delete '+name+'? This removes their '+n+' entr'+(n===1?'y':'ies')+' and '+na+' attendance record'+(na===1?'':'s')+' and cannot be undone.')) return;
+  var typed=prompt('To confirm, type delete');
+  if(typed==null || typed.trim().toLowerCase()!=='delete'){ showToast('Deletion cancelled \u2014 nothing was changed.'); return; }
   var roster = state.athletes[currentTeam]||[];
   var idx = roster.indexOf(name);
   if(idx>-1) roster.splice(idx,1);
   state.entries = state.entries.filter(function(e){
     if(e.athlete!==name) return true;
     if(e.id!=null && _pendingTeamDeletes.indexOf(e.id)===-1) _pendingTeamDeletes.push(e.id);
+    return false;
+  });
+  state.attendance=(state.attendance||[]).filter(function(a){
+    if(!(a.team===currentTeam && a.athlete===name)) return true;
+    if(a.id!=null && _pendingAttDeletes.indexOf(a.id)===-1) _pendingAttDeletes.push(a.id);
     return false;
   });
   delete state.profiles[name];
@@ -831,39 +895,125 @@ function renderSettings(){
 
 // Settings — Teams
 var newTeamName = '';
+var newTeamSeason='', newTeamYear='', newTeamOrg='', newTeamSport='';
 function renderSettingsTeams(){
+  var seasons=['Winter','Spring','Summer','Fall'];
+  var yrs=[]; var thisYr=new Date().getFullYear();
+  for(var y=thisYr-1;y<=thisYr+1;y++) yrs.push(String(y));
   var html = '<div class="panel"><div class="panel-title">Manage Teams</div>';
-  html += '<div class="form-group"><div class="form-label">New Team Name</div>'+
-    '<input class="form-input" id="new-team-input" placeholder="e.g. West Allegheny Volleyball" value="'+newTeamName.replace(/"/g,'&quot;')+'" oninput="newTeamName=this.value"/>'+
-    '</div>'+
+  html += '<div class="form-group"><div class="form-label">New Team \u00b7 Organization / Sport / Season / Year</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+    '<input class="form-input" list="org-list" style="flex:2;min-width:140px" placeholder="Organization (e.g. West Allegheny)" value="'+newTeamOrg.replace(/"/g,'&quot;')+'" oninput="newTeamOrg=this.value"/>'+
+    '<datalist id="org-list">'+_allOrgs().map(function(o){return '<option value="'+_esc(o)+'"></option>';}).join('')+'</datalist>'+
+    '<input class="form-input" style="flex:1;min-width:110px" placeholder="Sport (e.g. Track & Field)" value="'+newTeamSport.replace(/"/g,'&quot;')+'" oninput="newTeamSport=this.value"/>'+
+    '<select class="form-input" style="flex:1;min-width:90px" onchange="newTeamSeason=this.value">'+'<option value="">Season</option>'+seasons.map(function(s){return '<option'+(s===newTeamSeason?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
+    '<select class="form-input" style="flex:1;min-width:80px" onchange="newTeamYear=this.value">'+'<option value="">Year</option>'+yrs.map(function(y){return '<option'+(y===newTeamYear?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+    '</div></div>'+
     '<button class="btn btn-team" id="team-save-btn" style="width:100%;margin-top:4px">Add Team</button>';
 
-  if(state.teams.length){
-    html += '<div class="section-divider"></div>';
-    html += '<div style="display:flex;flex-direction:column;gap:8px">';
-    state.teams.forEach(function(t){
-      var count = (state.athletes[t]||[]).length;
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px">'+
-        '<div><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:15px">'+t+'</div>'+
-        '<div style="font-size:12px;color:var(--muted)">'+count+' athlete'+(count!==1?'s':'')+'</div></div>'+
-        '<button class="action-btn" style="color:var(--red)" onclick="deleteTeam(\''+_esc(t)+'\')">Delete</button>'+
-        '</div>';
-    });
-    html += '</div>';
-  } else {
-    html += '<div class="empty" style="padding:16px 0">No teams yet.</div>';
+  function card(t, archived){
+    var m=_meta(t), count=(state.athletes[t]||[]).length;
+    var stale='';
+    if(!archived){
+      var dates=[];
+      (state.entries||[]).forEach(function(e){ if((state.athletes[t]||[]).indexOf(e.athlete)>-1&&e.date) dates.push(e.date); });
+      (state.attendance||[]).forEach(function(a){ if(a.team===t&&a.date) dates.push(a.date); });
+      dates.sort();
+      if(dates.length){
+        var ageDays=(Date.now()-new Date(dates[dates.length-1]+'T12:00:00').getTime())/86400000;
+        if(ageDays>42) stale='<span style="font-size:10px;color:var(--amber,#d97706);margin-left:6px">season over?</span>';
+      }
+    }
+    var actions = archived
+      ? '<button class="action-btn" onclick="restoreTeam(\''+_esc(t)+'\')">Restore</button>'+
+        '<button class="action-btn" onclick="selectTeam(\''+_esc(t)+'\')">Open</button>'
+      : '<button class="action-btn" onclick="startNewSeason(\''+_esc(t)+'\')">New Season</button>'+
+        '<button class="action-btn" onclick="archiveTeam(\''+_esc(t)+'\')">Archive</button>'+
+        '<button class="action-btn" style="color:var(--red)" onclick="deleteTeam(\''+_esc(t)+'\')">Delete</button>';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px">'+
+      '<div style="min-width:0"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(_orgSport(m))+' <span style="font-weight:600;font-size:12px;color:var(--muted)">'+(m.season?m.season+' ':'')+(m.year||'')+'</span>'+stale+'</div>'+
+      '<div style="font-size:12px;color:var(--muted)">'+count+' athlete'+(count!==1?'s':'')+'</div></div>'+
+      '<div style="display:flex;gap:4px;flex-shrink:0">'+actions+'</div></div>';
+  }
+  var act=_activeTeams(), arc=_archivedTeams();
+  html += '<div class="section-divider"></div><div class="form-label" style="margin-bottom:6px">Active</div>';
+  html += act.length ? '<div style="display:flex;flex-direction:column;gap:8px">'+act.map(function(t){return card(t,false);}).join('')+'</div>'
+                     : '<div class="empty" style="padding:10px 0">No active teams.</div>';
+  if(arc.length){
+    html += '<div class="section-divider"></div><div class="form-label" style="margin-bottom:6px">Previous Seasons</div>';
+    // historical browser: Organization -> Sport -> Year -> Season (cascading)
+    var selO=window._histOrg||'', selSp=window._histSport||'', selY=window._histYear||'', selS=window._histSeason||'';
+    function opts(pick){ var o={}; arc.forEach(function(t){ var m=_meta(t);
+      if(selO&&m.org!==selO&&pick!=='org') return;
+      if(selSp&&m.sport!==selSp&&pick!=='sport'&&pick!=='org') return;
+      if(selY&&m.year!==selY&&(pick==='season')===false&&pick!=='org'&&pick!=='sport'&&pick!=='year') return;
+      o[m[pick]]=1; }); return Object.keys(o).filter(Boolean).sort(); }
+    html += '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">'+
+      '<select class="form-input" style="flex:2;min-width:130px" onchange="window._histOrg=this.value;window._histSport=\'\';window._histYear=\'\';window._histSeason=\'\';render()"><option value="">All organizations</option>'+opts('org').map(function(n){return '<option'+(n===selO?' selected':'')+'>'+_esc(n)+'</option>';}).join('')+'</select>'+
+      '<select class="form-input" style="flex:1;min-width:100px" onchange="window._histSport=this.value;window._histYear=\'\';window._histSeason=\'\';render()"><option value="">Sport</option>'+opts('sport').map(function(n){return '<option'+(n===selSp?' selected':'')+'>'+_esc(n)+'</option>';}).join('')+'</select>'+
+      '<select class="form-input" style="flex:1;min-width:80px" onchange="window._histYear=this.value;window._histSeason=\'\';render()"><option value="">Year</option>'+opts('year').map(function(y){return '<option'+(y===selY?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+      '<select class="form-input" style="flex:1;min-width:90px" onchange="window._histSeason=this.value;render()"><option value="">Season</option>'+opts('season').map(function(s){return '<option'+(s===selS?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
+      '</div>';
+    var filtered=arc.filter(function(t){ var m=_meta(t);
+      return (!selO||m.org===selO)&&(!selSp||m.sport===selSp)&&(!selY||m.year===selY)&&(!selS||m.season===selS); });
+    html += filtered.length ? '<div style="display:flex;flex-direction:column;gap:8px">'+filtered.map(function(t){return card(t,true);}).join('')+'</div>'
+                            : '<div class="empty" style="padding:10px 0">No seasons match.</div>';
   }
   html += '</div>';
   return html;
 }
+function archiveTeam(key){
+  if(!confirm('Archive '+_teamDisplay(key)+'? It moves to Previous Seasons \u2014 fully reversible, nothing is deleted.')) return;
+  state.teamMeta[key]=Object.assign({},_meta(key),{archived:true});
+  if(currentTeam===key) currentTeam='';
+  saveData(); showToast('Archived.'); render();
+}
+function restoreTeam(key){
+  state.teamMeta[key]=Object.assign({},_meta(key),{archived:false});
+  saveData(); showToast('Restored to Active.'); render();
+}
+function startNewSeason(key){
+  var m=_meta(key);
+  var season=prompt('New season for '+_orgSport(m)+' (Winter / Spring / Summer / Fall):','');
+  if(season==null) return; season=season.trim();
+  if(['Winter','Spring','Summer','Fall'].indexOf(season)===-1){ alert('Season must be Winter, Spring, Summer, or Fall.'); return; }
+  var year=prompt('Year:', String(new Date().getFullYear()));
+  if(year==null) return; year=year.trim();
+  if(!/^20\d\d$/.test(year)){ alert('Enter a 4-digit year.'); return; }
+  var newKey=_orgSport(m)+' \u2014 '+season+' '+year;
+  if(state.teams.indexOf(newKey)>-1){ alert('That season already exists.'); return; }
+  state.teams.push(newKey);
+  state.teamMeta[newKey]={org:m.org, sport:m.sport, season:season, year:year, archived:false};
+  state.athletes[newKey]=(state.athletes[key]||[]).slice();          // roster carries (profiles are global by athlete)
+  if(state.sessions&&state.sessions[key]) state.sessions[newKey]=state.sessions[key].slice();
+  state.required[newKey]=state.required[key]!=null?state.required[key]:2;
+  if(state.branding&&state.branding[key]) state.branding[newKey]=JSON.parse(JSON.stringify(state.branding[key]));
+  saveData();
+  if(confirm('Season created. Archive '+_teamDisplay(key)+' now?')){
+    state.teamMeta[key]=Object.assign({},_meta(key),{archived:true});
+    if(currentTeam===key) currentTeam='';
+    saveData();
+  }
+  currentTeam=newKey; showToast(season+' '+year+' season started.'); render();
+}
 
 function saveNewTeam(){
-  var name = newTeamName.trim();
-  if(!name){ alert('Enter a team name.'); return; }
-  if(state.teams.indexOf(name)>-1){ alert('Team already exists.'); return; }
-  state.teams.push(name);
-  if(!state.athletes[name]) state.athletes[name] = [];
-  newTeamName = '';
+  var org = newTeamOrg.trim(), sport = newTeamSport.trim();
+  if(!org||!sport){ alert('Enter an organization and a sport.'); return; }
+  if(!newTeamSeason||!newTeamYear){ alert('Pick a season and year for this team.'); return; }
+  var key = org+' '+sport+' \u2014 '+newTeamSeason+' '+newTeamYear;
+  if(state.teams.indexOf(key)>-1){ alert('That team season already exists.'); return; }
+  state.teams.push(key);
+  state.teamMeta=state.teamMeta||{};
+  state.teamMeta[key]={org:org, sport:sport, season:newTeamSeason, year:newTeamYear, archived:false};
+  state.required=state.required||{}; state.required[key]=2;
+  if(!state.athletes[key]) state.athletes[key] = [];
+  // same organization already here? offer to copy its branding (colors + logo)
+  var sib=(state.teams||[]).filter(function(t){ return t!==key && _meta(t).org===org && state.branding && state.branding[t]; });
+  if(sib.length && confirm('Copy branding (colors + logo) from '+_teamDisplay(sib[sib.length-1])+'?')){
+    state.branding[key]=JSON.parse(JSON.stringify(state.branding[sib[sib.length-1]]));
+  }
+  newTeamOrg=''; newTeamSport=''; newTeamSeason=''; newTeamYear='';
   saveData(); showToast('Team added!'); render();
 }
 
@@ -1098,7 +1248,8 @@ async function _bulkDownloadCards(positiveOnly){
     var zipBlob=await zip.generateAsync({type:'blob'});
     var url=URL.createObjectURL(zipBlob);
     var a=document.createElement('a');
-    a.href=url; a.download='FPT_'+(currentTeam||'team').replace(/\s+/g,'_')+'_Cards'+(positiveOnly?'_Positive':'')+'.zip';
+    var _bn=_teamLabelBits();
+    a.href=url; a.download='FPT_'+(_bn.name||'team').replace(/\s+/g,'_')+'_'+_bn.season+_bn.year+'_Cards'+(positiveOnly?'_Positive':'')+'.zip';
     a.click();
     setTimeout(function(){ URL.revokeObjectURL(url); },10000);
     showToast(list.length+' cards zipped.');
@@ -1150,57 +1301,171 @@ function _teamPercentileBest(ath, id){
   var below=peers.filter(function(p){return p.imp<mine.imp;}).length;
   return Math.round(below/(peers.length-1)*100);
 }
-function _parentAthleteBlock(ath, pageBreak){
-  var EXN={broad:'Broad Jump',fly:'10-10 Fly',vert:'Skyhook'};
-  var rows='';
-  ['broad','fly','vert'].forEach(function(id){
-    var c=getSessionComparison(ath,id);
-    if(!c){
-      rows+='<tr><td style="padding:10px 8px;font-weight:800">'+EXN[id]+'</td><td colspan="5" style="padding:10px 8px;color:#888">Only one testing session recorded</td></tr>';
-      return;
-    }
-    function cell(v){ return _spotVal(id,v); }
-    function delta(pct){
-      var col=pct>0?'#15803d':(pct<0?'#b91c1c':'#777');
-      var arrow=pct>0?'\u25B2':(pct<0?'\u25BC':'\u2013');
-      return '<span style="color:'+col+';font-weight:900">'+arrow+' '+(pct>=0?'+':'')+pct.toFixed(1)+'%</span>';
-    }
-    var pctile=_teamPercentileBest(ath,id);
-    rows+='<tr style="border-top:1px solid #ddd">'+
-      '<td style="padding:10px 8px;font-weight:800;white-space:nowrap">'+EXN[id]+'</td>'+
-      '<td style="padding:10px 8px;text-align:center">'+cell(c.intakeBest)+'<div style="font-size:9px;color:#888">avg '+cell(c.intakeAvg)+'</div></td>'+
-      '<td style="padding:10px 8px;text-align:center;color:#888">\u2192</td>'+
-      '<td style="padding:10px 8px;text-align:center;font-weight:900">'+cell(c.retestBest)+'<div style="font-size:9px;color:#888">avg '+cell(c.retestAvg)+'</div></td>'+
-      '<td style="padding:10px 8px;text-align:center">'+delta(c.bestImpPct)+'<div style="font-size:9px;color:#888">avg '+(c.avgImpPct>=0?'+':'')+c.avgImpPct.toFixed(1)+'%</div></td>'+
-      '<td style="padding:10px 8px;text-align:center;font-size:11px;color:#555">'+(pctile==null?'\u2014':'Improved more than<br><b>'+pctile+'%</b> of the team')+'</td>'+
-    '</tr>';
-  });
-  var dates=_reportDates();
-  return '<div style="'+(pageBreak?'page-break-after:always;':'')+'max-width:720px;margin:0 auto;padding:34px 26px;font-family:\'Barlow Condensed\',Arial,sans-serif;color:#111">'+
-    '<div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px solid #111;padding-bottom:8px">'+
-      '<div>'+
-        '<div style="font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#a02020">'+currentTeam+'</div>'+
-        '<div style="font-size:34px;font-weight:900;text-transform:uppercase;letter-spacing:-1px;line-height:.95">'+ath+'</div>'+
-      '</div>'+
-      '<div style="font-size:11px;color:#555;text-align:right">Summer Performance Report<br>'+fmtDate(dates.intake)+' \u2192 '+fmtDate(dates.retest)+'</div>'+
-    '</div>'+
-    '<table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:15px">'+
-      '<tr style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#888">'+
-        '<td style="padding:4px 8px">Exercise</td><td style="padding:4px 8px;text-align:center">Intake Best</td><td></td>'+
-        '<td style="padding:4px 8px;text-align:center">Final Best</td><td style="padding:4px 8px;text-align:center">Change (best)</td>'+
-        '<td style="padding:4px 8px;text-align:center">Vs. Team</td></tr>'+
-      rows+
-    '</table>'+
-    '<div style="margin-top:20px;padding:12px 14px;background:#f4f4f4;border-left:4px solid #a02020;font-size:13px;line-height:1.45">'+
-      'This summer\u2019s training was built to make athletes faster, stronger, and more explosive \u2014 and the numbers above are '+
-      ath.split(' ')[0]+'\u2019s. Consistent off-season training is how these gains keep compounding.'+
-    '</div>'+
-    '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#888">'+
-      '<span>Questions or continued training: Frye Performance Training \u00b7 Fryeperformance@gmail.com</span>'+
-      '<span style="display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px;font-weight:800;letter-spacing:1px;text-transform:uppercase">Powered by<img src="'+location.origin+'/fpt_logo_dark.png" style="height:48px;width:auto" crossorigin="anonymous"/></span>'+
-    '</div>'+
-  '</div>';
+// ════════ ATTENDANCE (Aug 2026, for the club baseball team & beyond) ════════
+// One row per check-in: {id, team, athlete, date, session}. Weekly compliance:
+// 2+ distinct dates in a Mon-Sun week = green, 1 = amber, 0 = red (binary — no
+// excuse tracking by design). Sessions are per-team labels, editable, scalable
+// to any schedule even though this team runs one 7-8 PM slot per day.
+function _attUid(){ return 'att-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8); }
+function _teamSessions(){ return (state.sessions&&state.sessions[currentTeam])||[]; }
+function _attFor(team){ return (state.attendance||[]).filter(function(a){ return a.team===team; }); }
+function _mondayOf(dateStr){
+  var d=new Date(dateStr+'T12:00:00');
+  var day=(d.getDay()+6)%7;                       // Mon=0
+  d.setDate(d.getDate()-day);
+  return d.toISOString().slice(0,10);
 }
+function _attWeeks(){
+  var recs=_attFor(currentTeam);
+  if(!recs.length) return [];
+  var dates=recs.map(function(a){return a.date;}).sort();
+  var start=_mondayOf(dates[0]);
+  var end=_mondayOf(dates[dates.length-1]);
+  var today=_mondayOf(new Date().toISOString().slice(0,10));
+  if(today>end) end=today;                        // show current (possibly red) week
+  var weeks=[], d=new Date(start+'T12:00:00');
+  while(d.toISOString().slice(0,10)<=end && weeks.length<60){
+    weeks.push(d.toISOString().slice(0,10));
+    d.setDate(d.getDate()+7);
+  }
+  return weeks;
+}
+function _athWeekDates(ath, weekMon){
+  var wk={}; _attFor(currentTeam).forEach(function(a){
+    if(a.athlete===ath && _mondayOf(a.date)===weekMon) wk[a.date]=1;
+  });
+  return Object.keys(wk).length;
+}
+function _teamRequired(){ var r=(state.required&&state.required[currentTeam]); return (r>=1&&r<=7)?r:2; }
+// Requirement-anchored scale (Aug 2026): green = met the team's weekly requirement,
+// amber = attended but short, red = absent. Consistent at any requirement value.
+function _attColor(n){ var req=_teamRequired(); return n>=req?'#15803d':(n>0?'#d97706':'#b91c1c'); }
+function editRequired(){
+  var v=prompt('Required sessions per week for '+_teamDisplay(currentTeam)+':', String(_teamRequired()));
+  if(v==null) return;
+  var n=parseInt(v,10);
+  if(!(n>=1&&n<=7)){ alert('Enter a number from 1 to 7.'); return; }
+  state.required=state.required||{}; state.required[currentTeam]=n;
+  saveData(); render();
+}
+function _athSeasonStats(ath){
+  var req=_teamRequired();
+  var weeks=_attWeeks(), green=0, streak=0, total={};
+  weeks.forEach(function(w){ if(_athWeekDates(ath,w)>=req) green++; });
+  for(var i=weeks.length-1;i>=0;i--){ if(_athWeekDates(ath,weeks[i])>=req) streak++; else break; }
+  _attFor(currentTeam).forEach(function(a){ if(a.athlete===ath) total[a.date+a.session]=1; });
+  return { weeks:weeks.length, green:green, streak:streak, sessions:Object.keys(total).length };
+}
+function toggleAttendance(ath){
+  var session=_currentAttSession();
+  var existing=(state.attendance||[]).filter(function(a){
+    return a.team===currentTeam && a.athlete===ath && a.date===attDate && a.session===session;
+  });
+  if(existing.length){
+    state.attendance=state.attendance.filter(function(a){
+      if(existing.indexOf(a)===-1) return true;
+      if(a.id!=null && _pendingAttDeletes.indexOf(a.id)===-1) _pendingAttDeletes.push(a.id);
+      return false;
+    });
+  } else {
+    state.attendance.push({ id:_attUid(), team:currentTeam, athlete:ath, date:attDate, session:session });
+  }
+  saveData(); render();
+}
+function _currentAttSession(){
+  var sessions=_teamSessions();
+  if(attSession && sessions.indexOf(attSession)>-1) return attSession;
+  var wd=new Date(attDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'long'}).slice(0,3).toLowerCase();
+  var m=sessions.filter(function(s){ return s.toLowerCase().indexOf(wd)>-1; });
+  return m[0]||sessions[0]||'';
+}
+function editSessions(){
+  var cur=_teamSessions();
+  var v=prompt('Session options for '+currentTeam+' (comma-separated):', cur.join(', ')||'Mon 7-8 PM, Tue 7-8 PM, Thu 7-8 PM, Fri 7-8 PM');
+  if(v==null) return;
+  state.sessions=state.sessions||{};
+  state.sessions[currentTeam]=v.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  saveData(); render();
+}
+function setAttDate(v){ attDate=v||attDate; attSession=''; render(); }
+function setAttSession(v){ attSession=v; render(); }
+function renderAttendance(){
+  var roster=(state.athletes[currentTeam]||[]).slice().sort(function(a,b){ return lastName(a).localeCompare(lastName(b)); });
+  var sessions=_teamSessions();
+  var curSession=_currentAttSession();
+  var selHtml=sessions.length
+    ? '<select id="att-session" class="input" style="flex:1" onchange="setAttSession(this.value)">'+sessions.map(function(s){
+        return '<option'+(s===curSession?' selected':'')+'>'+_esc(s)+'</option>';
+      }).join('')+'</select>'
+    : '<span style="color:var(--muted);font-size:13px;flex:1">No sessions configured yet</span>';
+  var marked={};
+  _attFor(currentTeam).forEach(function(a){ if(a.date===attDate) (marked[a.session]=marked[a.session]||{})[a.athlete]=1; });
+  var html=
+    '<div class="card"><div style="font-weight:800;font-size:15px;margin-bottom:8px">Roll Call</div>'+
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">'+
+      '<input type="date" class="input" value="'+attDate+'" onchange="setAttDate(this.value)" style="flex:1"/>'+selHtml+
+      '<button class="btn btn-ghost btn-sm" onclick="editSessions()">\u2699 Sessions</button>'+
+      '<button class="btn btn-ghost btn-sm" onclick="editRequired()">'+_teamRequired()+'/wk</button>'+
+    '</div>'+
+    '<div id="att-chips" style="display:flex;flex-wrap:wrap;gap:8px">'+
+      roster.map(function(a){
+        var on=marked[curSession]&&marked[curSession][a];
+        return '<button class="btn btn-sm'+(on?' btn-team':'')+'" onclick="toggleAttendance(\''+_esc(a)+'\')">'+_esc(a)+(on?' \u2713':'')+'</button>';
+      }).join('')+
+    '</div>'+
+    '<div style="color:var(--muted);font-size:11px;margin-top:8px">Tap a name to mark present for the selected date + session. Tap again to unmark. Saves instantly.</div></div>';
+  // compliance grid
+  var weeks=_attWeeks();
+  if(weeks.length){
+    var hdr=weeks.map(function(w,i){ return '<th style="padding:3px 2px;font-size:9px;color:var(--muted)">'+(i+1)+'</th>'; }).join('');
+    var rows=roster.map(function(a){
+      var st=_athSeasonStats(a);
+      var cells=weeks.map(function(w){
+        var n=_athWeekDates(a,w);
+        return '<td style="padding:2px"><div title="'+w+': '+n+' day'+(n===1?'':'s')+'" style="width:16px;height:16px;border-radius:3px;background:'+_attColor(n)+'"></div></td>';
+      }).join('');
+      return '<tr><td style="padding:3px 8px 3px 0;font-size:12px;font-weight:700;white-space:nowrap"><a href="#" onclick="downloadParentPdf(\''+_esc(a)+'\');return false;" style="color:inherit;text-decoration:none">'+_esc(a)+'</a></td>'+cells+
+        '<td style="padding:3px 0 3px 10px;font-size:11px;color:var(--muted);white-space:nowrap">'+st.green+'/'+st.weeks+' wks \u00b7 '+st.sessions+' sess</td></tr>';
+    }).join('');
+    html+='<div class="card" style="overflow-x:auto"><div style="font-weight:800;font-size:15px;margin-bottom:2px">Weekly Compliance</div>'+
+      '<div style="color:var(--muted);font-size:11px;margin-bottom:8px">Green = met the '+_teamRequired()+'/week requirement \u00b7 Amber = attended but short \u00b7 Red = absent. Tap an athlete\u2019s name for their report PDF.</div>'+
+      '<table style="border-collapse:collapse"><tr><th></th>'+hdr+'<th></th></tr>'+rows+'</table>'+
+      '<div style="color:var(--muted);font-size:11px;margin-top:10px">Reports (single or bulk zip) live in Studio \u2192 Parent Reports \u2014 pick which sections to include there.</div></div>';
+  } else {
+    html+='<div class="card" style="color:var(--muted);font-size:13px">No attendance recorded yet \u2014 the compliance grid appears after the first roll call.</div>';
+  }
+  return html;
+}
+// ── Attendance parent PDF: week strip across the top, numbered + color-coded ──
+// Shared attendance drawing: numbered week strip (green/amber/red) + summary lines.
+// Returns the y coordinate after the section.
+function _drawAttendanceSection(doc, ath, y, M, W){
+  var weeks=_attWeeks(), st=_athSeasonStats(ath);
+  doc.setFontSize(7); doc.setTextColor(136,136,136); doc.setFont('helvetica','bold');
+  var _req=_teamRequired();
+  doc.text('WEEK-BY-WEEK ATTENDANCE  (GREEN = MET THE '+_req+'/WEEK REQUIREMENT \u00b7 AMBER = SHORT \u00b7 RED = ABSENT)', M, y+4);
+  y+=12;
+  var per=Math.min(weeks.length,17)||1, cell=Math.min(28,Math.floor(W/per)-2), gap=4;
+  weeks.forEach(function(w,i){
+    var row=Math.floor(i/17), col=i%17;
+    var x=M+col*(cell+gap), yy=y+row*(cell+gap+10);
+    var n=_athWeekDates(ath,w);
+    var c=n>=_req?[21,128,61]:(n>0?[217,119,6]:[185,28,28]);
+    doc.setFillColor(c[0],c[1],c[2]);
+    doc.roundedRect(x,yy,cell,cell,3,3,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text(String(i+1), x+cell/2, yy+cell/2+3.5, {align:'center'});
+  });
+  y+=Math.ceil(weeks.length/17)*(cell+gap+10)+16;
+  doc.setTextColor(17,17,17); doc.setFontSize(13); doc.setFont('helvetica','bold');
+  var pct=st.weeks?Math.round(st.green/st.weeks*100):0;
+  doc.text('Met the '+_req+'/week requirement in '+st.green+' of '+st.weeks+' weeks  ('+pct+'%)', M, y);
+  y+=16;
+  doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.setTextColor(85,85,85);
+  doc.text('Total sessions attended: '+st.sessions+'      Current streak: '+st.streak+' week'+(st.streak===1?'':'s'), M, y);
+  return y;
+}
+
 function _seasonLabel(dateStr){
   var m = dateStr ? parseInt(dateStr.slice(5,7),10) : (new Date().getMonth()+1);
   var season = (m>=3&&m<=5)?'Spring':(m>=6&&m<=8)?'Summer':(m>=9&&m<=11)?'Fall':'Winter';
@@ -1221,21 +1486,25 @@ async function _fetchLogoDataUrl(){
   _logoCache={dataUrl:dataUrl,w:dims.w,h:dims.h};
   return _logoCache;
 }
-function _parentPdfDoc(ath, logo){
+function _parentPdfDoc(ath, logo, opts){
+  opts=opts||parentOpts;
+  var exIds=['broad','fly','vert'].filter(function(id){ return opts[id]; });
+  var withAtt=!!opts.attendance && _attWeeks().length>0;
   var EXN={broad:'Broad Jump',fly:'10-10 Fly',vert:'Skyhook'};
   var doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'});
   var M=40, W=612-2*M;
-  var sl=_seasonLabel(_reportDates().retest), dates=_reportDates();
+  var _b=_teamLabelBits(), sl={season:_b.season,year:_b.year}, dates=_reportDates();
   doc.setTextColor(160,32,32); doc.setFont('helvetica','bold'); doc.setFontSize(9);
-  doc.text((currentTeam||'').toUpperCase(), M, 50, {charSpace:1.2});
+  doc.text((_b.name||'').toUpperCase(), M, 50, {charSpace:1.2});
   doc.setTextColor(17,17,17); doc.setFontSize(26);
   doc.text(ath.toUpperCase(), M, 76);
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(90,90,90);
-  doc.text(sl.season+' '+sl.year+' Performance Report', 612-M, 50, {align:'right'});
+  var repName = exIds.length&&withAtt ? 'Athlete Report' : (withAtt&&!exIds.length ? 'Attendance Report' : 'Performance Report');
+  doc.text(sl.season+' '+sl.year+' '+repName, 612-M, 50, {align:'right'});
   doc.text(fmtDate(dates.intake)+'  to  '+fmtDate(dates.retest), 612-M, 62, {align:'right'});
   doc.setDrawColor(17,17,17); doc.setLineWidth(2); doc.line(M, 86, 612-M, 86);
   var body=[], rowSigns=[];
-  ['broad','fly','vert'].forEach(function(id){
+  exIds.forEach(function(id){
     var c=getSessionComparison(ath,id);
     if(!c){ body.push([EXN[id],'Only one testing session recorded','','','']); rowSigns.push(0); return; }
     var p=_teamPercentileBest(ath,id);
@@ -1248,8 +1517,10 @@ function _parentPdfDoc(ath, logo){
     ]);
     rowSigns.push(c.bestImpPct>0?1:(c.bestImpPct<0?-1:0));
   });
+  var y=100;
+  if(exIds.length){
   doc.autoTable({
-    startY:100, margin:{left:M,right:M}, theme:'plain',
+    startY:y, margin:{left:M,right:M}, theme:'plain',
     head:[['EXERCISE','INTAKE BEST','FINAL BEST','CHANGE (BEST)','VS. TEAM']],
     body:body,
     styles:{font:'helvetica',fontSize:10,cellPadding:{top:8,bottom:8,left:6,right:6},textColor:[17,17,17],lineColor:[221,221,221]},
@@ -1263,11 +1534,16 @@ function _parentPdfDoc(ath, logo){
       }
     }
   });
-  var y=doc.lastAutoTable.finalY+20;
+  y=doc.lastAutoTable.finalY+18;
+  }
+  if(withAtt){ y=_drawAttendanceSection(doc, ath, y, M, W)+18; }
   doc.setFillColor(244,244,244); doc.rect(M, y, W, 58, 'F');
   doc.setFillColor(160,32,32); doc.rect(M, y, 4, 58, 'F');
   doc.setTextColor(30,30,30); doc.setFontSize(9.5); doc.setFont('helvetica','normal');
-  var blurb=doc.splitTextToSize('This '+sl.season.toLowerCase()+'\u2019s training was built to make athletes faster, stronger, and more explosive \u2014 and the numbers above are '+ath.split(' ')[0]+'\u2019s. Consistent off-season training is how these gains keep compounding.', W-30);
+  var blurbTxt = exIds.length
+    ? 'This '+sl.season.toLowerCase()+'\u2019s training was built to make athletes faster, stronger, and more explosive \u2014 and the numbers above are '+ath.split(' ')[0]+'\u2019s. Consistent off-season training is how these gains keep compounding.'
+    : 'Showing up is the first rep. '+_teamRequired()+' session'+(_teamRequired()===1?'':'s')+' a week is the commitment that turns training into results \u2014 this is '+ath.split(' ')[0]+'\u2019s season at a glance.';
+  var blurb=doc.splitTextToSize(blurbTxt, W-30);
   doc.text(blurb, M+16, y+18);
   y+=84;
   doc.setFontSize(8); doc.setTextColor(136,136,136);
@@ -1282,26 +1558,43 @@ function _parentPdfDoc(ath, logo){
   }
   return doc;
 }
+function _teamLabelBits(){
+  var m=_meta(currentTeam);
+  var sl=(m.season&&m.year)?{season:m.season,year:m.year}:_seasonLabel(_reportDates().retest);
+  return {season:sl.season, year:sl.year, name:_orgSport(m), sport:m.sport||''};
+}
+async function downloadParentPdf(ath){
+  if(!ath){ alert('Pick an athlete first.'); return; }
+  if(!window.jspdf || !window.jspdf.jsPDF.API.autoTable){ alert('Still loading \u2014 try again in a moment.'); return; }
+  var exIds=['broad','fly','vert'].filter(function(id){ return parentOpts[id]; });
+  if(!exIds.length && !parentOpts.attendance){ alert('Pick at least one section for the report.'); return; }
+  var logo=null; try{ logo=await _fetchLogoDataUrl(); }catch(e){}
+  var b=_teamLabelBits();
+  _parentPdfDoc(ath, logo, parentOpts).save(ath+' '+b.year+' '+b.sport+' parent report.pdf');
+}
 async function _bulkParentPdfs(){
   if(!window.JSZip || !window.jspdf || !window.jspdf.jsPDF.API.autoTable){ alert('Still loading libraries \u2014 try again in a moment.'); return; }
+  var exIds=['broad','fly','vert'].filter(function(id){ return parentOpts[id]; });
+  if(!exIds.length && !parentOpts.attendance){ alert('Pick at least one section for the report.'); return; }
   var list=(state.athletes[currentTeam]||[]).filter(function(a){
     if(REPORT_EXCLUDE.indexOf(a)>-1) return false;
-    return getSessionComparison(a,'broad')||getSessionComparison(a,'fly')||getSessionComparison(a,'vert');
+    if(exIds.length) return exIds.some(function(id){ return getSessionComparison(a,id); });
+    return _attFor(currentTeam).some(function(r){ return r.athlete===a; });   // attendance-only mode
   }).sort(function(a,b){ return lastName(a).localeCompare(lastName(b)); });
-  if(!list.length){ alert('No retested athletes yet.'); return; }
+  if(!list.length){ alert('No matching athletes for the selected sections.'); return; }
   var btn=document.getElementById('parent-zip-btn');
   var origLabel=btn?btn.textContent:'';
-  var sl=_seasonLabel(_reportDates().retest);
-  var sport=(currentTeam||'').trim().split(/\s+/).pop()||'';
-  var folderName=sl.season+' '+sl.year+' '+currentTeam;
+  var b=_teamLabelBits(), sl={year:b.year};
+  var sport=b.sport;
+  var folderName=b.season+' '+b.year+' '+b.name;
   var logo=null;
   try{ logo=await _fetchLogoDataUrl(); }catch(e){ console.warn('logo fetch failed',e); }
-  var zip=new JSZip(), folder=zip.folder(folderName);
+  var zip=new JSZip(), folder=zip.folder(folderName);   // folderName from _teamLabelBits below
   try{
     for(var i=0;i<list.length;i++){
       var ath=list[i];
       if(btn) btn.textContent='Building '+(i+1)+'/'+list.length+'\u2026';
-      var pdf=_parentPdfDoc(ath, logo);
+      var pdf=_parentPdfDoc(ath, logo, parentOpts);
       folder.file(ath+' '+sl.year+' '+sport+' parent report.pdf', pdf.output('blob'));
       if(i%5===4) await new Promise(function(r){ setTimeout(r,0); });   // keep UI responsive
     }
@@ -1314,31 +1607,6 @@ async function _bulkParentPdfs(){
     showToast(list.length+' parent reports zipped.');
   }catch(e){ console.error(e); alert('Bulk PDF failed partway \u2014 try again.'); }
   finally{ if(btn) btn.textContent=origLabel; }
-}
-function _openParentDoc(title, body){
-  var w=window.open('','_blank');
-  if(!w){ alert('Pop-up blocked. Allow pop-ups for this site, then try again.'); return; }
-  w.document.write('<html><head><title>'+title+'</title><meta name="viewport" content="width=device-width, initial-scale=1"/>'+
-    '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;800;900&display=swap" rel="stylesheet"/>'+
-    '<style>body{margin:0;background:#fff}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>'+
-    '</head><body>'+body+
-    '<div style="text-align:center;padding:18px;font-family:Arial,sans-serif;font-size:12px;color:#888" class="noprint"><style>@media print{.noprint{display:none}}</style>'+
-    'Use your browser\u2019s Print (\u2318P / Share \u2192 Print) to print or save as PDF.</div>'+
-    '</body></html>');
-  w.document.close();
-}
-function openParentReport(ath){
-  if(!ath){ alert('Pick an athlete first.'); return; }
-  _openParentDoc('FPT Report \u2014 '+ath, _parentAthleteBlock(ath, false));
-}
-function openAllParentReports(){
-  var list=(state.athletes[currentTeam]||[]).filter(function(a){
-    if(REPORT_EXCLUDE.indexOf(a)>-1) return false;
-    return getSessionComparison(a,'broad')||getSessionComparison(a,'fly')||getSessionComparison(a,'vert');
-  }).sort(function(a,b){ return lastName(a).localeCompare(lastName(b)); });
-  if(!list.length){ alert('No retested athletes yet.'); return; }
-  var body=list.map(function(a,i){ return _parentAthleteBlock(a, i<list.length-1); }).join('');
-  _openParentDoc('FPT Parent Reports \u2014 '+currentTeam+' ('+list.length+')', body);
 }
 
 async function _downloadSpotlight(){
@@ -1517,15 +1785,16 @@ function renderStudio(){
         '<div id="spot-stage-scale" style="transform-origin:top left;width:540px">'+_teamReportCardHtml()+'</div>'+
       '</div>';
     html += '<button class="btn btn-team" id="report-dl-btn" style="width:100%">Download Team Report (1080×1350)</button>';
+    function _po(k,label){ return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;cursor:pointer"><input type="checkbox" '+(parentOpts[k]?'checked':'')+' onchange="toggleParentOpt(\''+k+'\',this.checked)"/>'+label+'</label>'; }
     html += '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">'+
-      '<div style="font-weight:800;font-size:13px;margin-bottom:6px">Parent Reports (printable)</div>'+
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">One-pager per athlete: intake \u2192 final, best + average, team percentile. Opens in a new tab \u2014 print or save as PDF from there.</div>'+
-      '<div style="display:flex;gap:8px">'+
-        '<button class="btn" id="parent-one-btn" style="flex:1">This Athlete</button>'+
-        '<button class="btn btn-team" id="parent-all-btn" style="flex:1">All Retested Athletes</button>'+
+      '<div style="font-weight:800;font-size:13px;margin-bottom:6px">Parent Reports (PDF)</div>'+
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Pick what goes on the report \u2014 any mix of tests and the attendance record. True selectable-text PDFs, ready to email.</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px">'+
+        _po('broad','Broad Jump')+_po('fly','10-10 Fly')+_po('vert','Skyhook')+_po('attendance','Attendance')+
       '</div>'+
-      '<div style="display:flex;gap:8px;margin-top:8px">'+
-        '<button class="btn btn-team" id="parent-zip-btn" style="flex:1">Download All as PDFs (.zip)</button>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn" id="parent-one-btn" style="flex:1">This Athlete (PDF)</button>'+
+        '<button class="btn btn-team" id="parent-zip-btn" style="flex:1">All Athletes (.zip)</button>'+
       '</div></div>';
     html += '</div>';
     _scheduleStudioFit();
