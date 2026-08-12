@@ -1304,6 +1304,7 @@ async function _bulkParentPdfs(){
       var pdf=_parentPdfDoc(ath, logo);
       folder.file(ath+' '+sl.year+' '+sport+' parent report.pdf', pdf.output('blob'));
       if(i%5===4) await new Promise(function(r){ setTimeout(r,0); });   // keep UI responsive
+    }
     if(btn) btn.textContent='Building zip\u2026';
     var zipBlob=await zip.generateAsync({type:'blob'});
     var url=URL.createObjectURL(zipBlob);
