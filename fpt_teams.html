@@ -100,6 +100,7 @@ canvas{max-width:100%;border-radius:8px;margin-top:8px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -208,6 +209,7 @@ function _handleDelegatedClick(e, prevent){
   else if(id==='parent-one-btn'){ if(prevent)e.preventDefault(); openParentReport(studioAthlete); }
   else if(id==='bulk-all-btn'){ if(prevent)e.preventDefault(); _bulkDownloadCards(false); }
   else if(id==='bulk-pos-btn'){ if(prevent)e.preventDefault(); _bulkDownloadCards(true); }
+  else if(id==='parent-zip-btn'){ if(prevent)e.preventDefault(); _bulkParentPdfs(); }
   else if(id==='parent-all-btn'){ if(prevent)e.preventDefault(); openAllParentReports(); }
 }
 document.addEventListener('click', function(e){ _handleDelegatedClick(e,false); });
@@ -563,6 +565,43 @@ function deleteEntry(id){
 }
 
 // ── ROSTER TAB ────────────────────────────────────────────────────────────
+// ── Roster management (Aug 2026): rename + delete, mirroring the gym portal ──
+// Both flow through the normal save pipeline so the server-side union-merge keeps
+// them durable: renames rewrite entries in place (same ids -> incoming wins on the
+// merge), deletions send tombstones so stale tabs can't resurrect the athlete.
+function renameTeamAthlete(oldName){
+  var newName = prompt('Rename "'+oldName+'" to:', oldName);
+  if(newName==null) return;
+  newName = newName.trim();
+  if(!newName || newName===oldName) return;
+  var roster = state.athletes[currentTeam]||[];
+  if(roster.indexOf(newName)>-1){ alert('"'+newName+'" is already on this roster.'); return; }
+  var idx = roster.indexOf(oldName);
+  if(idx===-1){ alert('Athlete not found on this team.'); return; }
+  roster[idx] = newName;
+  state.entries.forEach(function(e){ if(e.athlete===oldName) e.athlete = newName; });
+  if(state.profiles[oldName]){ state.profiles[newName] = state.profiles[oldName]; delete state.profiles[oldName]; }
+  (state.achievements||[]).forEach(function(a){ if(a && a.athlete===oldName) a.athlete = newName; });
+  if(studioAthlete===oldName) studioAthlete = newName;
+  saveData(); showToast('Renamed to '+newName+'.'); render();
+}
+function deleteTeamAthlete(name){
+  var n = state.entries.filter(function(e){ return e.athlete===name; }).length;
+  if(!confirm('Delete '+name+' and their '+n+' entr'+(n===1?'y':'ies')+'? This cannot be undone.')) return;
+  var roster = state.athletes[currentTeam]||[];
+  var idx = roster.indexOf(name);
+  if(idx>-1) roster.splice(idx,1);
+  state.entries = state.entries.filter(function(e){
+    if(e.athlete!==name) return true;
+    if(e.id!=null && _pendingTeamDeletes.indexOf(e.id)===-1) _pendingTeamDeletes.push(e.id);
+    return false;
+  });
+  delete state.profiles[name];
+  state.achievements = (state.achievements||[]).filter(function(a){ return !a || a.athlete!==name; });
+  if(studioAthlete===name) studioAthlete = '';
+  saveData(); showToast(name+' deleted.'); render();
+}
+
 function renderRoster(){
   var teamSel = renderTeamSelector();
   if(!currentTeam) return teamSel+'<div class="panel"><div class="empty">Select a team above.</div></div>';
@@ -592,6 +631,10 @@ function renderRoster(){
       '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'+
       '<button class="btn btn-ghost btn-sm" onclick="openReport(\''+_esc(name)+'\')">Report</button>'+
       '<button class="copy-btn" onclick="copyToGym(\''+_esc(name)+'\')">Copy to Gym</button>'+
+      '<div style="display:flex;gap:6px">'+
+        '<button class="btn btn-ghost btn-sm" onclick="renameTeamAthlete(\''+_esc(name)+'\')">\u270E Rename</button>'+
+        '<button class="btn btn-ghost btn-sm" style="color:#dc2626" onclick="deleteTeamAthlete(\''+_esc(name)+'\')">\u{1F5D1} Delete</button>'+
+      '</div>'+
       '</div></div></div>';
   }).join('');
 
@@ -914,13 +957,13 @@ function _spotBoxes(ath, P, positiveOnly){
     ['fly','10-10 Fly'],
     ['vert','Skyhook']
   ];
-  // Per exercise: BEST box + AVERAGE box, each with a colored delta chip vs test 1
+  // Per exercise: BEST box + AVERAGE box, each with a colored delta chip vs intake
   // (green = improved, red = regressed) once a retest session exists. Direction-aware.
   function chip(id, pct){
     if(pct==null) return '<div style="color:'+muted+';font-size:9px;font-weight:700;margin-top:2px">\u2014</div>';
     var col = pct>0 ? '#22c55e' : (pct<0 ? '#ef4444' : muted);
     var arrow = pct>0 ? '\u25B2' : (pct<0 ? '\u25BC' : '\u2013');
-    return '<div style="color:'+col+';font-size:10px;font-weight:900;margin-top:2px">'+arrow+' '+(pct>=0?'+':'')+pct.toFixed(1)+'% vs test 1</div>';
+    return '<div style="color:'+col+';font-size:10px;font-weight:900;margin-top:2px">'+arrow+' '+(pct>=0?'+':'')+pct.toFixed(1)+'% vs intake</div>';
   }
   var html = '';
   defs.forEach(function(d){
@@ -1142,8 +1185,8 @@ function _parentAthleteBlock(ath, pageBreak){
     '</div>'+
     '<table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:15px">'+
       '<tr style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:#888">'+
-        '<td style="padding:4px 8px">Exercise</td><td style="padding:4px 8px;text-align:center">Test 1 Best</td><td></td>'+
-        '<td style="padding:4px 8px;text-align:center">Test 2 Best</td><td style="padding:4px 8px;text-align:center">Change (best)</td>'+
+        '<td style="padding:4px 8px">Exercise</td><td style="padding:4px 8px;text-align:center">Intake Best</td><td></td>'+
+        '<td style="padding:4px 8px;text-align:center">Final Best</td><td style="padding:4px 8px;text-align:center">Change (best)</td>'+
         '<td style="padding:4px 8px;text-align:center">Vs. Team</td></tr>'+
       rows+
     '</table>'+
@@ -1153,9 +1196,59 @@ function _parentAthleteBlock(ath, pageBreak){
     '</div>'+
     '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#888">'+
       '<span>Questions or continued training: Frye Performance Training \u00b7 Fryeperformance@gmail.com</span>'+
-      '<span style="font-weight:800;letter-spacing:1px;text-transform:uppercase">Powered by FPT</span>'+
+      '<span style="display:inline-flex;align-items:center;gap:6px;font-weight:800;letter-spacing:1px;text-transform:uppercase">Powered by <img src="'+location.origin+'/fpt_logo_dark.png" style="height:30px;width:auto;vertical-align:middle" crossorigin="anonymous"/></span>'+
     '</div>'+
   '</div>';
+}
+function _seasonLabel(dateStr){
+  var m = dateStr ? parseInt(dateStr.slice(5,7),10) : (new Date().getMonth()+1);
+  var season = (m>=3&&m<=5)?'Spring':(m>=6&&m<=8)?'Summer':(m>=9&&m<=11)?'Fall':'Winter';
+  var y = dateStr ? dateStr.slice(0,4) : String(new Date().getFullYear());
+  return {season:season, year:y};
+}
+// ── Bulk parent-report PDFs (Aug 2026, per Chris): one real PDF per athlete,
+// zipped for the coach. Zip + inner folder: "{Season} {Year} {Team}";
+// each file: "{Athlete} {Year} {Sport} parent report.pdf".
+async function _bulkParentPdfs(){
+  if(!window.html2canvas || !window.JSZip || !window.jspdf){ alert('Still loading libraries \u2014 try again in a moment.'); return; }
+  var list=(state.athletes[currentTeam]||[]).filter(function(a){
+    if(REPORT_EXCLUDE.indexOf(a)>-1) return false;
+    return getSessionComparison(a,'broad')||getSessionComparison(a,'fly')||getSessionComparison(a,'vert');
+  }).sort(function(a,b){ return lastName(a).localeCompare(lastName(b)); });
+  if(!list.length){ alert('No retested athletes yet.'); return; }
+  var btn=document.getElementById('parent-zip-btn');
+  var origLabel=btn?btn.textContent:'';
+  var sl=_seasonLabel(_reportDates().retest);
+  var sport=(currentTeam||'').trim().split(/\s+/).pop()||'';
+  var folderName=sl.season+' '+sl.year+' '+currentTeam;
+  var holder=document.createElement('div');
+  holder.style.cssText='position:fixed;left:-10000px;top:0;width:760px;background:#fff';
+  document.body.appendChild(holder);
+  var zip=new JSZip(), folder=zip.folder(folderName);
+  try{
+    for(var i=0;i<list.length;i++){
+      var ath=list[i];
+      if(btn) btn.textContent='Rendering '+(i+1)+'/'+list.length+'\u2026';
+      holder.innerHTML=_parentAthleteBlock(ath, false);
+      await Promise.all(Array.prototype.map.call(holder.querySelectorAll('img'),function(img){
+        return (img.complete&&img.naturalWidth>0)?null:new Promise(function(r){ img.onload=r; img.onerror=r; setTimeout(r,3000); });
+      }));
+      var canvas=await window.html2canvas(holder.firstElementChild,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false});
+      var pdf=new window.jspdf.jsPDF({unit:'pt',format:'letter',orientation:'portrait'});
+      var imgW=540, imgH=canvas.height/canvas.width*imgW;
+      if(imgH>720){ imgH=720; imgW=canvas.width/canvas.height*imgH; }
+      pdf.addImage(canvas.toDataURL('image/png'),'PNG',(612-imgW)/2,36,imgW,imgH);
+      folder.file(ath+' '+sl.year+' '+sport+' parent report.pdf', pdf.output('blob'));
+    }
+    if(btn) btn.textContent='Building zip\u2026';
+    var zipBlob=await zip.generateAsync({type:'blob'});
+    var url=URL.createObjectURL(zipBlob);
+    var a=document.createElement('a');
+    a.href=url; a.download=folderName+'.zip'; a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); },10000);
+    showToast(list.length+' parent reports zipped.');
+  }catch(e){ console.error(e); alert('Bulk PDF failed partway \u2014 try again.'); }
+  finally{ if(holder.parentNode) document.body.removeChild(holder); if(btn) btn.textContent=origLabel; }
 }
 function _openParentDoc(title, body){
   var w=window.open('','_blank');
@@ -1276,7 +1369,7 @@ function _teamReportCardHtml(){
           '<span style="color:'+P.text+';font-size:20px;font-weight:900;line-height:1">'+_spotVal(id,d.teamAvgT2)+'</span>'+
         '</div>'+
         '<div style="color:'+arrowColor+';font-size:11px;font-weight:900;margin-top:1px">'+_fmtDelta(id,impDisp)+' ('+(d.avgImp>=0?'+':'')+d.avgImp.toFixed(1)+'%)</div>'+
-        '<div style="color:'+muted+';font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">team average \u00b7 test 1 \u2192 test 2</div>'+
+        '<div style="color:'+muted+';font-size:8.5px;text-transform:uppercase;letter-spacing:.5px">team average \u00b7 intake \u2192 final</div>'+
         '<div style="color:'+P.text+';font-size:13px;font-weight:900;line-height:1.35;margin-top:5px">'+d.improvedBest+'/'+d.n+' <span style="color:'+muted+';font-weight:700;font-size:9px;text-transform:uppercase">beat their best</span></div>'+
         '<div style="color:'+P.text+';font-size:13px;font-weight:900;line-height:1.35">'+d.improvedAvg+'/'+d.n+' <span style="color:'+muted+';font-weight:700;font-size:9px;text-transform:uppercase">raised their average</span></div>'+
       '</div>'+
@@ -1361,10 +1454,13 @@ function renderStudio(){
     html += '<button class="btn btn-team" id="report-dl-btn" style="width:100%">Download Team Report (1080×1350)</button>';
     html += '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">'+
       '<div style="font-weight:800;font-size:13px;margin-bottom:6px">Parent Reports (printable)</div>'+
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">One-pager per athlete: test 1 \u2192 test 2, best + average, team percentile. Opens in a new tab \u2014 print or save as PDF from there.</div>'+
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">One-pager per athlete: intake \u2192 final, best + average, team percentile. Opens in a new tab \u2014 print or save as PDF from there.</div>'+
       '<div style="display:flex;gap:8px">'+
         '<button class="btn" id="parent-one-btn" style="flex:1">This Athlete</button>'+
         '<button class="btn btn-team" id="parent-all-btn" style="flex:1">All Retested Athletes</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-top:8px">'+
+        '<button class="btn btn-team" id="parent-zip-btn" style="flex:1">Download All as PDFs (.zip)</button>'+
       '</div></div>';
     html += '</div>';
     _scheduleStudioFit();
