@@ -79,6 +79,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .action-btn-danger{color:#ff6b5c;border-color:rgba(255,107,92,.4)}
 .action-btn-danger:hover{background:rgba(255,107,92,.12)}
 .inactive-badge{font-family:'Barlow Condensed',sans-serif;font-size:10px;background:var(--surface3);color:var(--muted2);padding:2px 7px;border-radius:3px;letter-spacing:1px;text-transform:uppercase}
+.graduated-badge{font-family:'Barlow Condensed',sans-serif;font-size:10px;background:#2d3f5c;color:#8fb4e8;padding:2px 7px;border-radius:3px;letter-spacing:1px;text-transform:uppercase}
 .intake-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ach-item{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px}
 .ach-item-row{display:flex;justify-content:space-between;align-items:center}
@@ -632,8 +633,21 @@ async function editDataDelConfirm(id){
   var ok=await _saveWithDeletes();
   showToast(ok?'Entry deleted.':'Delete failed to save — retry');
 }
-function _rosterCardHtml(name,inactive,safe_name,sub,pills){
-  return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit Profile</button><button class="action-btn" data-editdata="'+safe_name+'">Edit Data</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="genAthleteFullReport(this.dataset.n)" data-n="'+safe_name+'">Full Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
+// Roster status (Aug 2026): three states, not a boolean.
+// - active:    normal, shows everywhere (leaderboards, BBB, birthdays, logging)
+// - inactive:  stopped coming to the gym. Drops off leaderboards, BBB, and birthdays.
+// - graduated: done playing sports, left on good terms. STAYS on all-time/monthly
+//   leaderboards (their record still counts) but drops off BBB and birthdays, same
+//   as inactive there. Mutually exclusive with inactive -- setting one clears the other.
+function _statusOf(p){ return p.graduated?'graduated':(p.inactive?'inactive':'active'); }
+function _rosterCardHtml(name,status,safe_name,sub,pills){
+  var badge = status==='graduated' ? '<span class="graduated-badge">Graduated</span>'
+            : status==='inactive'  ? '<span class="inactive-badge">Inactive</span>' : '';
+  var statusBtns =
+    status==='active'    ? '<button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'inactive\')" data-n="'+safe_name+'">Set Inactive</button><button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'graduated\')" data-n="'+safe_name+'">Set Graduated</button>'
+  : status==='inactive'  ? '<button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'active\')" data-n="'+safe_name+'">Reactivate</button><button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'graduated\')" data-n="'+safe_name+'">Set Graduated</button>'
+  : /* graduated */        '<button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'active\')" data-n="'+safe_name+'">Reactivate</button><button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'inactive\')" data-n="'+safe_name+'">Set Inactive</button>';
+  return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+badge+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit Profile</button><button class="action-btn" data-editdata="'+safe_name+'">Edit Data</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="genAthleteFullReport(this.dataset.n)" data-n="'+safe_name+'">Full Report</button>'+statusBtns+'<button class="action-btn" onclick="convertToAdult(this.dataset.n)" data-n="'+safe_name+'">Convert to Adult</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
 }
 function _firstNameOf(n){return String(n||'').trim().split(/\s+/)[0]||'';}
 function openDeleteAthlete(name){
@@ -682,12 +696,6 @@ function renderRoster(){
   if(q)sorted=sorted.filter(function(a){return a.toLowerCase().includes(q);});
   var search='<div class="panel" style="margin-bottom:12px"><input class="form-input" id="roster-search-input" style="width:100%" placeholder="Search athletes..." value="'+rosterQ.replace(/"/g,'&quot;')+'" oninput="rosterQ=this.value;updateRosterList();"/></div>';
   if(!sorted.length)return search+'<div class="panel"><div class="empty">No athletes match.</div></div>';
-  var cards=sorted.map(function(name){
-    var p=state.profiles[name]||{};var inactive=p.inactive;var safe_name=name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
-    var school=getAthleteSchool(name);var sub=[school,p.sports].filter(Boolean).join(' -- ');
-    var pills=EX_LIST.map(function(e){var pr=getPR(name,e.id);if(pr==null)return'';var cls=e.id==='fly'||e.id==='fly510'?'pill-fly':e.id==='broad'?'pill-broad':e.id==='rsi42'?'pill-vert':'pill-vert';var lbl=e.id==='fly510'?'5-10':e.id==='fly'?'10-10':e.id==='broad'?'Broad':e.id==='vert'?'Sky':'RSI';return'<span class="pr-pill '+cls+'" title="'+e.name+'">'+lbl+': '+fmtPR(e.id,pr)+'</span>';}).join('');
-    return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+(inactive?'<span class="inactive-badge">Inactive</span>':'')+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit Profile</button><button class="action-btn" data-editdata="'+safe_name+'">Edit Data</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="genAthleteFullReport(this.dataset.n)" data-n="'+safe_name+'">Full Report</button><button class="action-btn" onclick="toggleActive(this.dataset.n)" data-n="'+safe_name+'">'+(inactive?'Reactivate':'Set Inactive')+'</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
-  }).join('');
   return search+'<div id="roster-list-wrap">'+_rosterListHtml()+'</div>';
 }
 function _rosterListHtml(){
@@ -696,10 +704,10 @@ function _rosterListHtml(){
   if(q)sorted=sorted.filter(function(a){return a.toLowerCase().includes(q);});
   if(!sorted.length)return '<div class="panel"><div class="empty">No athletes match.</div></div>';
   var cards=sorted.map(function(name){
-    var p=state.profiles[name]||{};var inactive=p.inactive;var safe_name=name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    var p=state.profiles[name]||{};var status=_statusOf(p);var safe_name=name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     var school=getAthleteSchool(name);var sub=[school,p.sports].filter(Boolean).join(' -- ');
     var pills=EX_LIST.map(function(e){var pr=getPR(name,e.id);if(pr==null)return'';var cls=e.id==='fly'||e.id==='fly510'?'pill-fly':e.id==='broad'?'pill-broad':e.id==='rsi42'?'pill-vert':'pill-vert';var lbl=e.id==='fly510'?'5-10':e.id==='fly'?'10-10':e.id==='broad'?'Broad':e.id==='vert'?'Sky':'RSI';return'<span class="pr-pill '+cls+'" title="'+e.name+'">'+lbl+': '+fmtPR(e.id,pr)+'</span>';}).join('');
-    return _rosterCardHtml(name,inactive,safe_name,sub,pills);
+    return _rosterCardHtml(name,status,safe_name,sub,pills);
   }).join('');
   return '<div class="panel"><div class="panel-title">Athletes ('+sorted.length+')</div>'+cards+'</div>';
 }
@@ -714,7 +722,39 @@ function exportAthlete(name){
   entries.sort(function(a,b){return a.date.localeCompare(b.date);}).forEach(function(e){var ex=EX_LIST.filter(function(x){return x.id===e.exercise;})[0]||{name:e.exercise};rows.push([e.date,ex.name,e.exercise==='broad'?'':e.value,e.valueFt||'',e.valueIn||'',e.total||'']);});
   dlCSV(rows,'FPT_'+name.replace(/\s/g,'_')+'_'+TODAY+'.csv');
 }
-function toggleActive(name){if(!state.profiles[name])state.profiles[name]={};state.profiles[name].inactive=!state.profiles[name].inactive;saveData();render();}
+function setAthleteStatus(name,status){
+  if(!state.profiles[name])state.profiles[name]={};
+  var p=state.profiles[name];
+  p.inactive = (status==='inactive');
+  p.graduated = (status==='graduated');
+  saveData();
+  updateRosterList();
+}
+// Convert to Adult (Aug 2026): for an athlete who's done with sports but might keep
+// training at FPT as an adult -- sets graduated (their athlete PR history stays on
+// the all-time leaderboards, unaffected) and creates/updates the matching adult
+// record so their name, DOB, etc. don't need re-entering. Additive: the athlete
+// profile, entries, and PRs are never touched or removed. DOB carrying over also
+// means they keep showing up on the Birthday slide, now via the adult side.
+function convertToAdult(name){
+  var existing = state.adults && state.adults[name];
+  var msg = existing
+    ? 'Set '+name+' to Graduated and update their existing adult record?'
+    : 'Set '+name+' to Graduated and add them as an adult (so they can log Challenge results etc. without re-entering their info)?';
+  if(!confirm(msg)) return;
+  setAthleteStatus(name,'graduated');
+  var prof = state.profiles[name]||{};
+  var parts = String(name).trim().split(/\s+/);
+  if(!state.adults) state.adults={};
+  if(!state.guests) state.guests=[];
+  if(!state.guests.includes(name)) state.guests.push(name);
+  var rec = state.adults[name] || {firstName:parts[0]||name, lastName:parts.slice(1).join(' ')||'', isCoach:false, dob:''};
+  if(prof.dob && !rec.dob) rec.dob = prof.dob;   // don't clobber a DOB already set on the adult side
+  state.adults[name] = rec;
+  saveData();
+  showToast(name+' is now an adult'+(existing?' (updated)':'')+'.');
+  updateRosterList();
+}
 function dobStr(dob){
   if(!dob)return '';
   var parts=String(dob).split('-'); if(parts.length!==3)return dob;
