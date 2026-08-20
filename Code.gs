@@ -419,9 +419,25 @@ function handleGymPost_(payload) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // ── Profiles union-merge (Aug 2026): profiles was the one state slice never
+  // protected against the stale-tab clobber class -- a whole-object replace meant
+  // any device saving with an older in-memory copy of state.profiles could silently
+  // erase another device's bulk edits, including the Bulk Profile Editor's own saves.
+  // Keyed by athlete name: any profile present in current live but ABSENT from the
+  // incoming payload survives (protects against a stale/short payload deleting
+  // someone's data wholesale). Athletes present in both: incoming wins, same accepted
+  // last-write-wins tradeoff already used for single-record edits elsewhere in this
+  // file -- profile editing is a low-concurrency admin task, not a live multi-device
+  // logging flow, so the residual same-athlete-same-moment edit race is an accepted,
+  // rare edge case rather than something requiring a full field-level diff protocol.
+  var mergedProfiles = Object.assign({}, payload.profiles || {});
+  Object.keys(_curLive.profiles || {}).forEach(function(name) {
+    if (!(name in mergedProfiles)) mergedProfiles[name] = _curLive.profiles[name];
+  });
+
   var liveState = {
     athletes:       payload.athletes       || [],
-    profiles:       payload.profiles       || {},
+    profiles:       mergedProfiles,
     achievements:   payload.achievements   || [],
     guests:         payload.guests         || [],
     schoolLogos:    payload.schoolLogos    || {},

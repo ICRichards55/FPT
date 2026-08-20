@@ -369,11 +369,26 @@ function buildLeaderboard(slideId,ex,gender,entries){
   </div>`;
 }
 
+// Full offensive/defensive line abbreviation set (Aug 2026). Matched as whole tokens
+// (split on /,&+ and whitespace), not substring regex -- a bare "C" must mean Center,
+// not match inside "CB" (cornerback) or similar.
+const LINE_POSITIONS = new Set(['OL','DL','DE','DT','RT','RG','C','LG','LT']);
+function _hasLinePosition(posStr){
+  if(!posStr) return false;
+  const tokens = posStr.split(/[\/,&+]| and /i).map(t => t.trim().toUpperCase()).filter(Boolean);
+  return tokens.some(t => LINE_POSITIONS.has(t));
+}
 function getBigBoys(entries, exId){
-  // Athletes with OL or DL anywhere in their positions field (case-insensitive)
+  // Football offensive/defensive linemen ONLY (Aug 2026 fix): a line-position abbreviation
+  // is not sport-specific on its own -- a soccer "D" (defenseman) or similar can otherwise
+  // slip in. Require Football explicitly in the Sports field too.
   const p = state.profiles || {};
   const bigBoyNames = Object.entries(p)
-    .filter(([_, prof]) => !prof.inactive && prof.positions && /(OL|DL)/i.test(prof.positions))
+    .filter(([_, prof]) =>
+      !prof.inactive &&
+      _hasLinePosition(prof.positions) &&
+      prof.sports && /football/i.test(prof.sports)
+    )
     .map(([name]) => name);
   return getPRs(entries.filter(e => bigBoyNames.includes(e.athlete)), exId);
 }
