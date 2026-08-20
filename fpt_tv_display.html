@@ -95,10 +95,14 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .bd-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 14vh}
 .bd-title{font-family:'Permanent Marker',cursive;font-size:clamp(70px,13vw,210px);line-height:.82;color:#fff;text-transform:uppercase;margin-bottom:.4vh;flex-shrink:0}
 .bd-sub{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:clamp(18px,2.6vw,44px);letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:3vh;flex-shrink:0}
-.bd-list{display:grid;grid-template-columns:repeat(2,1fr);gap:.6vh 4vw;align-content:start;flex:1}
-.bd-item{display:flex;justify-content:space-between;align-items:baseline;gap:1vw;padding:.3vh 0;border-bottom:1px solid rgba(255,255,255,.15)}
-.bd-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(20px,3.1vw,53px);color:#fff;letter-spacing:1px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bd-date{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(15px,2.3vw,39px);color:rgba(255,255,255,.6);white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
+.bd-list{display:grid;gap:.6vh 4vw;align-content:start;flex:1}
+.bd-cols-1{grid-template-columns:1fr}
+.bd-cols-2{grid-template-columns:repeat(2,1fr)}
+.bd-item{display:flex;justify-content:space-between;align-items:baseline;gap:1vw;padding:.6vh 0;border-bottom:1px solid rgba(255,255,255,.15)}
+.bd-cols-1 .bd-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(32px,7vw,120px);color:#fff;letter-spacing:1px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-cols-1 .bd-date{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(20px,5vw,88px);color:rgba(255,255,255,.6);white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
+.bd-cols-2 .bd-name{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:clamp(20px,3.1vw,53px);color:#fff;letter-spacing:1px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-cols-2 .bd-date{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:clamp(15px,2.3vw,39px);color:rgba(255,255,255,.6);white-space:nowrap;letter-spacing:1px;text-transform:uppercase}
 .bd-today .bd-name,.bd-today .bd-date{color:#ffd34d}
 /* MONTHLY CHALLENGE (light slide) */
 .ch-row{display:flex;align-items:center;gap:1vw;padding:.12vh 0;border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0;container-type:size}
@@ -539,8 +543,13 @@ function birthdaysThisWeek(){
 }
 function fmtBday(bm,bd){var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return (MN[bm-1]||'')+' '+bd;}
 function buildBirthdays(){
+  // Adaptive layout (Aug 2026, matching the Challenge/Monthly-PR pattern): most weeks
+  // have only 1-3 birthdays, and a fixed 2-column grid with fixed font sizes sits tiny
+  // on the actual TV regardless of headcount. Column count now tracks list length so a
+  // light week gets dramatically bigger text instead of the busy-week-tuned default.
   var list=birthdaysThisWeek();
   if(!list.length)return '';            // self-suppress when no birthdays this week
+  var nCols = list.length<=3 ? 1 : 2;
   var items=list.map(function(b){
     return '<div class="bd-item'+(b.isToday?' bd-today':'')+'">'
       +'<span class="bd-name">'+b.name+(b.isToday?' \uD83C\uDF89':'')+'</span>'
@@ -552,7 +561,7 @@ function buildBirthdays(){
     +'<div class="bd-body">'
     +'<div class="bd-title">Birthdays</div>'
     +'<div class="bd-sub">In the Gym This Week</div>'
-    +'<div class="bd-list">'+items+'</div>'
+    +'<div class="bd-list bd-cols-'+nCols+'">'+items+'</div>'
     +'</div></div>';
 }
 function _adultNameParts(key){
