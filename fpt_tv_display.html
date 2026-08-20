@@ -390,7 +390,7 @@ function getBigBoys(entries, exId){
   const p = state.profiles || {};
   const bigBoyNames = Object.entries(p)
     .filter(([_, prof]) =>
-      !prof.inactive &&
+      !prof.inactive && !prof.graduated &&   // graduated athletes fall off BBB (Aug 2026)
       _hasLinePosition(prof.positions) &&
       prof.sports && /football/i.test(prof.sports)
     )
@@ -509,7 +509,7 @@ function birthdaysThisWeek(){
   var r=weekRangeMonSun();
   var cands=[];
   var p=state.profiles||{};
-  Object.keys(p).forEach(function(n){var pr=p[n];if(pr&&!pr.inactive&&pr.dob)cands.push({name:n,dob:pr.dob});});
+  Object.keys(p).forEach(function(n){var pr=p[n];if(pr&&!pr.inactive&&!pr.graduated&&pr.dob)cands.push({name:n,dob:pr.dob});});
   var ad=state.adults||{};
   Object.keys(ad).forEach(function(n){
     if(!ad[n]||!ad[n].dob)return;
