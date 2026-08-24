@@ -629,6 +629,25 @@ function _chColumnCount(n){
   if(n<=12)return 2;
   return 3;
 }
+// Time-based challenges are ENTERED as plain decimal seconds (e.g. 62.08 for 1:02.08 --
+// no format friction on data entry) but DISPLAYED on the TV as minutes:seconds, which
+// reads far better on a gym screen. Detected from the challenge's unit label -- any
+// month whose unit says Seconds/Sec/Minutes/Time formats this way; everything else
+// (Miles, Watts, reps, etc.) is untouched, unaffected decimal + unit-suffix rendering.
+function _isTimeUnit(unit){ return /^(sec|second|min|minute|time)/i.test(String(unit||'').trim()); }
+function _fmtMMSS(totalSeconds){
+  // Round to 2 decimals FIRST, before splitting into minutes/seconds -- otherwise a
+  // value like 59.999 rounds its remainder to "60.00" AFTER the split (never carrying
+  // into the minutes place) and displays the invalid "0:60" instead of "1:00".
+  var s = Math.max(0, Math.round((Number(totalSeconds)||0)*100)/100);
+  var m = Math.floor(s/60);
+  var rem = s - m*60;
+  // pad seconds to 2 digits before the decimal (1:02.08, not 1:2.08); trim trailing zeros
+  var remStr = rem.toFixed(2).replace(/\.?0+$/,'');
+  var secWhole = remStr.split('.')[0];
+  if(secWhole.length<2) remStr = '0'+remStr;
+  return m+':'+remStr;
+}
 function buildChallengeSlide(){
   var et=_etNow();
   var mm=et.getFullYear()+'-'+String(et.getMonth()+1).padStart(2,'0');
@@ -636,7 +655,9 @@ function buildChallengeSlide(){
   if(!ch)return '';                     // no challenge defined this month
   var rows=challengeLeaderboard(mm,ch);
   if(!rows.length)return '';            // no results logged yet
-  var unitSfx=ch.unit?(' '+ch.unit):'';
+  var isTime=_isTimeUnit(ch.unit);
+  var unitSfx=(ch.unit&&!isTime)?(' '+ch.unit):'';
+  var fmtChallengeVal=function(v){ return isTime?_fmtMMSS(v):(round3(v)+unitSfx); };
   var monName=et.toLocaleString('en-US',{month:'long'}).toUpperCase();
 
   // Rank the FULL list first (tie-aware), then split into columns so numbering stays continuous.
@@ -661,11 +682,11 @@ function buildChallengeSlide(){
       var resultCells;
       if(x.r.latest!=null){
         var dirCls=x.r.improvement>0?'up':(x.r.improvement<0?'down':'flat');
-        resultCells='<div class="ch-score">'+round3(x.r.baseline)+unitSfx+'</div>'
+        resultCells='<div class="ch-score">'+fmtChallengeVal(x.r.baseline)+'</div>'
           +'<div class="ch-arrow '+dirCls+'">\u2192</div>'
-          +'<div class="ch-score">'+round3(x.r.current)+unitSfx+'</div>';
+          +'<div class="ch-score">'+fmtChallengeVal(x.r.current)+'</div>';
       }else{
-        resultCells='<div class="ch-score">'+round3(x.r.current)+unitSfx+'</div>';
+        resultCells='<div class="ch-score">'+fmtChallengeVal(x.r.current)+'</div>';
       }
       return '<div class="ch-row" style="height:'+rowHeightPct+'%">'
         +'<div class="ch-rank">'+rankStr(x.rank)+'</div>'
