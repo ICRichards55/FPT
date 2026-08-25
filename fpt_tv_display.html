@@ -597,7 +597,12 @@ function _chDisplayLabels(adultKeys){
   return labels;
 }
 function challengeLeaderboard(m,ch){
-  var ents=(state.challengeEntries||[]).filter(function(e){return e.month===m;});
+  // Opt-out (Aug 2026): an adult can hide their result from this public TV display
+  // without their data being touched -- entries stay intact, this is display-only.
+  var adultsMap=state.adults||{};
+  var ents=(state.challengeEntries||[]).filter(function(e){
+    return e.month===m && !(adultsMap[e.adult]&&adultsMap[e.adult].hideFromTV);
+  });
   var byAdult={};
   ents.forEach(function(e){(byAdult[e.adult]=byAdult[e.adult]||[]).push(e);});
   var dir=ch.betterDir||'lower';

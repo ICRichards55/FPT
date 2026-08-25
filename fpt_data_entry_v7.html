@@ -1057,22 +1057,70 @@ function addAdult(){
   newAdultFirst='';newAdultLast='';newAdultDob='';
   saveData();showToast(n+' added.');render();
 }
+// Renames an adult's dict KEY (the actual identifier challengeEntries/guests/
+// achievements point to) and re-links every reference. Returns true on success.
+// Fails safe: aborts with an alert if the target key is already taken by someone else.
+function _renameAdultKey(oldKey,newKey){
+  if(!newKey||newKey===oldKey)return true;
+  if(state.adults[newKey]){alert('"'+newKey+'" is already a different adult -- rename skipped to avoid merging two people.');return false;}
+  state.adults[newKey]=state.adults[oldKey];
+  delete state.adults[oldKey];
+  state.guests=(state.guests||[]).map(function(g){return g===oldKey?newKey:g;});
+  (state.challengeEntries||[]).forEach(function(e){if(e.adult===oldKey)e.adult=newKey;});
+  (state.achievements||[]).forEach(function(a){if(a.athlete===oldKey)a.athlete=newKey;});
+  return true;
+}
+function _naturalAdultKey(fn,ln){var f=(fn||'').trim(),l=(ln||'').trim();return (f+(l?' '+l:'')).trim();}
 function setAdultFirst(name,val){
   if(!state.adults)state.adults={};
   if(!state.adults[name])state.adults[name]={};
   state.adults[name].firstName=(val||'').trim();
-  saveData();
+  var nk=_naturalAdultKey(state.adults[name].firstName,state.adults[name].lastName);
+  if(nk && _renameAdultKey(name,nk)) name=nk;
+  saveData();render();
 }
 function setAdultLast(name,val){
   if(!state.adults)state.adults={};
   if(!state.adults[name])state.adults[name]={};
   state.adults[name].lastName=(val||'').trim();
-  saveData();
+  var nk=_naturalAdultKey(state.adults[name].firstName,state.adults[name].lastName);
+  if(nk && _renameAdultKey(name,nk)) name=nk;
+  saveData();render();
+}
+// One-click sweep for adults whose key never got updated after a name-field edit
+// (fixes the existing Callie/Liz/Matt-style cases in one shot; new edits self-correct
+// via setAdultFirst/setAdultLast above, so this shouldn't be needed again going forward).
+function fixAdultNameKeys(){
+  var fixed=0;
+  Object.keys(state.adults||{}).slice().forEach(function(k){
+    var rec=state.adults[k];
+    var nk=_naturalAdultKey(rec.firstName,rec.lastName);
+    if(nk && nk!==k && _renameAdultKey(k,nk)) fixed++;
+  });
+  if(fixed){saveData();showToast(fixed+' adult name'+(fixed===1?'':'s')+' fixed.');render();}
+  else showToast('All adult names already match their records.');
 }
 function setAdultCoach(name,checked){
   if(!state.adults)state.adults={};
   if(!state.adults[name])state.adults[name]={};
   state.adults[name].isCoach=!!checked;
+  saveData();
+}
+// Opt-outs (Aug 2026): hide someone's challenge RESULT from a public display without
+// touching their data -- entries stay intact, this is display-only and reversible.
+// Independent flags so someone can opt out of the office TV but still be fine with a
+// social post, or vice versa. Coach-facing views (this admin table) always show
+// everyone regardless -- opt-out only affects the two public-facing outputs.
+function setAdultHideTV(name,checked){
+  if(!state.adults)state.adults={};
+  if(!state.adults[name])state.adults[name]={};
+  state.adults[name].hideFromTV=!!checked;
+  saveData();
+}
+function setAdultHideSocial(name,checked){
+  if(!state.adults)state.adults={};
+  if(!state.adults[name])state.adults[name]={};
+  state.adults[name].hideFromSocial=!!checked;
   saveData();
 }
 function _migrateAdultNames(){
@@ -1134,20 +1182,26 @@ function renderAdultRoster(){
     var fn=rec.firstName!==undefined?rec.firstName:n.split(/\s+/)[0];
     var ln=rec.lastName!==undefined?rec.lastName:n.split(/\s+/).slice(1).join(' ');
     var isCoach=!!rec.isCoach;
+    var hideTV=!!rec.hideFromTV, hideSocial=!!rec.hideFromSocial;
     var en=_esc(n);
     var pp=_mmddParts(dob);
+    var keyMismatch = _naturalAdultKey(fn,ln) && _naturalAdultKey(fn,ln)!==n;
     var lbl='font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px';
     return '<div style="padding:12px 0;border-bottom:1px solid var(--border)">'
       +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
       +'<div><div style="'+lbl+'">Challenge first name</div><input class="form-input" data-adult="'+en+'" value="'+_esc(fn).replace(/"/g,'&quot;')+'" placeholder="First" style="width:120px" onchange="setAdultFirst(this.dataset.adult,this.value)"/></div>'
       +'<div><div style="'+lbl+'">Last (disambig. only)</div><input class="form-input" data-adult="'+en+'" value="'+_esc(ln).replace(/"/g,'&quot;')+'" placeholder="Last" style="width:120px" onchange="setAdultLast(this.dataset.adult,this.value)"/></div>'
       +'<label style="display:flex;align-items:center;gap:6px;padding-bottom:9px;cursor:pointer;font-size:13px;color:var(--text)"><input type="checkbox" data-adult="'+en+'" '+(isCoach?'checked':'')+' onchange="setAdultCoach(this.dataset.adult,this.checked)"/>Coach</label>'
+      +'<label style="display:flex;align-items:center;gap:6px;padding-bottom:9px;cursor:pointer;font-size:13px;color:var(--text)" title="Hide their challenge result from the gym TV"><input type="checkbox" data-adult="'+en+'" '+(hideTV?'checked':'')+' onchange="setAdultHideTV(this.dataset.adult,this.checked)"/>Hide: TV</label>'
+      +'<label style="display:flex;align-items:center;gap:6px;padding-bottom:9px;cursor:pointer;font-size:13px;color:var(--text)" title="Hide their challenge result from Social Studio graphics"><input type="checkbox" data-adult="'+en+'" '+(hideSocial?'checked':'')+' onchange="setAdultHideSocial(this.dataset.adult,this.checked)"/>Hide: Social</label>'
+      +(keyMismatch?'<span style="font-size:10px;color:var(--amber,#d97706);padding-bottom:9px" title="Their stored name doesn\'t match the entered fields -- click Fix Names above">&#9888; name out of sync</span>':'')
       +'<div style="display:flex;gap:6px;margin-left:auto"><select class="form-input" data-adult="'+en+'" onchange="setAdultMonth(this.dataset.adult,this.value)" style="width:90px">'+_monthOpts(pp[0])+'</select><select class="form-input" data-adult="'+en+'" onchange="setAdultDay(this.dataset.adult,this.value)" style="width:84px">'+_dayOpts(pp[1],pp[0])+'</select></div>'
       +'<button class="action-btn" style="color:var(--red)" data-adult="'+en+'" onclick="removeAdult(this.dataset.adult)">Remove</button>'
       +'</div></div>';
   }).join('');
   return '<div class="panel"><div class="panel-title">Adults <span style="font-size:14px;color:var(--muted);font-weight:400">('+list.length+')</span></div>'
-    +'<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Adults (coaches, members) tracked for birthdays and the monthly challenge. Challenge leaderboard always shows just the first name. Check <b>Coach</b> to have the birthday slide show "Coach [First Name]" instead of just the first name.</div>'
+    +'<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Adults (coaches, members) tracked for birthdays and the monthly challenge. Challenge leaderboard always shows just the first name. Check <b>Coach</b> to have the birthday slide show "Coach [First Name]" instead of just the first name. <b>Hide: TV</b> / <b>Hide: Social</b> keep someone\'s challenge result out of the gym TV or Social Studio graphics without deleting their data.</div>'
+    +(list.some(function(n){var r=state.adults[n]||{};return _naturalAdultKey(r.firstName,r.lastName)&&_naturalAdultKey(r.firstName,r.lastName)!==n;})?'<button class="btn btn-ghost btn-sm" style="margin-bottom:12px" onclick="fixAdultNameKeys()">Fix Names (sync out-of-date entries)</button>':'')
     +'<div class="row" style="gap:10px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap">'
     +'<div class="form-group"><div class="form-label">First Name</div><input class="form-input" value="'+newAdultFirst.replace(/"/g,'&quot;')+'" oninput="newAdultFirst=this.value" onkeydown="if(event.key===\'Enter\')addAdult()" style="width:130px"/></div>'
     +'<div class="form-group"><div class="form-label">Last Name</div><input class="form-input" value="'+newAdultLast.replace(/"/g,'&quot;')+'" oninput="newAdultLast=this.value" onkeydown="if(event.key===\'Enter\')addAdult()" style="width:130px"/></div>'
