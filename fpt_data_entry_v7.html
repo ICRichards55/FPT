@@ -1459,15 +1459,37 @@ function runExport(fmt){
 // requiring individual approval, everything else applies straight into the table
 // for review before Save All Changes is clicked.
 var csvImportReport=null;   // {applied:[{name,field,val}], corrections:[{name,field,old,val,approved}], unmatched:[names]}
-var CSV_COLS = {
-  'first':'firstName','last':'lastName','dob':'dob','gender':'gender','level':'level',
-  'high school':'highSchool','hs grad yr':'hsGradYear','hs grad year':'hsGradYear',
-  'college':'college','col grad yr':'collegeGradYear','college grad year':'collegeGradYear',
-  'col class':'collegeClass','college class':'collegeClass','redshirt':'redshirt',
-  'fpt mo':'fptMonth','fpt month':'fptMonth','fpt yr':'fptYear','fpt year':'fptYear',
-  'sports':'sports','positions':'positions','instagram':'instagram','notes':'notes',
-  'athlete':'__athlete'
-};
+// Header matching (Aug 2026, rebuilt): the original exact-string lookup broke on
+// real-world header text -- e.g. a downloaded sheet's own header "DOB (MM/DD/YYYY)"
+// never matched the bare key 'dob', and a header cell with a manually-inserted line
+// break ("DOB\n(MM/DD/YYYY)", common after someone reformats a column in Excel/
+// Sheets) broke it further. This is what silently dropped every DOB in a real CSV
+// upload -- the column matched nothing, so no row's date ever reached the importer.
+// Fix: normalize whitespace/newlines first, then match by PREFIX rather than exact
+// equality, ordered most-specific-first so e.g. "college grad year" is checked
+// before the bare "college" pattern.
+function _normalizeHeader(h){
+  return String(h||'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+}
+var CSV_COL_PATTERNS = [
+  [/^athlete$/,'__athlete'],
+  [/^first/,'firstName'], [/^last/,'lastName'],
+  [/^dob/,'dob'], [/^gender/,'gender'], [/^level/,'level'],
+  [/^high school/,'highSchool'],
+  [/^hs grad/,'hsGradYear'],
+  [/^col(lege)? grad/,'collegeGradYear'],
+  [/^col(lege)? class/,'collegeClass'],
+  [/^college$/,'college'], [/^college /,'college'],
+  [/^redshirt/,'redshirt'],
+  [/^fpt mo/,'fptMonth'], [/^fpt y/,'fptYear'],
+  [/^sports/,'sports'], [/^positions/,'positions'], [/^instagram/,'instagram'],
+  [/^notes$/,'notes']   // exact 'notes' only -- NOT 'corrections / notes' (that's status metadata, not the athlete's notes field)
+];
+function _mapHeaderField(h){
+  var norm=_normalizeHeader(h);
+  for(var i=0;i<CSV_COL_PATTERNS.length;i++){ if(CSV_COL_PATTERNS[i][0].test(norm)) return CSV_COL_PATTERNS[i][1]; }
+  return null;
+}
 function _parseCsv(text){
   // minimal RFC4180-ish parser: handles quoted fields with embedded commas/quotes
   var rows=[], row=[], field='', inQuotes=false;
@@ -1491,13 +1513,31 @@ function _parseCsv(text){
 function runCsvImport(text){
   var rows=_parseCsv(text);
   if(rows.length<2){ alert('No data rows found in that file.'); return; }
-  var header=rows[0].map(function(h){ return h.trim().toLowerCase(); });
-  var fieldFor=header.map(function(h){ return CSV_COLS[h]||null; });
+  var fieldFor=rows[0].map(_mapHeaderField);
   var athCol=fieldFor.indexOf('__athlete');
   var firstCol=fieldFor.indexOf('firstName'), lastCol=fieldFor.indexOf('lastName');
   if(athCol===-1 && (firstCol===-1||lastCol===-1)){
     alert('Could not find an "Athlete" column (or First+Last columns) in the header row.');
     return;
+  }
+  // DOB needs format conversion: the sheet's own convention (and every DOB already in
+  // the database) is MM/DD/YYYY on the sheet side, ISO YYYY-MM-DD in storage -- the
+  // <input type="date"> widget in the Bulk Editor REQUIRES strict ISO to render at all.
+  // Without conversion, a CSV date like "12/30/2017" got written into bulkEdits
+  // unchanged, silently failed to display (showing the date-picker's empty/today
+  // placeholder -- easy to mistake for "nothing happened"), and would have corrupted
+  // the stored value had it saved. Also fixes a second bug: comparing an unconverted
+  // "12/30/2017" against an existing ISO "2017-12-30" always mismatched even for the
+  // exact same date, wrongly flagging real duplicates as corrections needing approval.
+  function _parseDobToISO(raw){
+    raw=String(raw).trim();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;   // already ISO -- leave as-is
+    var m=raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);   // M/D/YYYY, MM/DD/YYYY, etc
+    if(m){
+      var mm=m[1].length<2?'0'+m[1]:m[1], dd=m[2].length<2?'0'+m[2]:m[2];
+      return m[3]+'-'+mm+'-'+dd;
+    }
+    return raw;   // unrecognized format -- keep the original text rather than dropping it
   }
   var roster=state.athletes||[];
   var applied=[], corrections=[], unmatched=[];
@@ -1515,7 +1555,7 @@ function runCsvImport(text){
       if(!field || field==='__athlete' || field==='firstName' || field==='lastName') continue;
       var raw=(row[c]||'').trim();
       if(!raw) continue;   // blank cell = leave alone, never overwrites with blank
-      var val = field==='redshirt' ? /^y/i.test(raw) : raw;
+      var val = field==='redshirt' ? /^y/i.test(raw) : field==='dob' ? _parseDobToISO(raw) : raw;
       var existing = prof[field];
       var existingBlank = existing===undefined || existing===null || existing==='' || existing===false && field!=='redshirt';
       if(field==='redshirt'){ existingBlank = !('redshirt' in prof); }
