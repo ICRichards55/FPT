@@ -1795,18 +1795,39 @@ function saveData(){
   if(!_loadedOK){_setLoadWarning(true);showToast('Data has not loaded yet - refresh before making changes.');return;}
   // Auto-archive naturally expired achievements to profiles
   var now2=new Date();
+  var _profilesTouched=false;   // did THIS save call actually change any profile data?
   (state.achievements||[]).forEach(function(a){
     if(!a.archived&&isExp(a)){
       if((state.athletes||[]).includes(a.athlete)){
         if(!state.profiles[a.athlete])state.profiles[a.athlete]={};
         if(!state.profiles[a.athlete].achievementHistory)state.profiles[a.athlete].achievementHistory=[];
         var already=state.profiles[a.athlete].achievementHistory.some(function(h){return h.dateAdded===a.dateAdded&&h.achievement===a.achievement;});
-        if(!already){state.profiles[a.athlete].achievementHistory.push({achievement:a.achievement,dateAdded:a.dateAdded,durationWeeks:a.durationWeeks,dateArchived:new Date().toISOString().slice(0,10)});}
+        if(!already){state.profiles[a.athlete].achievementHistory.push({achievement:a.achievement,dateAdded:a.dateAdded,durationWeeks:a.durationWeeks,dateArchived:new Date().toISOString().slice(0,10)});_profilesTouched=true;}
       }
       a.archived=true;
     }
   });
-  _debounceSave(Object.assign({},state,{deletedIds:_pendingDeletes.slice(),deletedChallengeIds:_pendingChallengeDeletes.slice()}));
+  // Root cause fix (Aug 2026): every save used to bundle the tab's ENTIRE in-memory
+  // state.profiles, regardless of what triggered the save. A tab left open for weeks
+  // (a kiosk, a forgotten browser tab) would silently re-flatten anyone's profile
+  // edits back to old/stale values on its very next unrelated save -- logging a single
+  // test result was enough. This is what caused Chris Frye's college to keep
+  // reverting across "multiple bulk uploads" over "weeks": some standing, unrefreshed
+  // tab kept re-submitting its old blank-college snapshot on every save it made,
+  // whether or not that save had anything to do with profiles.
+  // Fix: only include profiles in the payload when this save genuinely involves
+  // profile data -- the user is on a profile-editing screen (Roster / Intake /
+  // Bulk Import / Bulk Edit), or this call just auto-archived an achievement into
+  // someone's history above. Every other save (logging a test, a challenge time,
+  // an achievement, etc.) now omits profiles entirely, so a stale tab sitting on
+  // any other screen can no longer clobber profile data no matter how old it is.
+  var _onProfileScreen = (currentTab==='roster') ||
+    (currentTab==='settings' && ['intake','bulkimport','bulkedit'].indexOf(settingsSection)>-1);
+  var _payload = Object.assign({},state,{deletedIds:_pendingDeletes.slice(),deletedChallengeIds:_pendingChallengeDeletes.slice()});
+  if(!_onProfileScreen && !_profilesTouched){
+    delete _payload.profiles;
+  }
+  _debounceSave(_payload);
 }
 (function(){if(window._API_URL&&window._API_URL.startsWith('https://script.google.com')){localStorage.setItem('fpt_api_url',window._API_URL);return;}var stored=localStorage.getItem('fpt_api_url');if(stored&&stored.startsWith('https://'))window._API_URL=stored;})();
 var _saveTimer=null;
