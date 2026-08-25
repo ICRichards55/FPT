@@ -223,6 +223,7 @@ function _handleDelegatedClick(e, prevent){
   if(el.dataset.edSave!==undefined){if(prevent)e.preventDefault();editDataSave(el.dataset.edSave);return;}
   if(el.dataset.edCancel!==undefined){if(prevent)e.preventDefault();editDataCancel();return;}
   if(el.dataset.approveIdx!==undefined){if(prevent)e.preventDefault();approveCorrection(parseInt(el.dataset.approveIdx,10));return;}
+  if(el.dataset.toggleApplied!==undefined){if(prevent)e.preventDefault();csvAppliedExpanded=!csvAppliedExpanded;render();setTimeout(_bindImportEvents,50);return;}
   if(id==='modal-save-btn'){if(prevent)e.preventDefault();saveModalEdit();}
   else if(id==='bulk-save-btn'){if(prevent)e.preventDefault();saveBulkEdits();}
   else if(id==='csv-dismiss-btn'){if(prevent)e.preventDefault();dismissCsvReport();}
@@ -1458,7 +1459,8 @@ function runExport(fmt){
 // that would OVERWRITE an already-populated field are held out as "corrections"
 // requiring individual approval, everything else applies straight into the table
 // for review before Save All Changes is clicked.
-var csvImportReport=null;   // {applied:[{name,field,val}], corrections:[{name,field,old,val,approved}], unmatched:[names]}
+var csvImportReport=null;
+var csvAppliedExpanded=false;   // {applied:[{name,field,val}], corrections:[{name,field,old,val,approved}], unmatched:[names]}
 // Header matching (Aug 2026, rebuilt): the original exact-string lookup broke on
 // real-world header text -- e.g. a downloaded sheet's own header "DOB (MM/DD/YYYY)"
 // never matched the bare key 'dob', and a header cell with a manually-inserted line
@@ -1581,16 +1583,25 @@ function dismissCsvReport(){ csvImportReport=null; render(); setTimeout(_bindImp
 function renderCsvImportPanel(){
   var html='<div class="panel" style="margin-bottom:16px">';
   html+='<div class="panel-title">Upload Profile Sheet (CSV)</div>';
-  html+='<div style="font-size:13px;color:var(--muted);margin-bottom:10px">Upload a filled-in profile CSV. Blank cells are skipped. New info fills straight into the table below for review. Overwrites of already-known fields need your approval first.</div>';
+  html+='<div style="font-size:13px;color:var(--muted);margin-bottom:10px">Upload a filled-in profile CSV. Blank cells are skipped. New info fills straight into the table below for review. Overwrites of already-known fields need your approval first. <strong>Nothing is saved until you click "Save All Changes" below the table.</strong></div>';
   html+='<input type="file" id="csv-import-input" accept=".csv" style="font-size:13px;color:var(--fg)"/>';
   if(csvImportReport){
     var rep=csvImportReport;
     html+='<div style="background:var(--surface2);border-radius:8px;padding:14px;margin-top:12px">';
     html+='<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:'+(rep.corrections.length||rep.unmatched.length?'12px':'0')+'">';
-    html+='<div><div style="font-size:22px;font-weight:700">'+rep.applied.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Fields Filled In</div></div>';
+    html+='<div style="cursor:pointer" data-toggle-applied="1"><div style="font-size:22px;font-weight:700;text-decoration:underline;text-decoration-style:dotted">'+rep.applied.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Fields Filled In'+(rep.applied.length?' (click to view)':'')+'</div></div>';
     html+='<div><div style="font-size:22px;font-weight:700">'+rep.corrections.filter(function(c){return!c.approved;}).length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Awaiting Approval</div></div>';
     if(rep.unmatched.length)html+='<div><div style="font-size:22px;font-weight:700;color:#e74c3c">'+rep.unmatched.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Unmatched Names</div></div>';
     html+='</div>';
+    if(rep.applied.length && csvAppliedExpanded){
+      html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px">Fields Filled In — Detail</div>';
+      var byAth={};
+      rep.applied.forEach(function(a){ (byAth[a.name]=byAth[a.name]||[]).push(a); });
+      Object.keys(byAth).sort().forEach(function(nm){
+        html+='<div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--border)"><strong>'+nm+'</strong> — '+
+          byAth[nm].map(function(a){ return a.field+': \u201c'+a.val+'\u201d'; }).join(', ')+'</div>';
+      });
+    }
     if(rep.corrections.length){
       html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px">Corrections (overwrites an existing value)</div>';
       rep.corrections.forEach(function(c,i){
