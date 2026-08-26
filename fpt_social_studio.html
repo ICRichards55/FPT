@@ -1039,9 +1039,23 @@ function getChallengeData(year, month){
     const es=byAdult[a].slice().sort((x,y)=>String(x.date).localeCompare(String(y.date)));
     const baseline=es[0].value, latest=es.length>1?es[es.length-1].value:null;
     const improvement=latest!=null?(dir==='higher'?latest-baseline:baseline-latest):null;
-    return {adult:a,baseline:baseline,latest:latest,improvement:improvement};
+    const current=latest!=null?latest:baseline;
+    const vals=es.map(e=>e.value);
+    const best=dir==='higher'?Math.max(...vals):Math.min(...vals);
+    return {adult:a,baseline:baseline,latest:latest,improvement:improvement,current:current,best:best};
   });
-  rows.sort((x,y)=>{const xi=x.improvement!=null?x.improvement:-Infinity;const yi=y.improvement!=null?y.improvement:-Infinity;return yi-xi;});
+  // Rank by CURRENT standing (Aug 2026 fix -- matches the TV display's convention),
+  // not improvement. Improvement is a motivational stat shown alongside, but the
+  // public leaderboard should reflect who's actually best right now -- someone who
+  // tested once and sits ahead of everyone shouldn't rank below a bigger mover who's
+  // still further back. Tied current -> better best-ever wins, same as the TV slide.
+  rows.sort((x,y)=>{
+    const byCur=dir==='higher'?y.current-x.current:x.current-y.current;
+    if(byCur!==0)return byCur;
+    const byBest=dir==='higher'?y.best-x.best:x.best-y.best;
+    if(byBest!==0)return byBest;
+    return String(x.adult).localeCompare(String(y.adult));
+  });
   return {ch:ch,rows:rows};
 }
 
