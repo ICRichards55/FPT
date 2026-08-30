@@ -677,6 +677,86 @@ function fmtMPRShort(ex, v) {
   return v.toFixed(3)+'"';
 }
 
+// ── School logos in Social Studio graphics (Aug 2026) ──────────────────────
+// Same resolution convention as Data Entry's getAthleteSchool: college once
+// enrolled, high school if still a committed-but-not-yet-enrolled recruit.
+// Chris can toggle this per-card via includeSchoolLogos -- default ON per the
+// marketing angle (a recognizable college crest next to a name is the point),
+// but a single unchecked box removes them from every card with zero layout
+// risk, since the drawing helper below is a strict no-op when off or when a
+// school has no logo on file.
+var includeSchoolLogos = true;
+var _logoImgCache = {};   // school name -> loaded Image | null (no logo/failed)
+function _resolveSchool(athleteName){
+  var p=(state.profiles||{})[athleteName]||{};
+  var today=new Date();
+  if(p.hsGradYear){
+    var gradDate=new Date(parseInt(p.hsGradYear,10),5,1);
+    if(today<gradDate) return p.highSchool||'';
+  }
+  return p.college||p.highSchool||'';
+}
+async function _preloadSchoolLogos(athleteNames){
+  if(!includeSchoolLogos) return;
+  var schools=[...new Set(athleteNames.map(_resolveSchool).filter(Boolean))];
+  var toLoad=schools.filter(function(s){ return !(s in _logoImgCache); });
+  await Promise.all(toLoad.map(function(school){
+    return new Promise(function(resolve){
+      var url=(state.schoolLogos||{})[school];
+      if(!url){ _logoImgCache[school]=null; resolve(); return; }
+      var img=new Image();
+      img.crossOrigin='anonymous';
+      var done=false;
+      function finish(val){ if(done)return; done=true; _logoImgCache[school]=val; resolve(); }
+      img.onload=function(){ finish(img); };
+      img.onerror=function(){ finish(null); };
+      img.src=url;
+      setTimeout(function(){ finish(null); }, 3000);   // safety timeout -- never hang a download on a slow/broken logo URL
+    });
+  }));
+}
+// Draws a name-plate row, with a square logo badge to the left of the white box when
+// a logo is available -- otherwise draws EXACTLY the original full-width centered
+// plate (byte-identical to pre-logo behavior), so toggling off or an athlete with no
+// school on file never changes existing layouts.
+function _drawNamePlate(ctx, athleteName, boxX, boxY, boxW, boxH, extraLeftPad){
+  extraLeftPad = extraLeftPad||0;
+  var school = includeSchoolLogos ? _resolveSchool(athleteName) : '';
+  var logo = school ? _logoImgCache[school] : null;
+  var plateX = boxX, plateW = boxW;
+  if(logo){
+    var badge = boxH;                       // square badge, matches row height
+    var gap = Math.round(boxH*0.12);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(boxX, boxY, badge, badge);
+    ctx.clip();
+    // fit the logo inside the square without distortion, centered
+    var scale = Math.min(badge/logo.naturalWidth, badge/logo.naturalHeight);
+    var lw = logo.naturalWidth*scale, lh = logo.naturalHeight*scale;
+    ctx.fillStyle='#ffffff'; ctx.fillRect(boxX,boxY,badge,badge);
+    ctx.drawImage(logo, boxX+(badge-lw)/2, boxY+(badge-lh)/2, lw, lh);
+    ctx.restore();
+    plateX = boxX + badge + gap;
+    plateW = boxW - badge - gap;
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(plateX, boxY, plateW, boxH);
+  var nameStr = athleteName.toUpperCase();
+  var nameFontSize = Math.floor(boxH * 0.52);
+  ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
+  var maxW = plateW - 20;
+  while (ctx.measureText(nameStr).width > maxW && nameFontSize > 18) {
+    nameFontSize -= 2;
+    ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
+  }
+  ctx.fillStyle = '#0a0a0a';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(nameStr, plateX + plateW/2, boxY + boxH/2);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
 function buildTop5Canvas(exId, ranked) {
   // Renders the 1080x1080 "Top 5 All-Time" graphic — same visual system as buildMPRCanvas
   // (halftone texture, divider, FPT logo), but each row is a rank + name + single best-value
@@ -743,22 +823,7 @@ function buildTop5Canvas(exId, ranked) {
     ctx.textBaseline = 'middle';
     ctx.fillText(String(i+1), 8, nameBoxY + nameBoxH/2);
 
-    // White name box (shifted right to make room for the rank number)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(58, nameBoxY, 406, nameBoxH);
-
-    const nameStr = item.athlete.toUpperCase();
-    let nameFontSize = Math.floor(nameBoxH * 0.52);
-    ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
-    while (ctx.measureText(nameStr).width > 370 && nameFontSize > 20) {
-      nameFontSize -= 2;
-      ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
-    }
-    ctx.fillStyle = '#0a0a0a';
-    ctx.textAlign = 'center';
-    ctx.fillText(nameStr, 261, nameBoxY + nameBoxH/2);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
+    _drawNamePlate(ctx, item.athlete, 58, nameBoxY, 406, nameBoxH);
   });
 
   // ── Right panel: exercise name + single value box per row ──
@@ -883,26 +948,7 @@ function buildMPRCanvas(ex, athletes, year, month) {
     const nameBoxH = Math.floor(rowH * 0.62);
     const nameBoxY = y + Math.floor((rowH - nameBoxH) / 2);
 
-    // White name box
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(28, nameBoxY, 436, nameBoxH);
-
-    // Athlete name text
-    const nameParts = item.athlete.toUpperCase().split(' ');
-    const nameStr = nameParts.join(' ');
-    let nameFontSize = Math.floor(nameBoxH * 0.52);
-    ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
-    // Auto-shrink if too wide
-    while (ctx.measureText(nameStr).width > 400 && nameFontSize > 20) {
-      nameFontSize -= 2;
-      ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
-    }
-    ctx.fillStyle = '#0a0a0a';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(nameStr, 246, nameBoxY + nameBoxH/2);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
+    _drawNamePlate(ctx, item.athlete, 28, nameBoxY, 436, nameBoxH);
   });
 
   // ── Right panel: exercise name + PR value boxes ──
@@ -1002,6 +1048,7 @@ async function downloadTop5(exId, gender, ranked) {
   if (_logo && !(_logo.complete && _logo.naturalWidth > 0)) {
     await new Promise(r => { _logo.onload = r; _logo.onerror = r; setTimeout(r, 2000); });
   }
+  await _preloadSchoolLogos(ranked.map(r => r.athlete));
   const canvas = buildTop5Canvas(exId, ranked);
   const dataUrl = canvas.toDataURL('image/png');
   _savePng(dataUrl, 'FPT_Top5_AllTime_'+exId+'_'+gender+'.png', _w);
@@ -1014,6 +1061,7 @@ async function downloadMPR(ex, athletes, year, month, pageNum, pageCount) {
   if (_logo && !(_logo.complete && _logo.naturalWidth > 0)) {
     await new Promise(r => { _logo.onload = r; _logo.onerror = r; setTimeout(r, 2000); });
   }
+  await _preloadSchoolLogos(athletes.map(a => a.athlete));
   const canvas = buildMPRCanvas(ex, athletes, year, month);
   const dataUrl = canvas.toDataURL('image/png');
   const monStr = MONTH_SHORT[month]+year;
@@ -1200,13 +1248,14 @@ function renderTop5() {
   window._top5SetGender = g => { top5Gender = g; render(); };
   window._top5Download = () => downloadTop5(exObj.id, top5Gender, ranked);
 
-  setTimeout(() => {
+  setTimeout(async () => {
     const previewEl = document.getElementById('top5-preview');
     if (!previewEl) return;
     if (!ranked.length) {
       previewEl.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">No eligible results yet for '+exObj.name+'</div>';
       return;
     }
+    await _preloadSchoolLogos(ranked.map(r => r.athlete));
     previewEl.innerHTML = '';
     const canvas = buildTop5Canvas(exObj.id, ranked);
     canvas.style.width = '100%';
@@ -1234,6 +1283,7 @@ function renderTop5() {
     </div>
     <div class="toggle-group" style="margin-bottom:10px">${genderToggs}</div>
     <div class="toggle-group" style="margin-bottom:14px">${exToggs}</div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);margin-bottom:14px;cursor:pointer"><input type="checkbox" ${includeSchoolLogos?'checked':''} onchange="includeSchoolLogos=this.checked;render()"/>Include school logos</label>
     <div id="top5-preview" style="min-height:200px;background:var(--surface2);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px">
       <div style="color:var(--muted);font-size:13px">Loading preview...</div>
     </div>
@@ -1264,13 +1314,14 @@ function renderMonthPR() {
   window._mprDownloadPage = (pi) => downloadMPR(exObj.id, pages[pi], mprYear, mprMonth, pi+1, pages.length);
 
   // Build preview
-  setTimeout(() => {
+  setTimeout(async () => {
     const previewEl = document.getElementById('mpr-preview');
     if (!previewEl) return;
     if (!pages.length) {
       previewEl.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">No PRs recorded for '+exObj.name+' in '+monthLabel+'</div>';
       return;
     }
+    await _preloadSchoolLogos(athletes.map(a => a.athlete));
     previewEl.innerHTML = '';
     pages.forEach((pageAths, pi) => {
       const wrap = document.createElement('div');
@@ -1311,6 +1362,7 @@ function renderMonthPR() {
       <button onclick="_mprNext()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">Next ›</button>
     </div>
     <div class="toggle-group" style="margin-bottom:14px">${exToggs}</div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);margin-bottom:14px;cursor:pointer"><input type="checkbox" ${includeSchoolLogos?'checked':''} onchange="includeSchoolLogos=this.checked;render()"/>Include school logos</label>
     <div id="mpr-preview" style="min-height:200px;background:var(--surface2);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px">
       <div style="color:var(--muted);font-size:13px">Loading preview...</div>
     </div>
