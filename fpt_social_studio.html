@@ -68,6 +68,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .story-ex{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
 .story-val{font-family:'Permanent Marker',cursive;font-size:54px;color:#fff;line-height:.9;margin-bottom:8px;letter-spacing:-1px}
 .story-ath{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#fff;letter-spacing:1px;text-transform:uppercase}
+.story-school{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;color:#fff;opacity:.7;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
 .story-prev{font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.5px}
 .story-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted2)}
 .fullscreen-btn{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);border-radius:6px;color:#fff;font-size:11px;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.5px;padding:5px 10px;cursor:pointer;text-transform:uppercase;z-index:10}
@@ -135,6 +136,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .story-fs-ex{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
 .story-fs-val{font-family:'Permanent Marker',cursive;font-size:88px;color:#fff;line-height:.88;margin-bottom:12px}
 .story-fs-ath{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.story-fs-school{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:#fff;opacity:.7;letter-spacing:1.5px;text-transform:uppercase;margin-top:3px}
 .story-fs-prev{font-family:'Barlow Condensed',sans-serif;font-size:16px;color:rgba(255,255,255,.6);margin-top:6px;letter-spacing:.5px}
 .story-fs-close{
   background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:8px;
@@ -195,6 +197,7 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
         <div class="story-fs-ex" id="fs-ex">Exercise</div>
         <div class="story-fs-val" id="fs-val">—</div>
         <div class="story-fs-ath" id="fs-ath">Athlete</div>
+        <div class="story-fs-school" id="fs-school"></div>
         <div class="story-fs-prev" id="fs-prev"></div>
       </div>
     </div>
@@ -439,6 +442,8 @@ function updateOverlay(){
       valEl.textContent=d.val;
     }
     athEl.textContent=d.ath;
+    const schoolEl=document.getElementById(`${prefix}-school`);
+    if(schoolEl) schoolEl.textContent = storyIncludeSchoolText ? _resolveSchool(d.ath) : '';
     if(prevEl){
       if((storyExId==='fly'||storyExId==='fly510')&&d.prev&&d.prev.includes('s')){
         const fixed=d.prev.replace(/(\d)s(|$)/,'$1<span style="font-family:&quot;Barlow Condensed&quot;,sans-serif;font-size:0.8em;font-weight:700;font-style:normal">s</span>$2');
@@ -685,7 +690,13 @@ function fmtMPRShort(ex, v) {
 // but a single unchecked box removes them from every card with zero layout
 // risk, since the drawing helper below is a strict no-op when off or when a
 // school has no logo on file.
-var includeSchoolLogos = true;
+var includeSchoolLogos = true;   // controls Monthly PR + Top 5 (roster-list cards)
+var spotLogoOnCover = true;      // Spotlight cover cards -- independent toggle
+var spotLogoOnProgress = true;   // Spotlight per-exercise progress cards -- independent toggle
+var includeSchoolText = true;    // MPR + Top 5: school name as a small subheader under the athlete's name
+var spotTextOnCover = true;      // Spotlight cover cards -- independent
+var spotTextOnProgress = true;   // Spotlight per-exercise progress cards -- independent
+var storyIncludeSchoolText = true; // PR Story overlay
 var _logoImgCache = {};   // school name -> loaded Image | null (no logo/failed)
 function _resolveSchool(athleteName){
   var p=(state.profiles||{})[athleteName]||{};
@@ -704,6 +715,22 @@ function _resolveSchool(athleteName){
 // proxy that re-serves any image with permissive CORS headers) fixes this for
 // virtually any source without needing to re-host every school's logo ourselves.
 // Falls back to the direct URL if the proxy itself fails to load.
+function _schoolLogoUrl(athleteName){
+  if(!includeSchoolLogos) return '';
+  var school=_resolveSchool(athleteName);
+  var url=school && (state.schoolLogos||{})[school];
+  return url ? _corsProxied(url) : '';
+}
+function _spotSchoolText(athleteName, on){
+  if(!on) return '';
+  return _resolveSchool(athleteName);
+}
+function _spotLogoUrl(athleteName, on){
+  if(!on) return '';
+  var school=_resolveSchool(athleteName);
+  var url=school && (state.schoolLogos||{})[school];
+  return url ? _corsProxied(url) : '';
+}
 function _corsProxied(url){
   return 'https://images.weserv.nl/?url='+encodeURIComponent(url.replace(/^https?:\/\//,''));
 }
@@ -738,8 +765,9 @@ async function _preloadSchoolLogos(athleteNames){
 // school on file never changes existing layouts.
 function _drawNamePlate(ctx, athleteName, boxX, boxY, boxW, boxH, extraLeftPad){
   extraLeftPad = extraLeftPad||0;
-  var school = includeSchoolLogos ? _resolveSchool(athleteName) : '';
-  var logo = school ? _logoImgCache[school] : null;
+  var school = (includeSchoolLogos||includeSchoolText) ? _resolveSchool(athleteName) : '';
+  var logo = (includeSchoolLogos && school) ? _logoImgCache[school] : null;
+  var showText = includeSchoolText && !!school;
   var plateX = boxX, plateW = boxW;
   if(logo){
     var badge = boxH;                       // square badge, matches row height
@@ -760,17 +788,46 @@ function _drawNamePlate(ctx, athleteName, boxX, boxY, boxW, boxH, extraLeftPad){
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(plateX, boxY, plateW, boxH);
   var nameStr = athleteName.toUpperCase();
-  var nameFontSize = Math.floor(boxH * 0.52);
-  ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
   var maxW = plateW - 20;
-  while (ctx.measureText(nameStr).width > maxW && nameFontSize > 18) {
-    nameFontSize -= 2;
-    ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
-  }
-  ctx.fillStyle = '#0a0a0a';
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(nameStr, plateX + plateW/2, boxY + boxH/2);
+  if(showText){
+    // Two-line plate: name on top (slightly smaller to make room), school as a
+    // small subheader underneath -- both centered as a block within the plate.
+    var nameFontSize = Math.floor(boxH * 0.40);
+    ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
+    while (ctx.measureText(nameStr).width > maxW && nameFontSize > 14) {
+      nameFontSize -= 2;
+      ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
+    }
+    var schoolStr = school.toUpperCase();
+    var schoolFontSize = Math.max(10, Math.floor(boxH * 0.17));
+    ctx.font = '700 '+schoolFontSize+'px "Barlow Condensed", sans-serif';
+    while (ctx.measureText(schoolStr).width > maxW && schoolFontSize > 9) {
+      schoolFontSize -= 1;
+      ctx.font = '700 '+schoolFontSize+'px "Barlow Condensed", sans-serif';
+    }
+    var gapY = Math.round(boxH*0.06);
+    var blockH = nameFontSize + gapY + schoolFontSize;
+    var nameY = boxY + (boxH-blockH)/2 + nameFontSize/2;
+    var schoolY = nameY + nameFontSize/2 + gapY + schoolFontSize/2;
+    ctx.fillStyle = '#0a0a0a';
+    ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(nameStr, plateX + plateW/2, nameY);
+    ctx.fillStyle = '#666666';
+    ctx.font = '700 '+schoolFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.fillText(schoolStr, plateX + plateW/2, schoolY);
+  } else {
+    var nameFontSize2 = Math.floor(boxH * 0.52);
+    ctx.font = 'italic 900 '+nameFontSize2+'px "Barlow Condensed", sans-serif';
+    while (ctx.measureText(nameStr).width > maxW && nameFontSize2 > 18) {
+      nameFontSize2 -= 2;
+      ctx.font = 'italic 900 '+nameFontSize2+'px "Barlow Condensed", sans-serif';
+    }
+    ctx.fillStyle = '#0a0a0a';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(nameStr, plateX + plateW/2, boxY + boxH/2);
+  }
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
 }
@@ -1300,7 +1357,7 @@ function renderTop5() {
     </div>
     <div class="toggle-group" style="margin-bottom:10px">${genderToggs}</div>
     <div class="toggle-group" style="margin-bottom:14px">${exToggs}</div>
-    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);margin-bottom:14px;cursor:pointer"><input type="checkbox" ${includeSchoolLogos?'checked':''} onchange="includeSchoolLogos=this.checked;render()"/>Include school logos</label>
+    <div style="display:flex;gap:16px;margin-bottom:14px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${includeSchoolLogos?'checked':''} onchange="includeSchoolLogos=this.checked;render()"/>School logos</label><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${includeSchoolText?'checked':''} onchange="includeSchoolText=this.checked;render()"/>School name (subheader)</label></div>
     <div id="top5-preview" style="min-height:200px;background:var(--surface2);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px">
       <div style="color:var(--muted);font-size:13px">Loading preview...</div>
     </div>
@@ -1379,7 +1436,7 @@ function renderMonthPR() {
       <button onclick="_mprNext()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">Next ›</button>
     </div>
     <div class="toggle-group" style="margin-bottom:14px">${exToggs}</div>
-    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);margin-bottom:14px;cursor:pointer"><input type="checkbox" ${includeSchoolLogos?'checked':''} onchange="includeSchoolLogos=this.checked;render()"/>Include school logos</label>
+    <div style="display:flex;gap:16px;margin-bottom:14px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${includeSchoolLogos?'checked':''} onchange="includeSchoolLogos=this.checked;render()"/>School logos</label><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${includeSchoolText?'checked':''} onchange="includeSchoolText=this.checked;render()"/>School name (subheader)</label></div>
     <div id="mpr-preview" style="min-height:200px;background:var(--surface2);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px">
       <div style="color:var(--muted);font-size:13px">Loading preview...</div>
     </div>
@@ -1401,6 +1458,10 @@ function renderStory(){
           <button class="tog${storyType==='gym'?' on':''}" onclick="storyType='gym';render()">Gym PR</button>
           <button class="tog${storyType==='athlete'?' on':''}" onclick="storyType='athlete';render()">Athlete PR</button>
         </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">School</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer;margin-top:4px"><input type="checkbox" ${storyIncludeSchoolText?'checked':''} onchange="storyIncludeSchoolText=this.checked;updateOverlay()"/>Show school name</label>
       </div>
       <div class="form-group">
         <div class="form-label">Exercise</div>
@@ -1462,6 +1523,7 @@ function renderStory(){
             <div class="story-ex" id="preview-ex">${d?d.ex:''}</div>
             <div class="story-val" id="preview-val">${d?((storyExId==='fly'||storyExId==='fly510')&&d.val&&d.val.endsWith('s')?d.val.slice(0,-1)+'<span style="font-family:Barlow Condensed,sans-serif;font-size:0.52em;font-weight:700;font-style:normal;vertical-align:0.15em">s</span>':d.val):'—'}</div>
             <div class="story-ath" id="preview-ath">${d?d.ath:'Select options above'}</div>
+            <div class="story-school" id="preview-school">${d&&storyIncludeSchoolText?_resolveSchool(d.ath):''}</div>
             <div class="story-prev" id="preview-prev">${d?((storyExId==='fly'||storyExId==='fly510')&&d.prev&&d.prev.includes('s')?d.prev.replace(/(\d)s(\b|$)/,'$1<span style="font-family:Barlow Condensed,sans-serif;font-size:0.8em;font-weight:700;font-style:normal">s</span>$2'):d.prev):''}</div>
           </div>
         </div>
@@ -1608,6 +1670,16 @@ function renderSpotlight(){
       </div>
       <div style="font-size:11px;color:var(--muted2);margin-top:6px">${spotFormat==='ig'?'1080×1080 square':'1200×675 landscape'}</div>
     </div>
+    <div class="panel" style="min-width:200px">
+      <div class="panel-title">School Logo</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer;margin-bottom:6px"><input type="checkbox" ${spotLogoOnCover?'checked':''} onchange="spotLogoOnCover=this.checked;render()"/>On cover card</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${spotLogoOnProgress?'checked':''} onchange="spotLogoOnProgress=this.checked;render()"/>On progress cards</label>
+    </div>
+    <div class="panel" style="min-width:200px">
+      <div class="panel-title">School Name (subheader)</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer;margin-bottom:6px"><input type="checkbox" ${spotTextOnCover?'checked':''} onchange="spotTextOnCover=this.checked;render()"/>On cover card</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${spotTextOnProgress?'checked':''} onchange="spotTextOnProgress=this.checked;render()"/>On progress cards</label>
+    </div>
   </div>
   ${spotAthlete?renderSpotCards():renderSpotEmpty()}`;
 }
@@ -1717,8 +1789,9 @@ function renderIGCards(athEntries,availEx){
       ${spotPhotoUrl?`<img src="${spotPhotoUrl}" style="width:100%;height:100%;object-fit:cover;clip-path:polygon(12% 0%,100% 0%,88% 100%,0% 100%)"/>`:`<div style="width:100%;height:100%;background:#181818;clip-path:polygon(12% 0%,100% 0%,88% 100%,0% 100%);display:flex;align-items:center;justify-content:center"><span style="color:#2a2a2a;font-size:9px;letter-spacing:1px">PHOTO</span></div>`}
     </div>
     <img src="${LOGO}" style="position:absolute;bottom:16px;right:14px;height:150px;width:150px;object-fit:contain"/>
-    <div style="position:absolute;bottom:16px;left:17px;width:330px;line-height:.88">
-      <div data-name="fn" style="color:#fff;font-size:90px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.9;white-space:nowrap">${fn}</div>${ln?`<div data-name="ln" style="color:#fff;font-size:90px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.92;margin-top:4px;white-space:nowrap">${ln}</div>`:''}
+    <div style="position:absolute;bottom:16px;left:17px;width:330px;line-height:.88;display:flex;flex-direction:column">
+      ${_spotLogoUrl(spotAthlete,spotLogoOnCover)?`<img src="${_spotLogoUrl(spotAthlete,spotLogoOnCover)}" style="height:44px;width:44px;object-fit:contain;background:#fff;border-radius:4px;padding:3px;margin-bottom:8px"/>`:''}
+      <div data-name="fn" style="color:#fff;font-size:90px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.9;white-space:nowrap">${fn}</div>${ln?`<div data-name="ln" style="color:#fff;font-size:90px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.92;margin-top:4px;white-space:nowrap">${ln}</div>`:''}${_spotSchoolText(spotAthlete,spotTextOnCover)?`<div style="color:#fff;opacity:.75;font-size:17px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-top:7px;white-space:nowrap">${_spotSchoolText(spotAthlete,spotTextOnCover)}</div>`:''}
     </div>
   </div>`;
   const cards=[{id:'cover-ig',label:'Card 1 — Cover',html:coverHtml,file:`FPT_${spotAthlete.replace(/ /g,'_')}_Cover.png`}];
@@ -1738,8 +1811,11 @@ function renderIGCards(athEntries,availEx){
           ${renderScatterChart(state.entries,spotAthlete,ex.id,ex.color,220)}
         </div>
         <div style="position:absolute;bottom:0;left:0;right:0;padding:8px 22px 12px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #0d1420">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#2a4055">${spotAthlete} · ${data.length} sessions</div>
-          <img src="${LOGO}" style="height:52px;opacity:.7"/>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#2a4055">${spotAthlete}${_spotSchoolText(spotAthlete,spotTextOnProgress)?' &middot; '+_spotSchoolText(spotAthlete,spotTextOnProgress):''} &middot; ${data.length} sessions</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            ${_spotLogoUrl(spotAthlete,spotLogoOnProgress)?`<img src="${_spotLogoUrl(spotAthlete,spotLogoOnProgress)}" style="height:36px;width:36px;object-fit:contain;background:#fff;border-radius:3px;padding:2px"/>`:''}
+            <img src="${LOGO}" style="height:52px;opacity:.7"/>
+          </div>
         </div>
       </div>`
     });
@@ -1760,7 +1836,8 @@ function renderXCards(athEntries,availEx){
         <div style="font-family:'Barlow Condensed',sans-serif;color:#fff;font-size:8px;font-weight:900;letter-spacing:2px;text-transform:uppercase;opacity:.8;margin-bottom:6px">FRYE PERFORMANCE TRAINING</div>
         <div class="x-boxes" style="${boxes.length>6?'gap:2px;margin-top:4px':''}">${boxes.map(b=>`<div class="x-box" style="${boxes.length>6?'padding:2px 6px':''}"><div class="x-box-label" style="${boxes.length>6?'font-size:7px':''}">${b.label}</div><div class="x-box-val" data-fitval style="${boxes.length>6?'font-size:14px':''}">${b.val}</div></div>`).join('')}</div>
         <div style="display:flex;align-items:flex-end;gap:8px">
-          <div class="x-cover-name" style="flex:1;min-width:0"><div data-xname="fn" style="white-space:nowrap">${fn}</div>${ln?`<div data-xname="ln" style="white-space:nowrap">${ln}</div>`:''}</div>
+          <div class="x-cover-name" style="flex:1;min-width:0"><div data-xname="fn" style="white-space:nowrap">${fn}</div>${ln?`<div data-xname="ln" style="white-space:nowrap">${ln}</div>`:''}${_spotSchoolText(spotAthlete,spotTextOnCover)?`<div style="color:#fff;opacity:.75;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;white-space:nowrap">${_spotSchoolText(spotAthlete,spotTextOnCover)}</div>`:''}</div>
+          ${_spotLogoUrl(spotAthlete,spotLogoOnCover)?`<img src="${_spotLogoUrl(spotAthlete,spotLogoOnCover)}" style="height:56px;width:56px;object-fit:contain;background:#fff;border-radius:4px;padding:3px;flex-shrink:0;margin-bottom:2px"/>`:''}
           <img src="${LOGO}" style="height:68px;flex-shrink:0;margin-bottom:2px"/>
         </div>
       </div>
@@ -1776,7 +1853,7 @@ function renderXCards(athEntries,availEx){
       html:`<div class="x-chart-card">
         <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#ffffff 40%,transparent)"></div>
         <div class="x-chart-header">
-          <div><div style="color:#273040;font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">Progress</div><div class="x-chart-title">${ex.name}</div><div style="color:#243040;font-size:10px;text-transform:uppercase;letter-spacing:1px">${spotAthlete}</div></div>
+          <div><div style="color:#273040;font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">Progress</div><div class="x-chart-title">${ex.name}</div><div style="color:#243040;font-size:10px;text-transform:uppercase;letter-spacing:1px">${spotAthlete}${_spotSchoolText(spotAthlete,spotTextOnProgress)?' &middot; '+_spotSchoolText(spotAthlete,spotTextOnProgress):''}</div></div>
           <div style="text-align:right"><div style="color:#273040;font-size:8px;letter-spacing:1.5px;text-transform:uppercase">Session PR Avg</div><div class="x-chart-pr" style="color:#ffffff">${fmt(ex.id,pv)}</div>${impPct!=null?`<div style="font-size:11px;color:#ffffff;font-weight:700">${ex.lower?'↓':'↑'} ${Math.abs(impPct).toFixed(1)}%</div>`:''}</div>
         </div>
         <div class="x-chart-body">
@@ -1784,7 +1861,7 @@ function renderXCards(athEntries,availEx){
             ${renderScatterChart(athEntries,spotAthlete,ex.id,ex.color,160)}
           </div>
         </div>
-        <div class="x-chart-footer"><span class="x-chart-ath">${spotAthlete}</span><img class="x-logo-sm" src="${LOGO}"/></div>
+        <div class="x-chart-footer"><span class="x-chart-ath">${spotAthlete}</span><div style="display:flex;align-items:center;gap:6px">${_spotLogoUrl(spotAthlete,spotLogoOnProgress)?`<img src="${_spotLogoUrl(spotAthlete,spotLogoOnProgress)}" style="height:26px;width:26px;object-fit:contain;background:#fff;border-radius:3px;padding:2px"/>`:''}<img class="x-logo-sm" src="${LOGO}"/></div></div>
       </div>`});
   });
   return`<div class="cards-row">${cards.map(c=>`<div class="card-wrap" id="${c.id}-wrap"><div class="card-label">${c.label}</div><div style="border-radius:4px;overflow:hidden;box-shadow:0 6px 32px rgba(0,0,0,.7)">${c.html}</div><button class="dl-btn" onclick="dlCard('${c.id}-wrap','${c.file}')">↓ Download PNG (1200×675)</button></div>`).join('')}</div>`;
