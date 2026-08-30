@@ -154,22 +154,36 @@ var state = { teams:[], athletes:{}, profiles:{}, entries:[], achievements:[], b
 // school's teams). Legacy teams are backfilled by splitting the name on load.
 function _meta(key){
   var m=(state.teamMeta&&state.teamMeta[key]);
-  if(m&&m.org!=null) return m;
+  if(m&&m.org!=null) return Object.assign({grade:'', archived:false, season:'', year:''}, m);
   if(m&&m.name){ // transitional shape from an earlier draft — split it
     var parts=m.name.trim().split(/\s+/);
-    return {org:parts.slice(0,-1).join(' ')||m.name, sport:parts.length>1?parts[parts.length-1]:'', season:m.season||'', year:m.year||'', archived:!!m.archived};
+    return {org:parts.slice(0,-1).join(' ')||m.name, grade:'', sport:parts.length>1?parts[parts.length-1]:'', season:m.season||'', year:m.year||'', archived:!!m.archived};
   }
   var parts=String(key).trim().split(/\s+/);
-  return {org:parts.slice(0,-1).join(' ')||key, sport:parts.length>1?parts[parts.length-1]:'', season:'', year:'', archived:false};
+  return {org:parts.slice(0,-1).join(' ')||key, grade:'', sport:parts.length>1?parts[parts.length-1]:'', season:'', year:'', archived:false};
 }
+// Space-joined "Org Sport" -- the ORIGINAL format, kept byte-identical for any team
+// with no grade (true sports orgs never see a difference). Grade support (Aug 2026)
+// is purely additive: optional, for org types with an intermediate level between
+// organization and team (e.g. a school's grade levels) that real sports orgs don't need.
 function _orgSport(m){ return (m.org+' '+m.sport).trim(); }
+// Dot-separated "Org · Grade · Sport" when a grade is set; falls back to the plain
+// space-joined format otherwise -- this is what every display call site should use.
+function _orgGradeSport(m){
+  if(m.grade) return [m.org,m.grade,m.sport].filter(Boolean).join(' \u00b7 ');
+  return _orgSport(m);
+}
 function _teamDisplay(key){
   var m=_meta(key);
-  return _orgSport(m)+(m.season||m.year?(' \u00b7 '+(m.season?m.season+' ':'')+(m.year||'')):'');
+  return _orgGradeSport(m)+(m.season||m.year?(' \u00b7 '+(m.season?m.season+' ':'')+(m.year||'')):'');
 }
 function _allOrgs(){
   var o={}; (state.teams||[]).forEach(function(t){ var m=_meta(t); if(m.org) o[m.org]=1; });
   return Object.keys(o).sort();
+}
+function _allGrades(org){
+  var g={}; (state.teams||[]).forEach(function(t){ var m=_meta(t); if(m.grade&&(!org||m.org===org)) g[m.grade]=1; });
+  return Object.keys(g).sort();
 }
 function _activeTeams(){ return (state.teams||[]).filter(function(t){ return !_meta(t).archived; }); }
 function _archivedTeams(){ return (state.teams||[]).filter(function(t){ return _meta(t).archived; }); }
@@ -248,6 +262,7 @@ function _handleDelegatedClick(e, prevent){
   var el = e.target, id = el.id;
   if(id==='ach-save-edit-btn'){ if(prevent)e.preventDefault(); saveAchEdit(); }
   else if(id==='team-save-btn'){ if(prevent)e.preventDefault(); saveNewTeam(); }
+  else if(id==='roster-import-dismiss'){ if(prevent)e.preventDefault(); dismissRosterImport(); }
   else if(id==='team-athlete-add-btn'){ if(prevent)e.preventDefault(); addAthleteToTeam(); }
   else if(id==='branding-pull-btn'){ if(prevent)e.preventDefault(); _pullPalette(); }
   else if(id==='branding-save-btn'){ if(prevent)e.preventDefault(); _saveBranding(); }
@@ -399,8 +414,8 @@ function renderTeamSelector(){
   if(currentTeam && vis.indexOf(currentTeam)===-1 && state.teams.indexOf(currentTeam)>-1) vis.push(currentTeam); // opened archive
   var chips = vis.map(function(t){
     var m=_meta(t);
-    var label=_esc(_orgSport(m))+(m.archived?' <span style="font-size:10px;opacity:.7">('+(m.season?m.season+' ':'')+m.year+' \u00b7 archived)</span>'
-      : (vis.filter(function(x){return _orgSport(_meta(x))===_orgSport(m);}).length>1?' <span style="font-size:10px;opacity:.7">'+(m.season?m.season+' ':'')+m.year+'</span>':''));
+    var label=_esc(_orgGradeSport(m))+(m.archived?' <span style="font-size:10px;opacity:.7">('+(m.season?m.season+' ':'')+m.year+' \u00b7 archived)</span>'
+      : (vis.filter(function(x){return _orgGradeSport(_meta(x))===_orgGradeSport(m);}).length>1?' <span style="font-size:10px;opacity:.7">'+(m.season?m.season+' ':'')+m.year+'</span>':''));
     return '<button class="team-chip'+(t===currentTeam?' active':'')+'" onclick="selectTeam(\''+_esc(t)+'\')">'+label+'</button>';
   }).join('');
   return '<div class="team-selector-wrap"><div class="team-selector-label">Team</div><div class="team-chips">'+chips+'</div></div>';
@@ -883,13 +898,14 @@ function endNowAch(id){
 
 // ── SETTINGS TAB ──────────────────────────────────────────────────────────
 function renderSettings(){
-  var sections = ['teams','athletes','branding','copytogym','backup'];
-  var labels   = ['Teams','Athletes','Branding','Copy to Gym','Backup'];
+  var sections = ['teams','bulkroster','athletes','branding','copytogym','backup'];
+  var labels   = ['Teams','Bulk Roster Import','Athletes','Branding','Copy to Gym','Backup'];
   var nav = sections.map(function(s,i){
     return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';render()">'+labels[i]+'</button>';
   }).join('');
   var content = '';
   if(settingsSection==='teams') content = renderSettingsTeams();
+  else if(settingsSection==='bulkroster') content = renderSettingsBulkRoster();
   else if(settingsSection==='athletes') content = renderSettingsAthletes();
   else if(settingsSection==='branding') content = renderSettingsBranding();
   else if(settingsSection==='copytogym') content = renderSettingsCopyToGym();
@@ -897,19 +913,62 @@ function renderSettings(){
   return '<div class="sn-nav">'+nav+'</div>'+content;
 }
 
+function renderSettingsBulkRoster(){
+  var seasons=['Winter','Spring','Summer','Fall'];
+  var yrs=[]; var thisYr=new Date().getFullYear();
+  for(var y=thisYr-1;y<=thisYr+1;y++) yrs.push(String(y));
+  var html='<div class="panel"><div class="panel-title">Bulk Roster Import</div>';
+  html+='<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Upload a spreadsheet of students to create teams and fill their rosters in one pass -- built for organizations with many small teams (like a school\'s grade-level groups) where adding students one at a time isn\'t practical. Any team in the file that doesn\'t exist yet gets created automatically. <strong>This saves immediately on import</strong> -- there\'s no separate review step, so double-check the file before uploading.</div>';
+  html+='<div class="form-group"><div class="form-label">Organization / Season / Year for this import</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+    '<input class="form-input" list="org-list" style="flex:2;min-width:160px" placeholder="Organization (e.g. Dutch Ridge)" value="'+rosterImportOrg.replace(/"/g,'&quot;')+'" oninput="rosterImportOrg=this.value"/>'+
+    '<select class="form-input" style="flex:1;min-width:90px" onchange="rosterImportSeason=this.value"><option value="">Season</option>'+seasons.map(function(s){return '<option'+(s===rosterImportSeason?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
+    '<select class="form-input" style="flex:1;min-width:80px" onchange="rosterImportYear=this.value"><option value="">Year</option>'+yrs.map(function(y){return '<option'+(y===rosterImportYear?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+    '</div></div>';
+  html+='<div class="form-group"><div class="form-label">Roster File (CSV)</div>'+
+    '<input type="file" accept=".csv" style="font-size:13px;color:var(--fg)" onchange="_rosterImportFile(this)"/></div>';
+  if(rosterImportReport){
+    var rep=rosterImportReport;
+    var totalAdded=Object.keys(rep.addedByTeam).reduce(function(s,k){return s+rep.addedByTeam[k].length;},0);
+    html+='<div style="background:var(--surface2);border-radius:8px;padding:14px;margin-top:12px">';
+    html+='<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px">'+
+      '<div><div style="font-size:22px;font-weight:700">'+rep.createdTeams.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Teams Created</div></div>'+
+      '<div><div style="font-size:22px;font-weight:700">'+totalAdded+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Students Added</div></div>'+
+      (rep.skipped.length?'<div><div style="font-size:22px;font-weight:700">'+rep.skipped.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Already on Team</div></div>':'')+
+      (rep.errors.length?'<div><div style="font-size:22px;font-weight:700;color:#e74c3c">'+rep.errors.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Rows Skipped</div></div>':'')+
+      '</div>';
+    if(totalAdded){
+      html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px">By Team</div>';
+      Object.keys(rep.addedByTeam).sort().forEach(function(k){
+        var isNew=rep.createdTeams.indexOf(k)>-1;
+        html+='<div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--border)"><strong>'+_teamDisplay(k)+'</strong>'+(isNew?' <span style="color:var(--team)">(new)</span>':'')+' \u2014 '+rep.addedByTeam[k].length+' student'+(rep.addedByTeam[k].length===1?'':'s')+'</div>';
+      });
+    }
+    if(rep.errors.length){
+      html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:10px 0 4px">Skipped Rows</div><div style="font-size:12px;color:var(--muted)">'+rep.errors.join('<br>')+'</div>';
+    }
+    html+='<button class="btn btn-ghost" id="roster-import-dismiss" style="margin-top:10px">Dismiss</button>';
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
 // Settings — Teams
 var newTeamName = '';
-var newTeamSeason='', newTeamYear='', newTeamOrg='', newTeamSport='';
+var newTeamSeason='', newTeamYear='', newTeamOrg='', newTeamGrade='', newTeamSport='';
 function renderSettingsTeams(){
   var seasons=['Winter','Spring','Summer','Fall'];
   var yrs=[]; var thisYr=new Date().getFullYear();
   for(var y=thisYr-1;y<=thisYr+1;y++) yrs.push(String(y));
   var html = '<div class="panel"><div class="panel-title">Manage Teams</div>';
-  html += '<div class="form-group"><div class="form-label">New Team \u00b7 Organization / Sport / Season / Year</div>'+
+  html += '<div class="form-group"><div class="form-label">New Team \u00b7 Organization / Grade (optional) / Sport-Team / Season / Year</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
     '<input class="form-input" list="org-list" style="flex:2;min-width:140px" placeholder="Organization (e.g. West Allegheny)" value="'+newTeamOrg.replace(/"/g,'&quot;')+'" oninput="newTeamOrg=this.value"/>'+
     '<datalist id="org-list">'+_allOrgs().map(function(o){return '<option value="'+_esc(o)+'"></option>';}).join('')+'</datalist>'+
-    '<input class="form-input" style="flex:1;min-width:110px" placeholder="Sport (e.g. Track & Field)" value="'+newTeamSport.replace(/"/g,'&quot;')+'" oninput="newTeamSport=this.value"/>'+
+    '<input class="form-input" list="grade-list" style="flex:1;min-width:110px" placeholder="Grade (optional)" value="'+newTeamGrade.replace(/"/g,'&quot;')+'" oninput="newTeamGrade=this.value" title="Only needed for organizations with a level between org and team, like a school\'s grades. Sports teams can leave this blank."/>'+
+    '<datalist id="grade-list">'+_allGrades(newTeamOrg).map(function(g){return '<option value="'+_esc(g)+'"></option>';}).join('')+'</datalist>'+
+    '<input class="form-input" style="flex:1;min-width:110px" placeholder="Sport / Team (e.g. Track & Field, Team 1)" value="'+newTeamSport.replace(/"/g,'&quot;')+'" oninput="newTeamSport=this.value"/>'+
     '<select class="form-input" style="flex:1;min-width:90px" onchange="newTeamSeason=this.value">'+'<option value="">Season</option>'+seasons.map(function(s){return '<option'+(s===newTeamSeason?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
     '<select class="form-input" style="flex:1;min-width:80px" onchange="newTeamYear=this.value">'+'<option value="">Year</option>'+yrs.map(function(y){return '<option'+(y===newTeamYear?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
     '</div></div>'+
@@ -935,7 +994,7 @@ function renderSettingsTeams(){
         '<button class="action-btn" onclick="archiveTeam(\''+_esc(t)+'\')">Archive</button>'+
         '<button class="action-btn" style="color:var(--red)" onclick="deleteTeam(\''+_esc(t)+'\')">Delete</button>';
     return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px">'+
-      '<div style="min-width:0"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(_orgSport(m))+' <span style="font-weight:600;font-size:12px;color:var(--muted)">'+(m.season?m.season+' ':'')+(m.year||'')+'</span>'+stale+'</div>'+
+      '<div style="min-width:0"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(_orgGradeSport(m))+' <span style="font-weight:600;font-size:12px;color:var(--muted)">'+(m.season?m.season+' ':'')+(m.year||'')+'</span>'+stale+'</div>'+
       '<div style="font-size:12px;color:var(--muted)">'+count+' athlete'+(count!==1?'s':'')+'</div></div>'+
       '<div style="display:flex;gap:4px;flex-shrink:0">'+actions+'</div></div>';
   }
@@ -945,21 +1004,44 @@ function renderSettingsTeams(){
                      : '<div class="empty" style="padding:10px 0">No active teams.</div>';
   if(arc.length){
     html += '<div class="section-divider"></div><div class="form-label" style="margin-bottom:6px">Previous Seasons</div>';
-    // historical browser: Organization -> Sport -> Year -> Season (cascading)
-    var selO=window._histOrg||'', selSp=window._histSport||'', selY=window._histYear||'', selS=window._histSeason||'';
-    function opts(pick){ var o={}; arc.forEach(function(t){ var m=_meta(t);
-      if(selO&&m.org!==selO&&pick!=='org') return;
-      if(selSp&&m.sport!==selSp&&pick!=='sport'&&pick!=='org') return;
-      if(selY&&m.year!==selY&&(pick==='season')===false&&pick!=='org'&&pick!=='sport'&&pick!=='year') return;
-      o[m[pick]]=1; }); return Object.keys(o).filter(Boolean).sort(); }
+    // Historical browser: Organization -> Grade (optional) -> Sport -> Year -> Season.
+    // Generic ordered-filter-chain so grade slots in cleanly as just another level --
+    // orgs with no grade-having teams simply never populate that dropdown's options.
+    var HIST_LEVELS=['org','grade','sport','year','season'];
+    var histSel={
+      org:window._histOrg||'', grade:window._histGrade||'', sport:window._histSport||'',
+      year:window._histYear||'', season:window._histSeason||''
+    };
+    function opts(pick){
+      var idx=HIST_LEVELS.indexOf(pick), o={};
+      arc.forEach(function(t){
+        var m=_meta(t);
+        for(var i=0;i<idx;i++){ var lvl=HIST_LEVELS[i]; if(histSel[lvl]&&m[lvl]!==histSel[lvl]) return; }
+        if(m[pick]) o[m[pick]]=1;
+      });
+      return Object.keys(o).sort();
+    }
+    // clears every level AFTER the one just changed, so stale lower selections don't linger
+    function _histReset(fromIdx){
+      var out='';
+      for(var i=fromIdx+1;i<HIST_LEVELS.length;i++) out+='window._hist'+HIST_LEVELS[i].charAt(0).toUpperCase()+HIST_LEVELS[i].slice(1)+'=\'\';';
+      return out;
+    }
+    var LEVEL_LABEL={org:'All organizations',grade:'Grade',sport:'Sport',year:'Year',season:'Season'};
     html += '<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">'+
-      '<select class="form-input" style="flex:2;min-width:130px" onchange="window._histOrg=this.value;window._histSport=\'\';window._histYear=\'\';window._histSeason=\'\';render()"><option value="">All organizations</option>'+opts('org').map(function(n){return '<option'+(n===selO?' selected':'')+'>'+_esc(n)+'</option>';}).join('')+'</select>'+
-      '<select class="form-input" style="flex:1;min-width:100px" onchange="window._histSport=this.value;window._histYear=\'\';window._histSeason=\'\';render()"><option value="">Sport</option>'+opts('sport').map(function(n){return '<option'+(n===selSp?' selected':'')+'>'+_esc(n)+'</option>';}).join('')+'</select>'+
-      '<select class="form-input" style="flex:1;min-width:80px" onchange="window._histYear=this.value;window._histSeason=\'\';render()"><option value="">Year</option>'+opts('year').map(function(y){return '<option'+(y===selY?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
-      '<select class="form-input" style="flex:1;min-width:90px" onchange="window._histSeason=this.value;render()"><option value="">Season</option>'+opts('season').map(function(s){return '<option'+(s===selS?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
+      HIST_LEVELS.map(function(lvl,i){
+        var cap='window'+'._hist'+lvl.charAt(0).toUpperCase()+lvl.slice(1);
+        var vals=opts(lvl);
+        if(lvl==='grade' && !vals.length) return '';   // no grade-having teams anywhere yet -- skip the dropdown entirely
+        return '<select class="form-input" style="flex:1;min-width:90px" onchange="'+cap+'=this.value;'+_histReset(i)+'render()">'+
+          '<option value="">'+LEVEL_LABEL[lvl]+'</option>'+
+          vals.map(function(v){return '<option'+(v===histSel[lvl]?' selected':'')+'>'+_esc(v)+'</option>';}).join('')+
+          '</select>';
+      }).join('')+
       '</div>';
     var filtered=arc.filter(function(t){ var m=_meta(t);
-      return (!selO||m.org===selO)&&(!selSp||m.sport===selSp)&&(!selY||m.year===selY)&&(!selS||m.season===selS); });
+      return HIST_LEVELS.every(function(lvl){ return !histSel[lvl] || m[lvl]===histSel[lvl]; });
+    });
     html += filtered.length ? '<div style="display:flex;flex-direction:column;gap:8px">'+filtered.map(function(t){return card(t,true);}).join('')+'</div>'
                             : '<div class="empty" style="padding:10px 0">No seasons match.</div>';
   }
@@ -978,16 +1060,16 @@ function restoreTeam(key){
 }
 function startNewSeason(key){
   var m=_meta(key);
-  var season=prompt('New season for '+_orgSport(m)+' (Winter / Spring / Summer / Fall):','');
+  var season=prompt('New season for '+_orgGradeSport(m)+' (Winter / Spring / Summer / Fall):','');
   if(season==null) return; season=season.trim();
   if(['Winter','Spring','Summer','Fall'].indexOf(season)===-1){ alert('Season must be Winter, Spring, Summer, or Fall.'); return; }
   var year=prompt('Year:', String(new Date().getFullYear()));
   if(year==null) return; year=year.trim();
   if(!/^20\d\d$/.test(year)){ alert('Enter a 4-digit year.'); return; }
-  var newKey=_orgSport(m)+' \u2014 '+season+' '+year;
+  var newKey=_teamKey(m.org, m.grade, m.sport, season, year);
   if(state.teams.indexOf(newKey)>-1){ alert('That season already exists.'); return; }
   state.teams.push(newKey);
-  state.teamMeta[newKey]={org:m.org, sport:m.sport, season:season, year:year, archived:false};
+  state.teamMeta[newKey]={org:m.org, grade:m.grade, sport:m.sport, season:season, year:year, archived:false};
   state.athletes[newKey]=(state.athletes[key]||[]).slice();          // roster carries (profiles are global by athlete)
   if(state.sessions&&state.sessions[key]) state.sessions[newKey]=state.sessions[key].slice();
   state.required[newKey]=state.required[key]!=null?state.required[key]:2;
@@ -1001,15 +1083,24 @@ function startNewSeason(key){
   currentTeam=newKey; showToast(season+' '+year+' season started.'); render();
 }
 
+// Builds the team's unique key. Grade folds in right after org when set, so e.g.
+// "Dutch Ridge 3rd Grade Team 1" and "Dutch Ridge 4th Grade Team 1" never collide
+// even though both are just called "Team 1" by their teacher. When grade is blank
+// the key is byte-identical to the original org+sport format (zero change for
+// existing sports teams).
+function _teamKey(org, grade, sport, season, year){
+  var parts=[org]; if(grade) parts.push(grade); parts.push(sport);
+  return parts.join(' ')+' \u2014 '+season+' '+year;
+}
 function saveNewTeam(){
-  var org = newTeamOrg.trim(), sport = newTeamSport.trim();
-  if(!org||!sport){ alert('Enter an organization and a sport.'); return; }
+  var org = newTeamOrg.trim(), grade = newTeamGrade.trim(), sport = newTeamSport.trim();
+  if(!org||!sport){ alert('Enter an organization and a sport/team name.'); return; }
   if(!newTeamSeason||!newTeamYear){ alert('Pick a season and year for this team.'); return; }
-  var key = org+' '+sport+' \u2014 '+newTeamSeason+' '+newTeamYear;
+  var key = _teamKey(org, grade, sport, newTeamSeason, newTeamYear);
   if(state.teams.indexOf(key)>-1){ alert('That team season already exists.'); return; }
   state.teams.push(key);
   state.teamMeta=state.teamMeta||{};
-  state.teamMeta[key]={org:org, sport:sport, season:newTeamSeason, year:newTeamYear, archived:false};
+  state.teamMeta[key]={org:org, grade:grade, sport:sport, season:newTeamSeason, year:newTeamYear, archived:false};
   state.required=state.required||{}; state.required[key]=2;
   if(!state.athletes[key]) state.athletes[key] = [];
   // same organization already here? offer to copy its branding (colors + logo)
@@ -1017,7 +1108,7 @@ function saveNewTeam(){
   if(sib.length && confirm('Copy branding (colors + logo) from '+_teamDisplay(sib[sib.length-1])+'?')){
     state.branding[key]=JSON.parse(JSON.stringify(state.branding[sib[sib.length-1]]));
   }
-  newTeamOrg=''; newTeamSport=''; newTeamSeason=''; newTeamYear='';
+  newTeamOrg=''; newTeamGrade=''; newTeamSport=''; newTeamSeason=''; newTeamYear='';
   saveData(); showToast('Team added!'); render();
 }
 
@@ -1102,7 +1193,7 @@ function _spotVal(id, v){
   if(v==null || isNaN(v)) return '--';
   if(id==='broad') return Math.floor(v/12)+"'"+Math.round(v%12);
   if(id==='fly')   return v.toFixed(2);
-  if(id==='pacer') return String(Math.round(v));   // whole laps -- no decimal
+  if(id==='pacer') return String(Math.round(v));
   return String(parseFloat(v.toFixed(1)));
 }
 
@@ -1567,7 +1658,7 @@ function _parentPdfDoc(ath, logo, opts){
 function _teamLabelBits(){
   var m=_meta(currentTeam);
   var sl=(m.season&&m.year)?{season:m.season,year:m.year}:_seasonLabel(_reportDates().retest);
-  return {season:sl.season, year:sl.year, name:_orgSport(m), sport:m.sport||''};
+  return {season:sl.season, year:sl.year, name:_orgGradeSport(m), sport:m.sport||''};
 }
 async function downloadParentPdf(ath){
   if(!ath){ alert('Pick an athlete first.'); return; }
@@ -2071,6 +2162,109 @@ function renderSettingsAthletes(){
   });
 
   return html;
+}
+
+// ── Bulk Roster Import (Aug 2026) ────────────────────────────────────────────
+// Built for the classroom use case (a teacher with dozens of "teams" -- e.g.
+// Dutch Ridge's 5 grades x 5 groups each) where one-at-a-time Add Athlete is
+// impractical. This CREATES teams that don't exist yet AND populates rosters
+// in one pass, unlike the gym-side CSV importer (which only edits fields on
+// already-existing athletes) -- a genuinely different job, so it's a separate
+// tool rather than a reuse of that one.
+var rosterImportReport = null;   // {createdTeams:[], addedByTeam:{team:[names]}, skipped:[], errors:[]}
+var rosterImportOrg = '', rosterImportSeason = '', rosterImportYear = '';
+
+// Same quoted-field-safe parser as the gym-side importer (handles commas/newlines
+// inside quoted cells, e.g. a wrapped "Grade\n(3rd, 4th...)" style header).
+function _parseRosterCsv(text){
+  var rows=[], row=[], field='', inQuotes=false;
+  for(var i=0;i<text.length;i++){
+    var c=text[i];
+    if(inQuotes){
+      if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inQuotes=false; }
+      else field+=c;
+    } else {
+      if(c==='"') inQuotes=true;
+      else if(c===','){ row.push(field); field=''; }
+      else if(c==='\n'||c==='\r'){
+        if(c==='\r'&&text[i+1]==='\n')i++;
+        row.push(field); field=''; rows.push(row); row=[];
+      } else field+=c;
+    }
+  }
+  if(field!==''||row.length){ row.push(field); rows.push(row); }
+  return rows.filter(function(r){ return r.length>1 || (r[0]&&r[0].trim()); });
+}
+function _normalizeRosterHeader(h){ return String(h||'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase(); }
+var ROSTER_COL_PATTERNS=[
+  [/^grade/,'grade'], [/^team/,'team'],
+  [/^first/,'first'], [/^last/,'last'],
+  [/^(student\s*)?name$/,'fullname'],   // supports a single "Name" column as an alternative to First+Last
+  [/^gender/,'gender']
+];
+function _mapRosterHeader(h){
+  var norm=_normalizeRosterHeader(h);
+  for(var i=0;i<ROSTER_COL_PATTERNS.length;i++){ if(ROSTER_COL_PATTERNS[i][0].test(norm)) return ROSTER_COL_PATTERNS[i][1]; }
+  return null;
+}
+function _rosterImportFile(input){
+  if(!input.files||!input.files[0])return;
+  var reader=new FileReader();
+  reader.onload=function(e){ runRosterImport(e.target.result); };
+  reader.readAsText(input.files[0]);
+}
+function dismissRosterImport(){ rosterImportReport=null; render(); }
+function runRosterImport(csvText){
+  if(!rosterImportOrg.trim()){ alert('Enter an Organization for this import first.'); return; }
+  if(!rosterImportSeason||!rosterImportYear){ alert('Pick a Season and Year for this import first.'); return; }
+  var rows=_parseRosterCsv(csvText);
+  if(rows.length<2){ alert('No data rows found in that file.'); return; }
+  var fieldFor=rows[0].map(_mapRosterHeader);
+  var gradeCol=fieldFor.indexOf('grade'), teamCol=fieldFor.indexOf('team');
+  var firstCol=fieldFor.indexOf('first'), lastCol=fieldFor.indexOf('last'), fullCol=fieldFor.indexOf('fullname');
+  var genderCol=fieldFor.indexOf('gender');
+  if(teamCol===-1){ alert('Could not find a "Team" column in the header row.'); return; }
+  if(fullCol===-1 && (firstCol===-1||lastCol===-1)){ alert('Could not find a "Student Name" column (or First + Last columns).'); return; }
+
+  var org=rosterImportOrg.trim(), season=rosterImportSeason, year=rosterImportYear;
+  var createdTeams=[], addedByTeam={}, skipped=[], errors=[];
+  var seenThisRun={};   // team|studentName -> true, catches duplicate rows within the same file
+
+  for(var r=1;r<rows.length;r++){
+    var row=rows[r]; if(!row.some(function(c){return c&&c.trim();})) continue;
+    var grade = gradeCol>-1 ? (row[gradeCol]||'').trim() : '';
+    var team = (row[teamCol]||'').trim();
+    var name = fullCol>-1 ? (row[fullCol]||'').trim()
+                          : ((row[firstCol]||'').trim()+' '+(row[lastCol]||'').trim()).trim();
+    if(!team || !name){ errors.push('Row '+(r+1)+': missing team or student name'); continue; }
+    var gender = genderCol>-1 ? (row[genderCol]||'').trim().toLowerCase() : '';
+    if(gender && gender!=='male' && gender!=='female') gender='';
+
+    var key=_teamKey(org, grade, team, season, year);
+    var dupKey=key+'|'+name.toLowerCase();
+    if(seenThisRun[dupKey]) continue;   // same student listed twice for the same team in this file
+    seenThisRun[dupKey]=true;
+
+    if(state.teams.indexOf(key)===-1){
+      state.teams.push(key);
+      state.teamMeta[key]={org:org, grade:grade, sport:team, season:season, year:year, archived:false};
+      state.athletes[key]=[];
+      state.required[key]=2;
+      createdTeams.push(key);
+    }
+    if(state.athletes[key].indexOf(name)>-1){
+      skipped.push(name+' (already on '+_teamDisplay(key)+')');
+      continue;
+    }
+    state.athletes[key].push(name);
+    if(!state.profiles[name]) state.profiles[name]={};
+    if(gender && !state.profiles[name].gender) state.profiles[name].gender=gender;
+    (addedByTeam[key]=addedByTeam[key]||[]).push(name);
+  }
+
+  rosterImportReport={createdTeams:createdTeams, addedByTeam:addedByTeam, skipped:skipped, errors:errors, org:org, season:season, year:year};
+  saveData();
+  render();
 }
 
 function addAthleteToTeam(){
