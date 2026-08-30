@@ -696,6 +696,17 @@ function _resolveSchool(athleteName){
   }
   return p.college||p.highSchool||'';
 }
+// Many logo URLs in the library point at hosts that don't send CORS headers
+// (redbubble.com, bsnsports CDNs, etc.) -- fine for a plain <img> on the TV, but
+// canvas.drawImage() (needed here so the card can be exported as a PNG) requires
+// the source to explicitly allow cross-origin reads, or the browser silently
+// blocks it. Routing through images.weserv.nl (a free, widely-used public image
+// proxy that re-serves any image with permissive CORS headers) fixes this for
+// virtually any source without needing to re-host every school's logo ourselves.
+// Falls back to the direct URL if the proxy itself fails to load.
+function _corsProxied(url){
+  return 'https://images.weserv.nl/?url='+encodeURIComponent(url.replace(/^https?:\/\//,''));
+}
 async function _preloadSchoolLogos(athleteNames){
   if(!includeSchoolLogos) return;
   var schools=[...new Set(athleteNames.map(_resolveSchool).filter(Boolean))];
@@ -704,14 +715,20 @@ async function _preloadSchoolLogos(athleteNames){
     return new Promise(function(resolve){
       var url=(state.schoolLogos||{})[school];
       if(!url){ _logoImgCache[school]=null; resolve(); return; }
-      var img=new Image();
-      img.crossOrigin='anonymous';
       var done=false;
       function finish(val){ if(done)return; done=true; _logoImgCache[school]=val; resolve(); }
-      img.onload=function(){ finish(img); };
-      img.onerror=function(){ finish(null); };
-      img.src=url;
-      setTimeout(function(){ finish(null); }, 3000);   // safety timeout -- never hang a download on a slow/broken logo URL
+      function tryLoad(src, isProxyAttempt){
+        var img=new Image();
+        img.crossOrigin='anonymous';
+        img.onload=function(){ finish(img); };
+        img.onerror=function(){
+          if(!isProxyAttempt){ tryLoad(_corsProxied(url), true); }   // direct load failed CORS -- retry via proxy
+          else { finish(null); }                                     // proxy also failed -- give up gracefully
+        };
+        img.src=src;
+      }
+      tryLoad(url, false);
+      setTimeout(function(){ finish(null); }, 4000);   // safety timeout -- never hang a download on a slow/broken logo URL
     });
   }));
 }
