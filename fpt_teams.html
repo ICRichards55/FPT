@@ -10,7 +10,7 @@
 :root{
   --bg:#07090B;--surface:#0F1215;--surface2:#171B20;--surface3:#1E242B;
   --border:#252B33;--accent:#FFFFFF;--red:#FF5C35;--green:#2ECC71;
-  --fly:#FF5C35;--broad:#3B9EFF;--vert:#2ECC71;
+  --fly:#FF5C35;--broad:#3B9EFF;--vert:#2ECC71;--pacer:#F5A623;
   --text:#F0F2F5;--muted:#7A8694;--muted2:#4A5260;
   --team:#e8c84a;
 }
@@ -221,6 +221,7 @@ var EX_LIST = [
   {id:'fly',   name:'10-10 Fly',   unit:'seconds', lower:true,  color:'var(--fly)'},
   {id:'broad', name:'Broad Jump',  unit:'ft + in', lower:false, color:'var(--broad)'},
   {id:'vert',  name:'Skyhook',     unit:'inches',  lower:false, color:'var(--vert)'},
+  {id:'pacer', name:'Pacer Test',  unit:'laps',    lower:false, color:'var(--pacer)'},
 ];
 
 // ── AUTH ──────────────────────────────────────────────────────────────────
@@ -308,7 +309,7 @@ var _pendingTeamDeletes=[];
 var _pendingAttDeletes=[];
 var attDate=new Date().toISOString().slice(0,10);
 // Parent report content toggles (Studio checkboxes): which sections make the PDF
-var parentOpts={broad:true,fly:true,vert:true,attendance:true};
+var parentOpts={broad:true,fly:true,vert:true,pacer:true,attendance:true};
 function toggleParentOpt(k,v){ parentOpts[k]=!!v; }
 var attSession='';
 function saveData(){
@@ -325,7 +326,8 @@ function _esc(s){ return String(s).replace(/'/g,"\\'"); }
 function fmtFly(v){ return v!=null ? v.toFixed(2)+'s' : '--'; }
 function fmtBroad(v){ if(v==null) return '--'; return Math.floor(v/12)+"' "+Math.round(v%12)+'"'; }
 function fmtVert(v){ return v!=null ? v.toFixed(3)+'"' : '--'; }
-function fmtPR(id,v){ return id==='fly'?fmtFly(v):id==='broad'?fmtBroad(v):fmtVert(v); }
+function fmtPacer(v){ return v!=null ? Math.round(v)+' laps' : '--'; }
+function fmtPR(id,v){ return id==='fly'?fmtFly(v):id==='broad'?fmtBroad(v):id==='pacer'?fmtPacer(v):fmtVert(v); }
 function fmtDate(d){ if(!d) return ''; var p=d.split('-'); var m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return m[parseInt(p[1])-1]+' '+parseInt(p[2])+', '+p[0]; }
 function fmtShortDate(d){ if(!d) return ''; var p=d.split('-'); return p[1].replace(/^0/,'')+'/'+p[2].replace(/^0/,'')+'/'+p[0].slice(2); }
 function lastName(name){ return (name||'').split(' ').pop(); }
@@ -445,6 +447,8 @@ function renderLog(){
   var resultHtml;
   if(logEx==='broad'){
     resultHtml = '<div style="display:flex;gap:8px;align-items:flex-end"><div style="flex:1"><div class="form-label">Feet</div><input class="result-field" id="res-ft" type="number" min="0" max="15" step="1" placeholder="6" oninput="checkPRLive()"/></div><div style="color:var(--muted);font-size:26px;padding-bottom:10px;font-weight:300">ft</div><div style="flex:1"><div class="form-label">Inches</div><input class="result-field" id="res-in" type="number" min="0" max="11" step="1" placeholder="9" oninput="checkPRLive()"/></div><div style="color:var(--muted);font-size:26px;padding-bottom:10px;font-weight:300">in</div></div>';
+  } else if(logEx==='pacer'){
+    resultHtml = '<input class="result-field" id="res-val" type="number" step="1" min="0" placeholder="8" oninput="checkPRLive()" style="width:100%"/>';
   } else {
     resultHtml = '<input class="result-field" id="res-val" type="number" step="0.01" min="0" placeholder="'+(logEx==='fly'?'1.25':'20.0')+'" oninput="checkPRLive()" style="width:100%"/>';
   }
@@ -501,7 +505,7 @@ function checkPRLive(){
   } else {
     var isPR = logEx==='fly' ? newVal<current : newVal>current;
     if(isPR){
-      var diff = logEx==='fly' ? (current-newVal).toFixed(2)+'s' : logEx==='broad' ? (newVal-current).toFixed(1)+' in' : (newVal-current).toFixed(3)+'"';
+      var diff = logEx==='fly' ? (current-newVal).toFixed(2)+'s' : logEx==='broad' ? (newVal-current).toFixed(1)+' in' : logEx==='pacer' ? Math.round(newVal-current)+' laps' : (newVal-current).toFixed(3)+'"';
       ind.innerHTML='<span style="color:var(--green)">🏆 NEW PR! +'+diff+' improvement</span>';
     } else {
       ind.innerHTML='<span style="color:var(--muted)">Current PR: '+fmtPR(logEx,current)+'</span>';
@@ -1098,6 +1102,7 @@ function _spotVal(id, v){
   if(v==null || isNaN(v)) return '--';
   if(id==='broad') return Math.floor(v/12)+"'"+Math.round(v%12);
   if(id==='fly')   return v.toFixed(2);
+  if(id==='pacer') return String(Math.round(v));   // whole laps -- no decimal
   return String(parseFloat(v.toFixed(1)));
 }
 
@@ -1106,7 +1111,8 @@ function _spotBoxes(ath, P, positiveOnly){
   var defs = [
     ['broad','Broad Jump'],
     ['fly','10-10 Fly'],
-    ['vert','Skyhook']
+    ['vert','Skyhook'],
+    ['pacer','Pacer Test']
   ];
   // Per exercise: BEST box + AVERAGE box, each with a colored delta chip vs intake
   // (green = improved, red = regressed) once a retest session exists. Direction-aware.
@@ -1217,7 +1223,7 @@ async function _bulkDownloadCards(positiveOnly){
     var any=state.entries.some(function(e){ return e.athlete===a; });
     if(!any) return false;
     if(!positiveOnly) return true;
-    return ['broad','fly','vert'].some(function(id){
+    return ['broad','fly','vert','pacer'].some(function(id){
       var c=getSessionComparison(a,id);
       return c && (c.bestImpPct>0 || c.avgImpPct>0);
     });
@@ -1488,9 +1494,9 @@ async function _fetchLogoDataUrl(){
 }
 function _parentPdfDoc(ath, logo, opts){
   opts=opts||parentOpts;
-  var exIds=['broad','fly','vert'].filter(function(id){ return opts[id]; });
+  var exIds=['broad','fly','vert','pacer'].filter(function(id){ return opts[id]; });
   var withAtt=!!opts.attendance && _attWeeks().length>0;
-  var EXN={broad:'Broad Jump',fly:'10-10 Fly',vert:'Skyhook'};
+  var EXN={broad:'Broad Jump',fly:'10-10 Fly',vert:'Skyhook',pacer:'Pacer Test'};
   var doc=new window.jspdf.jsPDF({unit:'pt',format:'letter'});
   var M=40, W=612-2*M;
   var _b=_teamLabelBits(), sl={season:_b.season,year:_b.year}, dates=_reportDates();
@@ -1566,7 +1572,7 @@ function _teamLabelBits(){
 async function downloadParentPdf(ath){
   if(!ath){ alert('Pick an athlete first.'); return; }
   if(!window.jspdf || !window.jspdf.jsPDF.API.autoTable){ alert('Still loading \u2014 try again in a moment.'); return; }
-  var exIds=['broad','fly','vert'].filter(function(id){ return parentOpts[id]; });
+  var exIds=['broad','fly','vert','pacer'].filter(function(id){ return parentOpts[id]; });
   if(!exIds.length && !parentOpts.attendance){ alert('Pick at least one section for the report.'); return; }
   var logo=null; try{ logo=await _fetchLogoDataUrl(); }catch(e){}
   var b=_teamLabelBits();
@@ -1574,7 +1580,7 @@ async function downloadParentPdf(ath){
 }
 async function _bulkParentPdfs(){
   if(!window.JSZip || !window.jspdf || !window.jspdf.jsPDF.API.autoTable){ alert('Still loading libraries \u2014 try again in a moment.'); return; }
-  var exIds=['broad','fly','vert'].filter(function(id){ return parentOpts[id]; });
+  var exIds=['broad','fly','vert','pacer'].filter(function(id){ return parentOpts[id]; });
   if(!exIds.length && !parentOpts.attendance){ alert('Pick at least one section for the report.'); return; }
   var list=(state.athletes[currentTeam]||[]).filter(function(a){
     if(REPORT_EXCLUDE.indexOf(a)>-1) return false;
@@ -1633,13 +1639,16 @@ function _reportDates(){
   return { intake:arr[0]||null, retest:arr[arr.length-1]||null, count:arr.length };
 }
 function _fmtDelta(id, d){
-  var mag = (id==='broad') ? Math.round(Math.abs(d))+'\u2033' : (id==='fly' ? Math.abs(d).toFixed(2)+'s' : Math.abs(d).toFixed(1)+'\u2033');
+  var mag = (id==='broad') ? Math.round(Math.abs(d))+'\u2033'
+    : (id==='fly') ? Math.abs(d).toFixed(2)+'s'
+    : (id==='pacer') ? Math.round(Math.abs(d))+' laps'
+    : Math.abs(d).toFixed(1)+'\u2033';
   return (d>=0?'+':'\u2212')+mag;
 }
 function _teamReportData(){
   var roster=state.athletes[currentTeam]||[];
   var out={ retested:{} };
-  ['broad','fly','vert'].forEach(function(id){
+  ['broad','fly','vert','pacer'].forEach(function(id){
     var rows=[];
     roster.forEach(function(ath){
       if(REPORT_EXCLUDE.indexOf(ath)>-1) return;              // injured etc.
@@ -1679,7 +1688,7 @@ function _teamReportCardHtml(){
     : 'Intake '+(dates.intake?fmtShortDate(dates.intake):'\u2014')+' \u00b7 awaiting retest';
   var roster=state.athletes[currentTeam]||[];
   var fptLogo=_fptLogoFor(P.background), teamLogo=brand.logoUrl;
-  var EXN={broad:'Broad Jump',fly:'10-10 Fly',vert:'Skyhook'};
+  var EXN={broad:'Broad Jump',fly:'10-10 Fly',vert:'Skyhook',pacer:'Pacer Test'};
   function section(id,last){
     var d=R[id], rows='';
     d.top5.forEach(function(r,i){
@@ -1732,7 +1741,7 @@ function _teamReportCardHtml(){
       '</div>'+
     '</div>'+
     banner+
-    '<div style="margin-top:'+(studioTeamPhoto?'5':'12')+'px">'+section('broad')+section('fly')+section('vert',true)+footnote+'</div>'+
+    '<div style="margin-top:'+(studioTeamPhoto?'5':'12')+'px">'+section('broad')+section('fly')+section('vert')+section('pacer',true)+footnote+'</div>'+
     '<div style="position:absolute;bottom:12px;left:32px;right:32px;display:flex;align-items:center;justify-content:flex-end;gap:10px;border-top:1px solid '+line+';padding-top:8px">'+
       '<span style="color:'+muted+';font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase">Powered by</span>'+
       '<img src="'+fptLogo+'" crossorigin="anonymous" style="height:44px;width:auto;object-fit:contain"/>'+
@@ -1790,7 +1799,7 @@ function renderStudio(){
       '<div style="font-weight:800;font-size:13px;margin-bottom:6px">Parent Reports (PDF)</div>'+
       '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Pick what goes on the report \u2014 any mix of tests and the attendance record. True selectable-text PDFs, ready to email.</div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px">'+
-        _po('broad','Broad Jump')+_po('fly','10-10 Fly')+_po('vert','Skyhook')+_po('attendance','Attendance')+
+        _po('broad','Broad Jump')+_po('fly','10-10 Fly')+_po('vert','Skyhook')+_po('pacer','Pacer Test')+_po('attendance','Attendance')+
       '</div>'+
       '<div style="display:flex;gap:8px">'+
         '<button class="btn" id="parent-one-btn" style="flex:1">This Athlete (PDF)</button>'+
