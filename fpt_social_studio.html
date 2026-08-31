@@ -1210,7 +1210,11 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
   // Table geometry
   const tableTop=200, tableBottom=1000, headH=48;
   const n=rows.length;
-  const rowH=Math.min(60, Math.floor((tableBottom-tableTop-headH)/Math.max(n,1)));
+  // Raised from a flat 60px cap (Aug 2026): with few entries the table only ever used
+  // a fraction of the available space, leaving a large dead black area below the last
+  // row. 150px lets rows genuinely grow to fill the space when there's room, while a
+  // full 14-row page (~54px/row) sits well under this ceiling and is unaffected.
+  const rowH=Math.min(150, Math.floor((tableBottom-tableTop-headH)/Math.max(n,1)));
   const colAdultX=124, colBase=712, colLatest=872, colImp=1040;
 
   // Header row
