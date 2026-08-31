@@ -653,9 +653,38 @@ function _fmtMMSS(totalSeconds){
   if(secWhole.length<2) remStr = '0'+remStr;
   return m+':'+remStr;
 }
-function buildChallengeSlide(){
+// The gym runs on a Monday-start week, not the calendar month -- so the switch to a
+// new month's challenge should happen on the MONDAY of whichever week contains the
+// 1st, not on the literal 1st itself (which may land mid-week). E.g. if Sept 1 falls
+// on a Tuesday, the week is Mon Aug 31 - Sun Sept 6; Aug 31 is treated as already
+// "September" for the TV, even though the calendar still says August that day.
+// Then, matching the original ask, the OLD month keeps showing alongside the new one
+// through that same week's Saturday, and drops off starting that week's Sunday.
+function _mondayOf(d){
+  var day=d.getDay();                         // 0=Sun...6=Sat
+  var diff=(day===0)?-6:(1-day);              // days to walk back (or forward, if Sunday) to Monday
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()+diff);
+}
+function _challengeMonthsToShow(){
   var et=_etNow();
-  var mm=et.getFullYear()+'-'+String(et.getMonth()+1).padStart(2,'0');
+  var today=new Date(et.getFullYear(), et.getMonth(), et.getDate());   // date-only, no time-of-day
+  var monday=_mondayOf(et);
+  var sunday=new Date(monday.getFullYear(), monday.getMonth(), monday.getDate()+6);
+  var straddles = monday.getMonth()!==sunday.getMonth() || monday.getFullYear()!==sunday.getFullYear();
+  if(!straddles){
+    return [{y:et.getFullYear(), m:et.getMonth()}];                    // ordinary week, nothing special
+  }
+  var saturday=new Date(monday.getFullYear(), monday.getMonth(), monday.getDate()+5);
+  if(today<=saturday){
+    // grace window: still show both the old month (Monday's month) and the
+    // new one (Sunday's month) -- this covers Ian's exact case, a Monday that's
+    // technically still last month but is already treated as the new one.
+    return [{y:monday.getFullYear(),m:monday.getMonth()}, {y:sunday.getFullYear(),m:sunday.getMonth()}];
+  }
+  // it's the Sunday that closes out the straddling week -- new month only from here
+  return [{y:sunday.getFullYear(), m:sunday.getMonth()}];
+}
+function buildChallengeSlideForMonth(mm, monName){
   var ch=(state.challenges||{})[mm];
   if(!ch)return '';                     // no challenge defined this month
   var rows=challengeLeaderboard(mm,ch);
@@ -663,7 +692,6 @@ function buildChallengeSlide(){
   var isTime=_isTimeUnit(ch.unit);
   var unitSfx=(ch.unit&&!isTime)?(' '+ch.unit):'';
   var fmtChallengeVal=function(v){ return isTime?_fmtMMSS(v):(round3(v)+unitSfx); };
-  var monName=et.toLocaleString('en-US',{month:'long'}).toUpperCase();
 
   // Rank the FULL list first (tie-aware), then split into columns so numbering stays continuous.
   var rankNum=1;
@@ -763,7 +791,13 @@ function renderBoard(){
   add(buildBigBoysBoard(tvEntries),12);
   add(buildShredmill(),11);
   add(buildBirthdays(),13);
-  if(SHOW_CHALLENGE_SLIDE)add(buildChallengeSlide(),13);
+  if(SHOW_CHALLENGE_SLIDE){
+    _challengeMonthsToShow().forEach(function(mo){
+      var mm=mo.y+'-'+String(mo.m+1).padStart(2,'0');
+      var monName=new Date(mo.y,mo.m,1).toLocaleString('en-US',{month:'long'}).toUpperCase();
+      add(buildChallengeSlideForMonth(mm,monName),13);
+    });
+  }
   add(buildCongrats(tvEntries),13);
   TOTAL_SLIDES=slides.length;
   SLIDE_TIMES=slides.map(function(s){return s.time;});
