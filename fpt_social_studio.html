@@ -1181,6 +1181,20 @@ function getChallengeData(year, month){
   return {ch:ch,rows:rows};
 }
 
+// Time-based challenges (unit = Seconds/Minutes/Time) are stored and entered as
+// plain decimal seconds, but read far better on a graphic as minutes:seconds --
+// same convention and same rounding-before-split fix as the TV display's Challenge
+// slide, ported here so both surfaces show identical formatting.
+function _isTimeUnit(unit){ return /^(sec|second|min|minute|time)/i.test(String(unit||'').trim()); }
+function _fmtMMSS(totalSeconds){
+  var s = Math.max(0, Math.round((Number(totalSeconds)||0)*100)/100);
+  var m = Math.floor(s/60);
+  var rem = s - m*60;
+  var remStr = rem.toFixed(2).replace(/\.?0+$/,'');
+  var secWhole = remStr.split('.')[0];
+  if(secWhole.length<2) remStr = '0'+remStr;
+  return m+':'+remStr;
+}
 function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
   const canvas=document.createElement('canvas');
   canvas.width=1080;canvas.height=1080;
@@ -1239,14 +1253,19 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
     // adult name
     ctx.fillStyle='#ffffff';let nf=Math.floor(rowH*0.50);ctx.font='italic 900 '+nf+'px "Barlow Condensed", sans-serif';
     let nm=r.adult.toUpperCase();
-    while(ctx.measureText(nm).width>(colBase-70-colAdultX)&&nf>16){nf-=2;ctx.font='italic 900 '+nf+'px "Barlow Condensed", sans-serif';}
+    // Requires 20px of REAL margin before stopping, not just "no longer overflowing" --
+    // the old check stopped the instant width dropped under budget, which with -2px
+    // steps could leave as little as a few px of slack (enough to visually clash with
+    // the Base number on a long name at the taller row heights introduced above).
+    while(ctx.measureText(nm).width>(colBase-70-colAdultX-20)&&nf>16){nf-=2;ctx.font='italic 900 '+nf+'px "Barlow Condensed", sans-serif';}
     ctx.fillText(nm,colAdultX,midY);
     // baseline
+    const isTime=_isTimeUnit(ch.unit);
     ctx.textAlign='right';ctx.fillStyle='#8c8c8c';ctx.font='900 '+Math.floor(rowH*0.44)+'px "Barlow Condensed", sans-serif';
-    ctx.fillText(String(_ch_round3(r.baseline)),colBase,midY);
+    ctx.fillText(isTime?_fmtMMSS(r.baseline):String(_ch_round3(r.baseline)),colBase,midY);
     // latest
     ctx.fillStyle='#ffffff';
-    ctx.fillText(r.latest!=null?String(_ch_round3(r.latest)):'\u2014',colLatest,midY);
+    ctx.fillText(r.latest!=null?(isTime?_fmtMMSS(r.latest):String(_ch_round3(r.latest))):'\u2014',colLatest,midY);
     // improvement
     const imp=r.improvement;
     ctx.fillStyle=imp==null?'#4a4a4a':(imp>0?'#3ad07a':(imp<0?'#e0564b':'#9a9a9a'));
