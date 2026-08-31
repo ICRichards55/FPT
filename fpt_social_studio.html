@@ -1229,7 +1229,22 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
   // row. 150px lets rows genuinely grow to fill the space when there's room, while a
   // full 14-row page (~54px/row) sits well under this ceiling and is unaffected.
   const rowH=Math.min(150, Math.floor((tableBottom-tableTop-headH)/Math.max(n,1)));
-  const colAdultX=124, colBase=712, colLatest=872, colImp=1040;
+  // mm:ss strings ("1:28.86") run ~40-50px wider than the plain decimals ("88.86")
+  // these column positions were originally tuned for -- time-based challenges get
+  // their own wider layout (and a smaller name budget to make room), while every
+  // other challenge type (Miles, reps, etc.) keeps today's exact positions, unchanged.
+  // Rebuilt from actual measured content widths (Aug 2026), not guessed anchor
+  // positions -- the earlier version reserved only a small fixed gap for the name
+  // column, without accounting for how wide the mm:ss VALUE text itself is (up to
+  // ~165px at this font size), so it still overlapped in practice. These numbers
+  // are derived directly from worst-case rendered widths with real margin to spare;
+  // non-time challenges (Miles, reps, etc.) keep today's exact original positions.
+  const isTime=_isTimeUnit(ch.unit);
+  const colAdultX=124;
+  const colBase = isTime ? 660 : 712;
+  const colLatest = isTime ? 855 : 872;
+  const colImp = 1040;
+  const nameMaxW = isTime ? 330 : (colBase-70-colAdultX);
 
   // Header row
   ctx.fillStyle='#888888';ctx.font='700 28px "Barlow Condensed", sans-serif';
@@ -1257,11 +1272,12 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
     // the old check stopped the instant width dropped under budget, which with -2px
     // steps could leave as little as a few px of slack (enough to visually clash with
     // the Base number on a long name at the taller row heights introduced above).
-    while(ctx.measureText(nm).width>(colBase-70-colAdultX-20)&&nf>16){nf-=2;ctx.font='italic 900 '+nf+'px "Barlow Condensed", sans-serif';}
+    while(ctx.measureText(nm).width>(nameMaxW-20)&&nf>16){nf-=2;ctx.font='italic 900 '+nf+'px "Barlow Condensed", sans-serif';}
     ctx.fillText(nm,colAdultX,midY);
-    // baseline
-    const isTime=_isTimeUnit(ch.unit);
-    ctx.textAlign='right';ctx.fillStyle='#8c8c8c';ctx.font='900 '+Math.floor(rowH*0.44)+'px "Barlow Condensed", sans-serif';
+    // baseline -- time-formatted values get a slightly smaller font (0.386 vs 0.44 of
+    // rowH) to buy extra breathing room against the wider mm:ss strings, on top of the
+    // wider column spacing above; non-time challenges are completely unaffected.
+    ctx.textAlign='right';ctx.fillStyle='#8c8c8c';ctx.font='900 '+Math.floor(rowH*(isTime?0.386:0.44))+'px "Barlow Condensed", sans-serif';
     ctx.fillText(isTime?_fmtMMSS(r.baseline):String(_ch_round3(r.baseline)),colBase,midY);
     // latest
     ctx.fillStyle='#ffffff';
@@ -1269,7 +1285,7 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
     // improvement
     const imp=r.improvement;
     ctx.fillStyle=imp==null?'#4a4a4a':(imp>0?'#3ad07a':(imp<0?'#e0564b':'#9a9a9a'));
-    ctx.font='900 '+Math.floor(rowH*0.46)+'px "Barlow Condensed", sans-serif';
+    ctx.font='900 '+Math.floor(rowH*(isTime?0.41:0.46))+'px "Barlow Condensed", sans-serif';
     ctx.fillText(imp!=null?((imp>0?'+':'')+_ch_round3(imp)):'\u2014',colImp,midY);
     ctx.textBaseline='alphabetic';
   });
