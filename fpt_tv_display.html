@@ -190,10 +190,10 @@ function getMonthlyPRsGender(entries,exId,gender){
   return getPRs(entries.filter(e=>athletes.includes(e.athlete)&&e.date.startsWith(ms)),exId);
 }
 
-function getMonthlyImprovers(entries,exId){
-  const ms=new Date().toISOString().slice(0,7);
+function getMonthlyImprovers(entries,exId,monthStr){
+  const ms=monthStr||new Date().toISOString().slice(0,7);
   const thisMonth=entries.filter(e=>e.exercise===exId&&e.date.startsWith(ms));
-  const before=entries.filter(e=>e.exercise===exId&&!e.date.startsWith(ms));
+  const before=entries.filter(e=>e.exercise===exId&&e.date<ms+'-01');
   const result=[];
   [...new Set(thisMonth.map(e=>e.athlete))].forEach(ath=>{
     const mVals=thisMonth.filter(e=>e.athlete===ath).map(e=>exId==='broad'?e.total:e.value).filter(v=>v!=null);
@@ -423,9 +423,20 @@ function buildBigBoysBoard(entries){
 // to improver count (<=6 -> 1, <=12 -> 2, else 3) so text scales up dramatically in the
 // common case; 3-col worst case is exactly the old geometry (stress-tested 0-30 rows).
 // Self-suppresses when the exercise has no improvers this month.
+function _exerciseTestedThisMonth(entries,exId){
+  const ms=new Date().toISOString().slice(0,7);
+  return entries.some(e=>e.exercise===exId&&e.date.startsWith(ms));
+}
+function _prevMonthDate(){ const d=new Date(); d.setMonth(d.getMonth()-1); return d; }
 function buildMonthlyPRsEx(ex,entries,slideId){
-  const mon=getMonthName();
-  const rows=getMonthlyImprovers(entries,ex.id);
+  let mon=getMonthName();
+  let targetMonthStr=null;   // null = use the real current month (default, unchanged path)
+  if(!_exerciseTestedThisMonth(entries,ex.id)){
+    const pd=_prevMonthDate();
+    mon=pd.toLocaleString('en-US',{month:'long'}).toUpperCase();
+    targetMonthStr=pd.toISOString().slice(0,7);
+  }
+  const rows=getMonthlyImprovers(entries,ex.id,targetMonthStr);
   if(!rows.length)return '';
   const nCols=rows.length<=6?1:(rows.length<=12?2:3);
   const perCol=Math.ceil(rows.length/nCols);
