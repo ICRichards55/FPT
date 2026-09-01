@@ -184,9 +184,9 @@ function getPRsGender(entries,exId,gender){
   return getPRs(entries.filter(e=>athletes.includes(e.athlete)),exId);
 }
 
-function getMonthlyPRsGender(entries,exId,gender){
+function getMonthlyPRsGender(entries,exId,gender,monthStr){
   const athletes=getAthletesForGender(gender);
-  const ms=new Date().toISOString().slice(0,7);
+  const ms=monthStr||new Date().toISOString().slice(0,7);
   return getPRs(entries.filter(e=>athletes.includes(e.athlete)&&e.date.startsWith(ms)),exId);
 }
 
@@ -352,9 +352,15 @@ function lbRowsEx(arr,exId){
 }
 
 function buildLeaderboard(slideId,ex,gender,entries){
-  const monthly=getMonthlyPRsGender(entries,ex.id,gender);
+  let mon=getMonthName();
+  let targetMonthStr=null;
+  if(!_exerciseTestedThisMonth(entries,ex.id)){
+    const pd=_prevMonthDate();
+    mon=pd.toLocaleString('en-US',{month:'long'}).toUpperCase();
+    targetMonthStr=pd.toISOString().slice(0,7);
+  }
+  const monthly=getMonthlyPRsGender(entries,ex.id,gender,targetMonthStr);
   const allTime=getPRsGender(entries,ex.id,gender);
-  const mon=getMonthName();
   return`<div class="slide slide-light" id="s${slideId}">
     ${blackBrush()}
     <img class="slide-logo" src="${LOGO}" alt="FPT" style="height:clamp(84px,14.7vw,245px)"/>
