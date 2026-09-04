@@ -154,7 +154,7 @@ var state = { teams:[], athletes:{}, profiles:{}, entries:[], achievements:[], b
 // school's teams). Legacy teams are backfilled by splitting the name on load.
 function _meta(key){
   var m=(state.teamMeta&&state.teamMeta[key]);
-  if(m&&m.org!=null) return Object.assign({grade:'', archived:false, season:'', year:''}, m);
+  if(m&&m.org!=null) return Object.assign({grade:'', archived:false, season:'', year:'', includeInTV:false}, m);
   if(m&&m.name){ // transitional shape from an earlier draft — split it
     var parts=m.name.trim().split(/\s+/);
     return {org:parts.slice(0,-1).join(' ')||m.name, grade:'', sport:parts.length>1?parts[parts.length-1]:'', season:m.season||'', year:m.year||'', archived:!!m.archived};
@@ -263,6 +263,7 @@ function _handleDelegatedClick(e, prevent){
   if(id==='ach-save-edit-btn'){ if(prevent)e.preventDefault(); saveAchEdit(); }
   else if(id==='team-save-btn'){ if(prevent)e.preventDefault(); saveNewTeam(); }
   else if(id==='roster-import-dismiss'){ if(prevent)e.preventDefault(); dismissRosterImport(); }
+  else if(id==='results-import-dismiss'){ if(prevent)e.preventDefault(); dismissResultsImport(); }
   else if(id==='team-athlete-add-btn'){ if(prevent)e.preventDefault(); addAthleteToTeam(); }
   else if(id==='branding-pull-btn'){ if(prevent)e.preventDefault(); _pullPalette(); }
   else if(id==='branding-save-btn'){ if(prevent)e.preventDefault(); _saveBranding(); }
@@ -898,19 +899,60 @@ function endNowAch(id){
 
 // ── SETTINGS TAB ──────────────────────────────────────────────────────────
 function renderSettings(){
-  var sections = ['teams','bulkroster','athletes','branding','copytogym','backup'];
-  var labels   = ['Teams','Bulk Roster Import','Athletes','Branding','Copy to Gym','Backup'];
+  var sections = ['teams','bulkroster','bulkresults','athletes','branding','copytogym','backup'];
+  var labels   = ['Teams','Bulk Roster Import','Bulk Results Import','Athletes','Branding','Copy to Gym','Backup'];
   var nav = sections.map(function(s,i){
     return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';render()">'+labels[i]+'</button>';
   }).join('');
   var content = '';
   if(settingsSection==='teams') content = renderSettingsTeams();
   else if(settingsSection==='bulkroster') content = renderSettingsBulkRoster();
+  else if(settingsSection==='bulkresults') content = renderSettingsBulkResults();
   else if(settingsSection==='athletes') content = renderSettingsAthletes();
   else if(settingsSection==='branding') content = renderSettingsBranding();
   else if(settingsSection==='copytogym') content = renderSettingsCopyToGym();
   else if(settingsSection==='backup') content = renderSettingsBackup();
   return '<div class="sn-nav">'+nav+'</div>'+content;
+}
+
+function renderSettingsBulkResults(){
+  var seasons=['Winter','Spring','Summer','Fall'];
+  var yrs=[]; var thisYr=new Date().getFullYear();
+  for(var y=thisYr-1;y<=thisYr+1;y++) yrs.push(String(y));
+  var html='<div class="panel"><div class="panel-title">Bulk Results Import</div>';
+  html+='<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Upload test results for many students at once -- built for intake/retest days with a lot of students, like Chris\'s classes. One row per student, one column per exercise they were tested on that day. A student or team not already on the roster gets created automatically, same as Bulk Roster Import. <strong>This saves immediately on import.</strong></div>';
+  html+='<div class="form-group"><div class="form-label">Organization / Season / Year</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+    '<input class="form-input" list="org-list" style="flex:2;min-width:160px" placeholder="Organization (e.g. Dutch Ridge)" value="'+resultsImportOrg.replace(/"/g,'&quot;')+'" oninput="resultsImportOrg=this.value"/>'+
+    '<select class="form-input" style="flex:1;min-width:90px" onchange="resultsImportSeason=this.value"><option value="">Season</option>'+seasons.map(function(s){return '<option'+(s===resultsImportSeason?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
+    '<select class="form-input" style="flex:1;min-width:80px" onchange="resultsImportYear=this.value"><option value="">Year</option>'+yrs.map(function(y){return '<option'+(y===resultsImportYear?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+    '</div></div>';
+  html+='<div class="form-group"><div class="form-label">Test Date (applies to every row in this file)</div>'+
+    '<input type="date" class="form-input" style="max-width:200px" value="'+resultsImportDate+'" onchange="resultsImportDate=this.value"/></div>';
+  html+='<div class="form-group"><div class="form-label">Results File (CSV)</div>'+
+    '<input type="file" accept=".csv" style="font-size:13px;color:var(--fg)" onchange="_resultsImportFile(this)"/></div>';
+  if(resultsImportReport){
+    var rep=resultsImportReport;
+    var totalEntries=rep.entriesByExercise.fly+rep.entriesByExercise.broad+rep.entriesByExercise.vert+rep.entriesByExercise.pacer;
+    html+='<div style="background:var(--surface2);border-radius:8px;padding:14px;margin-top:12px">';
+    html+='<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px">'+
+      '<div><div style="font-size:22px;font-weight:700">'+rep.createdTeams.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Teams Created</div></div>'+
+      '<div><div style="font-size:22px;font-weight:700">'+rep.addedToRoster.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Students Added to Roster</div></div>'+
+      '<div><div style="font-size:22px;font-weight:700">'+totalEntries+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Results Logged</div></div>'+
+      (rep.errors.length?'<div><div style="font-size:22px;font-weight:700;color:#e74c3c">'+rep.errors.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Rows Skipped</div></div>':'')+
+      '</div>';
+    if(totalEntries){
+      html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px">By Exercise</div>';
+      html+='<div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--border)">Fly: '+rep.entriesByExercise.fly+' \u00b7 Broad Jump: '+rep.entriesByExercise.broad+' \u00b7 Skyhook: '+rep.entriesByExercise.vert+' \u00b7 Pacer Test: '+rep.entriesByExercise.pacer+'</div>';
+    }
+    if(rep.errors.length){
+      html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:10px 0 4px">Skipped Rows</div><div style="font-size:12px;color:var(--muted)">'+rep.errors.join('<br>')+'</div>';
+    }
+    html+='<button class="btn btn-ghost" id="results-import-dismiss" style="margin-top:10px">Dismiss</button>';
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
 }
 
 function renderSettingsBulkRoster(){
@@ -987,16 +1029,21 @@ function renderSettingsTeams(){
         if(ageDays>42) stale='<span style="font-size:10px;color:var(--amber,#d97706);margin-left:6px">season over?</span>';
       }
     }
+    var tvToggle = archived ? '' :
+      '<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);white-space:nowrap;cursor:pointer" title="Show a Top 5 all-time page for this team in the gym TV rotation. Automatically stops once this team is archived -- no need to remember to uncheck it.">'+
+      '<input type="checkbox" '+(m.includeInTV?'checked':'')+' onchange="toggleIncludeInTV(\''+_esc(t)+'\')"/>Show on Gym TV</label>';
     var actions = archived
       ? '<button class="action-btn" onclick="restoreTeam(\''+_esc(t)+'\')">Restore</button>'+
         '<button class="action-btn" onclick="selectTeam(\''+_esc(t)+'\')">Open</button>'
       : '<button class="action-btn" onclick="startNewSeason(\''+_esc(t)+'\')">New Season</button>'+
         '<button class="action-btn" onclick="archiveTeam(\''+_esc(t)+'\')">Archive</button>'+
         '<button class="action-btn" style="color:var(--red)" onclick="deleteTeam(\''+_esc(t)+'\')">Delete</button>';
-    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px">'+
+    return '<div style="display:flex;flex-direction:column;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
       '<div style="min-width:0"><div style="font-family:\'Barlow Condensed\',sans-serif;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_esc(_orgGradeSport(m))+' <span style="font-weight:600;font-size:12px;color:var(--muted)">'+(m.season?m.season+' ':'')+(m.year||'')+'</span>'+stale+'</div>'+
       '<div style="font-size:12px;color:var(--muted)">'+count+' athlete'+(count!==1?'s':'')+'</div></div>'+
-      '<div style="display:flex;gap:4px;flex-shrink:0">'+actions+'</div></div>';
+      '<div style="display:flex;gap:4px;flex-shrink:0">'+actions+'</div></div>'+
+      (tvToggle?'<div>'+tvToggle+'</div>':'')+'</div>';
   }
   var act=_activeTeams(), arc=_archivedTeams();
   html += '<div class="section-divider"></div><div class="form-label" style="margin-bottom:6px">Active</div>';
@@ -1088,6 +1135,12 @@ function startNewSeason(key){
 // even though both are just called "Team 1" by their teacher. When grade is blank
 // the key is byte-identical to the original org+sport format (zero change for
 // existing sports teams).
+function toggleIncludeInTV(key){
+  if(!state.teamMeta[key]) state.teamMeta[key]=_meta(key);
+  state.teamMeta[key].includeInTV = !state.teamMeta[key].includeInTV;
+  saveData();
+  render();
+}
 function _teamKey(org, grade, sport, season, year){
   var parts=[org]; if(grade) parts.push(grade); parts.push(sport);
   return parts.join(' ')+' \u2014 '+season+' '+year;
@@ -2207,6 +2260,114 @@ function _mapRosterHeader(h){
   for(var i=0;i<ROSTER_COL_PATTERNS.length;i++){ if(ROSTER_COL_PATTERNS[i][0].test(norm)) return ROSTER_COL_PATTERNS[i][1]; }
   return null;
 }
+// ── Bulk Results Import (Sept 2026) ──────────────────────────────────────────
+// Companion to Bulk Roster Import -- same Org/Season/Year batch-context pattern,
+// but per-row this one carries actual test results (one row per student, one
+// column per exercise) rather than just names. If a named team or student
+// doesn't exist yet, it's created on the spot -- same forgiving behavior as the
+// roster importer, so results can be uploaded even slightly out of order with
+// roster uploads, or for a student added on the fly.
+var resultsImportReport = null;
+var resultsImportOrg = '', resultsImportSeason = '', resultsImportYear = '';
+var resultsImportDate = TODAY;
+
+var RESULTS_COL_PATTERNS = [
+  [/^grade/,'grade'], [/^team/,'team'],
+  [/^first/,'first'], [/^last/,'last'],
+  [/^(student\s*)?name$/,'fullname'],
+  [/^fly/,'fly'],
+  [/^broad.*ft|^broad.*feet/,'broadFt'],
+  [/^broad.*in/,'broadIn'],
+  [/^(skyhook|vert)/,'vert'],
+  [/^pacer/,'pacer'],
+];
+function _mapResultsHeader(h){
+  var norm=_normalizeRosterHeader(h);
+  for(var i=0;i<RESULTS_COL_PATTERNS.length;i++){ if(RESULTS_COL_PATTERNS[i][0].test(norm)) return RESULTS_COL_PATTERNS[i][1]; }
+  return null;
+}
+function _resultsImportFile(input){
+  if(!input.files||!input.files[0])return;
+  var reader=new FileReader();
+  reader.onload=function(e){ runResultsImport(e.target.result); };
+  reader.readAsText(input.files[0]);
+}
+function dismissResultsImport(){ resultsImportReport=null; render(); }
+function runResultsImport(csvText){
+  if(!resultsImportOrg.trim()){ alert('Enter an Organization for this import first.'); return; }
+  if(!resultsImportSeason||!resultsImportYear){ alert('Pick a Season and Year for this import first.'); return; }
+  if(!resultsImportDate){ alert('Pick the test date for this import first.'); return; }
+  var rows=_parseRosterCsv(csvText);
+  if(rows.length<2){ alert('No data rows found in that file.'); return; }
+  var fieldFor=rows[0].map(_mapResultsHeader);
+  var gradeCol=fieldFor.indexOf('grade'), teamCol=fieldFor.indexOf('team');
+  var firstCol=fieldFor.indexOf('first'), lastCol=fieldFor.indexOf('last'), fullCol=fieldFor.indexOf('fullname');
+  var flyCol=fieldFor.indexOf('fly'), broadFtCol=fieldFor.indexOf('broadFt'), broadInCol=fieldFor.indexOf('broadIn');
+  var vertCol=fieldFor.indexOf('vert'), pacerCol=fieldFor.indexOf('pacer');
+  if(teamCol===-1){ alert('Could not find a "Team" column in the header row.'); return; }
+  // Last Name is optional (Sept 2026, student privacy) -- a First Name column
+  // alone is enough, and can contain a full "First L." style entry if that's
+  // all the org wants to share. Last, if present, still combines in when given.
+  if(fullCol===-1 && firstCol===-1){ alert('Could not find a "Student Name" column (or a "First Name" column).'); return; }
+
+  var org=resultsImportOrg.trim(), season=resultsImportSeason, year=resultsImportYear, date=resultsImportDate;
+  var createdTeams=[], addedToRoster=[], entriesByExercise={fly:0,broad:0,vert:0,pacer:0}, errors=[];
+
+  for(var r=1;r<rows.length;r++){
+    var row=rows[r]; if(!row.some(function(c){return c&&c.trim();})) continue;
+    var grade = gradeCol>-1 ? (row[gradeCol]||'').trim() : '';
+    var team = (row[teamCol]||'').trim();
+    var name = fullCol>-1 ? (row[fullCol]||'').trim()
+                          : lastCol>-1 && (row[lastCol]||'').trim()
+                            ? ((row[firstCol]||'').trim()+' '+(row[lastCol]||'').trim()).trim()
+                            : (row[firstCol]||'').trim();   // no Last column, or blank for this row -- First alone is the full identifier
+    if(!team || !name){ errors.push('Row '+(r+1)+': missing team or student name'); continue; }
+
+    var key=_teamKey(org, grade, team, season, year);
+    if(state.teams.indexOf(key)===-1){
+      state.teams.push(key);
+      state.teamMeta[key]={org:org, grade:grade, sport:team, season:season, year:year, archived:false};
+      state.athletes[key]=[];
+      state.required[key]=2;
+      createdTeams.push(key);
+    }
+    if(state.athletes[key].indexOf(name)===-1){
+      state.athletes[key].push(name);
+      addedToRoster.push(name+' (added to '+_teamDisplay(key)+' while importing results)');
+    }
+
+    function addEntry(exercise, numericValue){
+      if(numericValue==null || isNaN(numericValue)) return;
+      var entry = {id: Date.now().toString(36)+Math.random().toString(36).slice(2), athlete:name, exercise:exercise, date:date, value:numericValue};
+      if(exercise==='broad') entry.total = numericValue;   // broad stores the same number under both keys, matching the rest of the app's convention
+      state.entries.push(entry);
+      entriesByExercise[exercise]++;
+    }
+    function addRawEntry(exercise, rawStr){
+      if(rawStr==null || String(rawStr).trim()==='') return;
+      var num = parseFloat(rawStr);
+      if(isNaN(num)){ errors.push('Row '+(r+1)+' ('+name+'): "'+rawStr+'" is not a valid number for '+exercise); return; }
+      addEntry(exercise, num);
+    }
+
+    if(flyCol>-1) addRawEntry('fly', row[flyCol]);
+    if(vertCol>-1) addRawEntry('vert', row[vertCol]);
+    if(pacerCol>-1) addRawEntry('pacer', row[pacerCol]);
+    if(broadFtCol>-1 || broadInCol>-1){
+      var ftRaw=broadFtCol>-1?(row[broadFtCol]||'').trim():'', inRaw=broadInCol>-1?(row[broadInCol]||'').trim():'';
+      if(ftRaw || inRaw){
+        var ft = ftRaw ? parseFloat(ftRaw) : 0, inch = inRaw ? parseFloat(inRaw) : 0;
+        if(isNaN(ft) || isNaN(inch)){ errors.push('Row '+(r+1)+' ('+name+'): invalid Broad Jump ft/in value'); }
+        else addEntry('broad', ft*12+inch);
+      }
+    }
+  }
+
+  resultsImportReport={createdTeams:createdTeams, addedToRoster:addedToRoster, entriesByExercise:entriesByExercise, errors:errors};
+  saveData();
+  render();
+}
+
 function _rosterImportFile(input){
   if(!input.files||!input.files[0])return;
   var reader=new FileReader();
@@ -2224,7 +2385,10 @@ function runRosterImport(csvText){
   var firstCol=fieldFor.indexOf('first'), lastCol=fieldFor.indexOf('last'), fullCol=fieldFor.indexOf('fullname');
   var genderCol=fieldFor.indexOf('gender');
   if(teamCol===-1){ alert('Could not find a "Team" column in the header row.'); return; }
-  if(fullCol===-1 && (firstCol===-1||lastCol===-1)){ alert('Could not find a "Student Name" column (or First + Last columns).'); return; }
+  // Last Name is optional (Sept 2026, student privacy) -- a First Name column
+  // alone is enough, and can contain a full "First L." style entry if that's
+  // all the org wants to share. Last, if present, still combines in when given.
+  if(fullCol===-1 && firstCol===-1){ alert('Could not find a "Student Name" column (or a "First Name" column).'); return; }
 
   var org=rosterImportOrg.trim(), season=rosterImportSeason, year=rosterImportYear;
   var createdTeams=[], addedByTeam={}, skipped=[], errors=[];
@@ -2235,7 +2399,9 @@ function runRosterImport(csvText){
     var grade = gradeCol>-1 ? (row[gradeCol]||'').trim() : '';
     var team = (row[teamCol]||'').trim();
     var name = fullCol>-1 ? (row[fullCol]||'').trim()
-                          : ((row[firstCol]||'').trim()+' '+(row[lastCol]||'').trim()).trim();
+                          : lastCol>-1 && (row[lastCol]||'').trim()
+                            ? ((row[firstCol]||'').trim()+' '+(row[lastCol]||'').trim()).trim()
+                            : (row[firstCol]||'').trim();   // no Last column, or blank for this row -- First alone is the full identifier
     if(!team || !name){ errors.push('Row '+(r+1)+': missing team or student name'); continue; }
     var gender = genderCol>-1 ? (row[genderCol]||'').trim().toLowerCase() : '';
     if(gender && gender!=='male' && gender!=='female') gender='';

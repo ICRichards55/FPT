@@ -16,14 +16,19 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Ba
 svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 
 /* LOGO — all slides: top right, below wave banner */
+
 .slide-logo{position:absolute;z-index:10;right:3%;top:14%}
+.team-slide-header{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:4vh 4vw 2vh;flex-shrink:0}
+.team-header-logo{height:clamp(50px,10vw,140px);width:clamp(50px,10vw,140px);object-fit:contain;flex-shrink:0}
+.team-header-title{flex:1;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-style:italic;text-transform:uppercase;font-size:clamp(32px,5.5vw,90px);color:#fff;letter-spacing:-.5px;padding:0 2vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team-slide-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:0 4vw 6vh}
 
 /* WELCOME */
 .welcome-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;padding:5vw 6vw}
 .welcome-title{font-family:'Permanent Marker',cursive;font-size:clamp(68px,9.7vw,186px);line-height:.88;color:#fff;text-transform:uppercase;letter-spacing:-2px}
 .welcome-tag-wrap{text-align:right;padding-right:2vw;margin-top:3vh}
 .welcome-motto{font-family:'Permanent Marker',cursive;font-size:clamp(28px,4.43vw,85px);color:#fff;letter-spacing:2px;text-transform:uppercase}
-.welcome-sub{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:rgba(255,255,255,.65);font-size:clamp(14px,2.5vw,48px);letter-spacing:4px;text-transform:uppercase;margin-top:.8vh}
+.welcome-sub{font-family:'Barlow Condensed',sans-serif;font-weight:700;color:rgba(255,255,255,.65);font-size:clamp(18px,3.25vw,62px);letter-spacing:4px;text-transform:uppercase;margin-top:.8vh}
 
 /* LEADERBOARD */
 .lb-body{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:14vh 4vw 14vh}
@@ -179,6 +184,13 @@ function getPRs(entries,exId){
     .sort((a,b)=>exId==='fly'?a.v-b.v:b.v-a.v);
 }
 
+// Top 5 all-time for an arbitrary roster (any team's athlete list), independent of
+// gender or position -- getBigBoys/getPRsGender both filter on gym-specific concepts
+// that don't apply to a team roster, so this is its own small function reusing the
+// same underlying getPRs ranking.
+function getTeamTop5(entries, roster, exId){
+  return getPRs(entries.filter(e=>roster.includes(e.athlete)), exId).slice(0,5);
+}
 function getPRsGender(entries,exId,gender){
   const athletes=getAthletesForGender(gender);
   return getPRs(entries.filter(e=>athletes.includes(e.athlete)),exId);
@@ -342,9 +354,17 @@ function lbRowsEx(arr,exId){
   arr.slice(0,5).forEach((r,i)=>{
     if(i>0&&arr[i].v!==arr[i-1].v)rank=i+1;
     const logo_=getSchoolLogo(r.athlete);
+    // Fixed-size logo slot (Sept 2026): previously the image used width:auto, so a wide
+    // wordmark logo consumed more horizontal space than a square crest, pushing each
+    // row's name to a different starting X. Now every row reserves the SAME box --
+    // generous enough for a landscape wordmark (aspect-ratio 1.8:1) -- with the actual
+    // image (if any) fit inside it via object-fit:contain. The box renders even when an
+    // athlete has no school on file, so a logo-less row's name still starts at the exact
+    // same X as every other row, not flush left.
+    const logoBox='<div style="height:clamp(28px,92cqh,150px);aspect-ratio:1.8;display:flex;align-items:center;justify-content:flex-start;flex-shrink:0">'+(logo_?'<img src="'+logo_+'" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.parentElement.style.visibility=&apos;hidden&apos;"/>':'')+'</div>';
     html+=`<div class="lb-row">
       <div class="lb-rank">${rankStr(rank)}</div>
-      <div class="lb-name" style="display:flex;align-items:center;gap:8px">${logo_?'<img src="'+logo_+'" style="height:clamp(28px,92cqh,150px);width:auto;object-fit:contain;flex-shrink:0" onerror="this.style.display=&apos;none&apos;"/>':''}<span>${r.athlete}</span></div>
+      <div class="lb-name" style="display:flex;align-items:center;gap:8px">${logoBox}<span>${r.athlete}</span></div>
       <div class="lb-score">${fmtScore(exId,r.v)}</div>
     </div>`;
   });
@@ -404,6 +424,38 @@ function getBigBoys(entries, exId){
   return getPRs(entries.filter(e => bigBoyNames.includes(e.athlete)), exId);
 }
 
+// One Top-5-all-time slide per team opted into the gym TV (Sept 2026) -- built for
+// short-window in-gym teams (e.g. a fall club team training at FPT for ~2 months)
+// who want a page without needing a whole month-over-month tracking history. Applies
+// the same "2+ distinct session dates" eligibility filter as every other TV
+// leaderboard, for consistency (a single intake-day result alone won't show yet).
+function buildTeamSlide(teamKey, teamsState){
+  var meta = teamsState.teamMeta && teamsState.teamMeta[teamKey];
+  if(!meta || meta.archived || !meta.includeInTV) return '';
+  var roster = teamsState.athletes && teamsState.athletes[teamKey] || [];
+  var rawEntries = (teamsState.entries||[]).filter(e=>roster.includes(e.athlete));
+  var entries = _eligibleTvEntries(rawEntries);
+  var teamName = (meta.org||'').toUpperCase()+(meta.sport?' '+meta.sport.toUpperCase():'');
+  var logoUrl = teamsState.branding && teamsState.branding[teamKey] && teamsState.branding[teamKey].logo;
+
+  var allRows = EX.slice(0,3).map(function(ex){ return getTeamTop5(entries, roster, ex.id); });
+  var hasAnyData = allRows.some(function(rows){ return rows.length>0; });
+  if(!hasAnyData) return '';   // nobody on this roster has an eligible result on ANY of the 3 exercises yet -- self-suppress, matching every other slide on this TV
+  var tabs = EX.slice(0,3).map(function(ex,i){
+    return '<div><div class="lb-col-head">'+ex.name+'</div>'+lbRowsEx(allRows[i], ex.id)+'</div>';
+  }).join('');
+
+  return '<div class="slide slide-light">'
+    +blackBrush()
+    +'<div class="team-slide-header">'
+    +(logoUrl?'<img class="team-header-logo" src="'+logoUrl+'" alt="'+teamName+'"/>':'<div class="team-header-logo"></div>')
+    +'<div class="team-header-title">'+teamName+'</div>'
+    +'<img class="team-header-logo" src="'+LOGO+'" alt="FPT"/>'
+    +'</div>'
+    +'<div class="team-slide-body">'
+    +'<div class="lb-columns lb-columns-3" style="grid-template-columns:1fr 1fr 1fr">'+tabs+'</div>'
+    +'</div></div>';
+}
 function buildBigBoysBoard(entries){
   const tabs = EX.map((ex, i) => {
     const rows = getBigBoys(entries, ex.id);
@@ -761,6 +813,16 @@ function buildChallengeSlideForMonth(mm, monName){
 let current=0,timer=null;
 let state={entries:[],profiles:{},achievements:[]};
 
+let teamsState={teams:[],athletes:{},teamMeta:{},branding:{},entries:[]};
+async function loadTeamsData(){
+  var url=_getApiUrl(); if(!url) return;
+  try{
+    var r=await fetch(url+'?type=teams&t='+Date.now(),{cache:'no-store'});
+    var j=await r.json();
+    if(j.ok && j.data) teamsState=j.data;
+  }catch(e){ console.warn('FPT teams load:',e); }
+  renderBoard();
+}
 async function loadData(){
   const loaded=await _apiLoad();
   if(loaded)state=loaded;
@@ -806,6 +868,11 @@ function renderBoard(){
   add(buildLeaderboard(6,EX[2],'female',tvEntries),12);
   add(buildMonthlyPRsEx(EX[2],tvEntries,73),12);
   add(buildBigBoysBoard(tvEntries),12);
+  // one Top-5-all-time slide per team opted into the gym TV; each independently
+  // self-suppresses (returns '') once archived or if the checkbox is off
+  (teamsState.teams||[]).forEach(function(teamKey){
+    add(buildTeamSlide(teamKey, teamsState), 12);
+  });
   add(buildShredmill(),11);
   add(buildBirthdays(),13);
   if(SHOW_CHALLENGE_SLIDE){
@@ -961,7 +1028,9 @@ async function _apiLoad(){
 }
 
 setInterval(loadData,60000);
+setInterval(loadTeamsData,60000);
 loadData();
+loadTeamsData();
 
 </script>
 </body>
