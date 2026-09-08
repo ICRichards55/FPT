@@ -348,7 +348,8 @@ function getSchoolLogo(name){
   return (state.schoolLogos||{})[school]||null;
 }
 
-function lbRowsEx(arr,exId){
+function lbRowsEx(arr,exId,logoScale){
+  logoScale = logoScale || 1;   // optional shrink factor for tight layouts (e.g. Big Boys Board), default = full size everywhere else
   if(!arr.length)return`<div class="lb-rows-wrap"><div class="lb-empty">No entries yet</div></div>`;
   let rank=1,html='';
   arr.slice(0,5).forEach((r,i)=>{
@@ -368,7 +369,8 @@ function lbRowsEx(arr,exId){
     // wasn't being told to fill whatever space it had. width/height:100% forces the
     // image element itself to the full box size; object-fit:contain then scales the
     // actual artwork proportionally within that box, whatever its native shape.
-    const logoBox='<div style="height:clamp(28px,92cqh,150px);aspect-ratio:2.4;display:flex;align-items:center;justify-content:flex-start;flex-shrink:0">'+(logo_?'<img src="'+logo_+'" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.style.visibility=&apos;hidden&apos;"/>':'')+'</div>';
+    const logoBoxH = 'calc(clamp(28px,92cqh,150px) * '+logoScale+')';
+    const logoBox='<div style="height:'+logoBoxH+';aspect-ratio:2.4;display:flex;align-items:center;justify-content:flex-start;flex-shrink:0">'+(logo_?'<img src="'+logo_+'" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.style.visibility=&apos;hidden&apos;"/>':'')+'</div>';
     html+=`<div class="lb-row">
       <div class="lb-rank">${rankStr(rank)}</div>
       <div class="lb-name" style="display:flex;align-items:center;gap:8px">${logoBox}<span>${r.athlete}</span></div>
@@ -464,11 +466,17 @@ function buildTeamSlide(teamKey, teamsState){
     +'</div></div>';
 }
 function buildBigBoysBoard(entries){
+  // Big Boys Board is always locked to 3 columns (never adapts to 1-2 like other
+  // leaderboard slides), making it the tightest layout on the whole TV. Shrinking the
+  // name font once already wasn't enough breathing room -- rather than shrink it
+  // further and risk illegibility, the logo itself scales down here specifically
+  // (0.6x), freeing up horizontal room for the name. Every other leaderboard slide
+  // is untouched -- lbRowsEx defaults to full-size logos unless told otherwise.
   const tabs = EX.map((ex, i) => {
     const rows = getBigBoys(entries, ex.id);
     return `<div>
       <div class="lb-col-head">${ex.name}</div>
-      ${lbRowsEx(rows, ex.id)}
+      ${lbRowsEx(rows, ex.id, 0.6)}
     </div>`;
   }).join('');
   return`<div class="slide slide-light" id="s8">
