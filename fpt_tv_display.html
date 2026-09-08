@@ -361,7 +361,7 @@ function lbRowsEx(arr,exId){
     // image (if any) fit inside it via object-fit:contain. The box renders even when an
     // athlete has no school on file, so a logo-less row's name still starts at the exact
     // same X as every other row, not flush left.
-    const logoBox='<div style="height:clamp(28px,92cqh,150px);aspect-ratio:1.8;display:flex;align-items:center;justify-content:flex-start;flex-shrink:0">'+(logo_?'<img src="'+logo_+'" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.parentElement.style.visibility=&apos;hidden&apos;"/>':'')+'</div>';
+    const logoBox='<div style="height:clamp(28px,92cqh,150px);aspect-ratio:3;display:flex;align-items:center;justify-content:flex-start;flex-shrink:0">'+(logo_?'<img src="'+logo_+'" style="max-width:100%;max-height:100%;object-fit:contain" onerror="this.parentElement.style.visibility=&apos;hidden&apos;"/>':'')+'</div>';
     html+=`<div class="lb-row">
       <div class="lb-rank">${rankStr(rank)}</div>
       <div class="lb-name" style="display:flex;align-items:center;gap:8px">${logoBox}<span>${r.athlete}</span></div>
