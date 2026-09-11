@@ -649,6 +649,17 @@ async function editDataDelConfirm(id){
 //   leaderboards (their record still counts) but drops off BBB and birthdays, same
 //   as inactive there. Mutually exclusive with inactive -- setting one clears the other.
 function _statusOf(p){ return p.graduated?'graduated':(p.inactive?'inactive':'active'); }
+// Adult Challenge eligibility (Sept 2026): lets an athlete participate in the SAME
+// monthly adult challenge, logged directly under their own name -- no duplicate
+// "adult" record created. challengeLeaderboard/logCard/results-table are all already
+// name-string-agnostic (they never look anything up in state.adults for display), so
+// the only real gap was the picker in Adult Challenge only ever listing state.adults.
+// This flag just adds eligible athletes into that same picker.
+function setChallengeEligible(name,checked){
+  if(!state.profiles[name])state.profiles[name]={};
+  state.profiles[name].challengeEligible=!!checked;
+  saveData();render();
+}
 function _rosterCardHtml(name,status,safe_name,sub,pills){
   var badge = status==='graduated' ? '<span class="graduated-badge">Graduated</span>'
             : status==='inactive'  ? '<span class="inactive-badge">Inactive</span>' : '';
@@ -656,7 +667,9 @@ function _rosterCardHtml(name,status,safe_name,sub,pills){
     status==='active'    ? '<button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'inactive\')" data-n="'+safe_name+'">Set Inactive</button><button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'graduated\')" data-n="'+safe_name+'">Set Graduated</button>'
   : status==='inactive'  ? '<button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'active\')" data-n="'+safe_name+'">Reactivate</button><button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'graduated\')" data-n="'+safe_name+'">Set Graduated</button>'
   : /* graduated */        '<button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'active\')" data-n="'+safe_name+'">Reactivate</button><button class="action-btn" onclick="setAthleteStatus(this.dataset.n,\'inactive\')" data-n="'+safe_name+'">Set Inactive</button>';
-  return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+badge+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit Profile</button><button class="action-btn" data-editdata="'+safe_name+'">Edit Data</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="genAthleteFullReport(this.dataset.n)" data-n="'+safe_name+'">Full Report</button>'+statusBtns+'<button class="action-btn" onclick="convertToAdult(this.dataset.n)" data-n="'+safe_name+'">Convert to Adult</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
+  var challengeEligible=!!((state.profiles[name]||{}).challengeEligible);
+  var challengeToggle='<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer;margin-top:3px" title="Lets this athlete log results directly in the Adult Challenge, under their own name -- no separate adult record created"><input type="checkbox" data-n="'+safe_name+'" '+(challengeEligible?'checked':'')+' onchange="setChallengeEligible(this.dataset.n,this.checked)"/>Adult Challenge eligible</label>';
+  return '<div class="ath-card"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span class="ath-card-name">'+name+'</span>'+badge+'</div>'+(sub?'<div class="ath-card-sub">'+sub+'</div>':'')+(pills?'<div class="pr-pills">'+pills+'</div>':'')+challengeToggle+'</div><div class="ath-actions"><button class="action-btn" onclick="openViewModal(this.dataset.n)" data-n="'+safe_name+'">View</button><button class="action-btn" onclick="openEditModal(this.dataset.n)" data-n="'+safe_name+'">Edit Profile</button><button class="action-btn" data-editdata="'+safe_name+'">Edit Data</button><button class="action-btn" onclick="exportAthlete(this.dataset.n)" data-n="'+safe_name+'">CSV</button><button class="action-btn" onclick="genAthleteReport(this.dataset.n)" data-n="'+safe_name+'">Report</button><button class="action-btn" onclick="genAthleteFullReport(this.dataset.n)" data-n="'+safe_name+'">Full Report</button>'+statusBtns+'<button class="action-btn" onclick="convertToAdult(this.dataset.n)" data-n="'+safe_name+'">Convert to Adult</button><button class="action-btn action-btn-danger" data-del-ath="'+safe_name+'">Delete</button></div></div>';
 }
 function _firstNameOf(n){return String(n||'').trim().split(/\s+/)[0]||'';}
 function openDeleteAthlete(name){
@@ -1276,7 +1289,11 @@ function renderAdultChallenge(){
       +(ch?'<button class="btn btn-ghost" style="width:100%" onclick="challEditing=false;render()">Cancel</button>':'')
       +'</div></div>';
   }
-  var adults=adultList();
+  // Combined picker: normal adults + any athlete opted in via the roster checkbox above.
+  // Logging/leaderboard/results-table below all key purely off the name string in
+  // challengeEntries, so an athlete's name works here with zero other changes needed.
+  var eligibleAthletes=(state.athletes||[]).filter(function(n){return (state.profiles[n]||{}).challengeEligible;});
+  var adults=Array.from(new Set(adultList().concat(eligibleAthletes))).sort(function(a,b){return a.localeCompare(b);});
   var opts='<option value="">Select adult...</option>'+adults.map(function(a){return '<option value="'+_esc(a)+'"'+(challAdult===a?' selected':'')+'>'+a+'</option>';}).join('');
   var logCard=monthNav+'<div class="panel"><div class="panel-title">'+ch.name+(ch.unit?' <span style="font-size:13px;color:var(--muted);font-weight:400">('+ch.unit+' &middot; '+(ch.betterDir==='higher'?'higher better':'lower better')+')</span>':'')+'<button class="btn btn-ghost btn-sm" style="float:right" onclick="startEditChallenge()">Edit</button></div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:flex-end">'
