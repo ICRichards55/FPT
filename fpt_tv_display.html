@@ -594,12 +594,16 @@ function birthdaysThisWeek(){
   var cands=[];
   var p=state.profiles||{};
   Object.keys(p).forEach(function(n){var pr=p[n];if(pr&&!pr.inactive&&!pr.graduated&&pr.dob)cands.push({name:n,dob:pr.dob});});
+  // Sept 2026: birthdays now show an adult's FULL name, not just first --
+  // first-name-only caused real confusion at the gym once two people were both
+  // celebrating birthdays the same week and it wasn't clear who was who.
+  // Adult dict keys are already maintained as proper "First Last" strings
+  // (see the key-rename cleanup elsewhere in this file), so the key itself
+  // IS the correct full display name -- no truncation needed.
   var ad=state.adults||{};
   Object.keys(ad).forEach(function(n){
     if(!ad[n]||!ad[n].dob)return;
-    var fp=_adultNameParts(n);
-    var disp=fp.first;
-    cands.push({name:disp,dob:ad[n].dob});
+    cands.push({name:n,dob:ad[n].dob});
   });
   var out=[],seen={};
   cands.forEach(function(c){
