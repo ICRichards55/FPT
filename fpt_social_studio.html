@@ -4,58 +4,58 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
 <title>FPT Social Studio</title>
-<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   --bg:#07090B;--surface:#0F1215;--surface2:#171B20;--surface3:#1E242B;
-  --border:#252B33;--accent:#FFFFFF;--red:#FF5C35;
-  --fly:#FF5C35;--broad:#3B9EFF;--vert:#2ECC71;
+  --border:#252B33;--accent:#FFFFFF;--red:#ffffff;
+  --fly:#ffffff;--broad:#ffffff;--vert:#ffffff;
   --text:#F0F2F5;--muted:#7A8694;--muted2:#4A5260;
 }
-body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-height:100vh}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh}
 .header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 18px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
 .logo-wrap{display:flex;align-items:center;gap:10px}
 .logo-img{height:36px}
-.logo-sub{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.logo-sub{font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
 .nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
 .nav::-webkit-scrollbar{display:none}
-.nav-btn{background:none;border:none;color:var(--muted);font-family:'Barlow',sans-serif;font-size:13px;font-weight:500;padding:6px 11px;border-radius:6px;cursor:pointer;transition:.15s;white-space:nowrap}
+.nav-btn{background:none;border:none;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;padding:6px 11px;border-radius:6px;cursor:pointer;transition:.15s;white-space:nowrap}
 .nav-btn.active{color:var(--accent);background:rgba(255,255,255,.1)}
 .main{padding:18px;max-width:1100px;margin:0 auto}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px}
-.panel-title{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.panel-title{font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
 .row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
 .form-group{display:flex;flex-direction:column;gap:6px}
-.form-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
-.form-select,.form-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;outline:none;transition:.15s;-webkit-appearance:none;appearance:none}
+.form-label{font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.form-select,.form-input{background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;outline:none;transition:.15s;-webkit-appearance:none;appearance:none}
 .form-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237A8694' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
 .form-select:focus,.form-input:focus{border-color:var(--accent)}
 .toggle-group{display:flex;gap:6px}
-.tog{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;padding:8px 16px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;color:var(--muted);text-transform:uppercase;transition:.15s;min-height:38px}
+.tog{background:var(--surface3);border:1.5px solid var(--border);border-radius:6px;padding:8px 16px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;cursor:pointer;color:var(--muted);text-transform:uppercase;transition:.15s;min-height:38px}
 .tog.on{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.08)}
-.btn{border:none;border-radius:7px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;padding:10px 18px;cursor:pointer;transition:.15s;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px}
+.btn{border:none;border-radius:7px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;padding:10px 18px;cursor:pointer;transition:.15s;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px}
 .btn-accent{background:var(--accent);color:#000}
 .btn-accent:hover{background:#cccccc}
 .btn-ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
 .btn-ghost:hover{border-color:var(--accent)}
-.btn-red{background:var(--red);color:#fff}
+.btn-red{background:#ffffff;color:#000}
 .upload-zone{background:var(--surface3);border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:.2s;position:relative}
 .upload-zone:hover{border-color:var(--accent)}
 .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.upload-label{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;color:var(--muted);text-transform:uppercase}
+.upload-label{font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;color:var(--muted);text-transform:uppercase}
 .upload-sub{font-size:12px;color:var(--muted2);margin-top:4px}
-.empty{color:var(--muted);font-size:13px;text-align:center;padding:32px;font-style:italic}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:32px;font-style:normal}
 .pr-stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
 .pr-stat-label{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.5px}
-.pr-stat-val{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900}
+.pr-stat-val{font-family:'Outfit',sans-serif;font-size:22px;font-weight:900}
 
 /* ── CARD PREVIEWS ── */
 .cards-row{display:flex;gap:18px;flex-wrap:wrap;margin-top:4px}
 .card-wrap{display:flex;flex-direction:column;gap:8px}
-.card-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase}
-.dl-btn{background:var(--accent);border:none;border-radius:7px;color:#000;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;letter-spacing:.5px;padding:8px 16px;cursor:pointer;text-transform:uppercase;width:100%}
+.card-label{font-family:'Outfit',sans-serif;font-size:11px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase}
+.dl-btn{background:var(--accent);border:none;border-radius:7px;color:#000;font-family:'Outfit',sans-serif;font-size:12px;font-weight:800;letter-spacing:.5px;padding:8px 16px;cursor:pointer;text-transform:uppercase;width:100%}
 
 /* ── STORY PREVIEW ── */
 .story-stage{position:relative;width:270px;height:480px;border-radius:16px;overflow:hidden;background:#000;flex-shrink:0;box-shadow:0 8px 40px rgba(0,0,0,.7)}
@@ -64,14 +64,14 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .story-gradient{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.3) 0%,rgba(0,0,0,.1) 35%,rgba(0,0,0,.65) 65%,rgba(0,0,0,.92) 100%)}
 .story-content{position:relative;z-index:2;padding:20px 18px 28px}
 .story-logo{height:auto;width:44%;position:absolute;bottom:22px;right:14px;z-index:5;max-height:26%}
-.story-badge{display:inline-block;background:var(--accent);color:#000;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:900;letter-spacing:2px;padding:4px 10px;border-radius:4px;margin-bottom:8px;text-transform:uppercase}
-.story-ex{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
-.story-val{font-family:'Permanent Marker',cursive;font-size:54px;color:#fff;line-height:.9;margin-bottom:8px;letter-spacing:-1px}
-.story-ath{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:#fff;letter-spacing:1px;text-transform:uppercase}
-.story-school{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;color:#fff;opacity:.7;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
-.story-prev{font-family:'Barlow Condensed',sans-serif;font-size:13px;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.5px}
+.story-badge{display:inline-block;background:var(--accent);color:#000;font-family:'Outfit',sans-serif;font-size:11px;font-weight:900;letter-spacing:2px;padding:4px 10px;border-radius:4px;margin-bottom:8px;text-transform:uppercase}
+.story-ex{font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+.story-val{font-family:'Outfit',sans-serif;font-weight:900;font-size:54px;color:#fff;line-height:.9;margin-bottom:8px;letter-spacing:-1px}
+.story-ath{font-family:'Outfit',sans-serif;font-size:16px;font-weight:800;color:#fff;letter-spacing:1px;text-transform:uppercase}
+.story-school{font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;color:#fff;opacity:.7;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.story-prev{font-family:'Outfit',sans-serif;font-size:13px;color:rgba(255,255,255,.6);margin-top:4px;letter-spacing:.5px}
 .story-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted2)}
-.fullscreen-btn{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);border-radius:6px;color:#fff;font-size:11px;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.5px;padding:5px 10px;cursor:pointer;text-transform:uppercase;z-index:10}
+.fullscreen-btn{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);border-radius:6px;color:#fff;font-size:11px;font-family:'Outfit',sans-serif;font-weight:700;letter-spacing:.5px;padding:5px 10px;cursor:pointer;text-transform:uppercase;z-index:10}
 
 /* ── X CARD (16:9) ── */
 .x-card{width:480px;height:270px;position:relative;overflow:hidden;border-radius:6px;flex-shrink:0}
@@ -80,29 +80,29 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .x-cover-logo{height:28px;position:absolute;bottom:10px;right:10px}
 .x-boxes{display:grid;grid-template-columns:1fr 1fr;gap:4px;flex:1;margin-top:10px;align-content:start}
 .x-box{border:1px solid #fff;padding:5px 7px}
-.x-box-label{color:#bbb;font-size:8px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;font-family:'Barlow Condensed',sans-serif}
-.x-box-val{color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;line-height:1}
-.x-cover-name{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:-1px;line-height:.9}
+.x-box-label{color:#bbb;font-size:8px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;font-family:'Outfit',sans-serif}
+.x-box-val{color:#fff;font-family:'Outfit',sans-serif;font-size:20px;font-weight:900;line-height:1}
+.x-cover-name{font-family:'Outfit',sans-serif;font-size:26px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:-1px;line-height:.9}
 .x-cover-right{width:42%;position:relative;overflow:hidden}
 .x-cover-photo{width:100%;height:100%;object-fit:cover;clip-path:polygon(12% 0%,100% 0%,88% 100%,0% 100%)}
 .x-cover-photo-ph{width:100%;height:100%;background:#1a1a1a;clip-path:polygon(12% 0%,100% 0%,88% 100%,0% 100%);display:flex;align-items:center;justify-content:center}
-.x-chart-card{width:480px;height:270px;background:#060A10;position:relative;overflow:hidden;border-radius:6px;flex-shrink:0;display:flex;flex-direction:column}
+.x-chart-card{width:480px;height:270px;background:#0a0a0a;position:relative;overflow:hidden;border-radius:6px;flex-shrink:0;display:flex;flex-direction:column}
 .x-chart-header{padding:12px 16px 6px;display:flex;justify-content:space-between;align-items:flex-start}
-.x-chart-title{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;text-transform:uppercase;color:#fff}
-.x-chart-pr{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:900;line-height:1}
+.x-chart-title{font-family:'Outfit',sans-serif;font-weight:900;font-size:18px;text-transform:uppercase;color:#fff}
+.x-chart-pr{font-family:'Outfit',sans-serif;font-size:32px;font-weight:900;line-height:1}
 .x-chart-body{flex:1;padding:4px 8px 8px;position:relative}
-.x-chart-footer{padding:6px 16px 10px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #0d1520}
-.x-chart-ath{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#3a5060}
+.x-chart-footer{padding:6px 16px 10px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #1a1a1a}
+.x-chart-ath{font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;color:#8a8a8a}
 .x-logo-sm{height:16px;opacity:.5}
 
 /* ── SCREEN RECORD MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;display:none;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;max-width:440px;width:90%;text-align:center}
-.modal-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:.5px;margin-bottom:8px;color:var(--accent)}
+.modal-title{font-family:'Outfit',sans-serif;font-size:22px;font-weight:900;letter-spacing:.5px;margin-bottom:8px;color:var(--accent)}
 .modal-body{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:20px}
 .modal-step{display:flex;align-items:center;gap:10px;text-align:left;margin-bottom:10px}
-.modal-num{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#000;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-num{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#000;font-family:'Outfit',sans-serif;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .modal-text{font-size:13px;color:var(--text)}
 
 /* ── FULLSCREEN STORY ── */
@@ -132,30 +132,30 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .story-fs-gradient{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.3) 0%,rgba(0,0,0,.1) 35%,rgba(0,0,0,.65) 65%,rgba(0,0,0,.92) 100%)}
 .story-fs-content{position:absolute;bottom:0;left:0;right:0;padding:32px 28px 48px;z-index:2}
 .story-fs-logo{height:auto;width:42%;position:absolute;bottom:60px;right:32px;z-index:5;max-height:22%}
-.story-fs-badge{display:inline-block;background:var(--accent);color:#000;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:2px;padding:5px 12px;border-radius:4px;margin-bottom:10px;text-transform:uppercase}
-.story-fs-ex{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
-.story-fs-val{font-family:'Permanent Marker',cursive;font-size:88px;color:#fff;line-height:.88;margin-bottom:12px}
-.story-fs-ath{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
-.story-fs-school{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:#fff;opacity:.7;letter-spacing:1.5px;text-transform:uppercase;margin-top:3px}
-.story-fs-prev{font-family:'Barlow Condensed',sans-serif;font-size:16px;color:rgba(255,255,255,.6);margin-top:6px;letter-spacing:.5px}
+.story-fs-badge{display:inline-block;background:var(--accent);color:#000;font-family:'Outfit',sans-serif;font-size:13px;font-weight:900;letter-spacing:2px;padding:5px 12px;border-radius:4px;margin-bottom:10px;text-transform:uppercase}
+.story-fs-ex{font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.story-fs-val{font-family:'Outfit',sans-serif;font-weight:900;font-size:88px;color:#fff;line-height:.88;margin-bottom:12px}
+.story-fs-ath{font-family:'Outfit',sans-serif;font-size:22px;font-weight:900;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.story-fs-school{font-family:'Outfit',sans-serif;font-size:16px;font-weight:700;color:#fff;opacity:.7;letter-spacing:1.5px;text-transform:uppercase;margin-top:3px}
+.story-fs-prev{font-family:'Outfit',sans-serif;font-size:16px;color:rgba(255,255,255,.6);margin-top:6px;letter-spacing:.5px}
 .story-fs-close{
   background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:8px;
-  color:#fff;font-size:13px;font-family:'Barlow Condensed',sans-serif;font-weight:700;
+  color:#fff;font-size:13px;font-family:'Outfit',sans-serif;font-weight:700;
   letter-spacing:.5px;padding:10px 16px;cursor:pointer;text-transform:uppercase;
   min-height:44px;display:flex;align-items:center;
 }
 .story-fs-rec{
-  background:rgba(220,30,30,.9);border:none;border-radius:22px;
-  color:#fff;font-size:14px;font-family:'Barlow Condensed',sans-serif;font-weight:800;
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:22px;
+  color:#fff;font-size:14px;font-family:'Outfit',sans-serif;font-weight:800;
   letter-spacing:1px;padding:11px 22px;cursor:pointer;text-transform:uppercase;
   display:flex;align-items:center;gap:7px;min-height:44px;
-  animation:pulse-rec 2s infinite;white-space:nowrap;
+  white-space:nowrap;
 }
 @keyframes pulse-rec{0%,100%{opacity:1}50%{opacity:.7}}
 .rec-dot{width:9px;height:9px;border-radius:50%;background:#fff}
 .tap-hint{
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  color:rgba(255,255,255,.4);font-size:12px;font-family:'Barlow Condensed',sans-serif;
+  color:rgba(255,255,255,.4);font-size:12px;font-family:'Outfit',sans-serif;
   letter-spacing:1px;text-transform:uppercase;pointer-events:none;
   transition:opacity .4s;text-align:center;line-height:1.6;
 }
@@ -284,11 +284,11 @@ let spotQuery='';
 let spotDdOpen=false;
 
 const EX=[
-  {id:'fly',  name:'10-10 Fly',         lower:true,  color:'#FF5C35'},
-  {id:'broad',name:'Broad Jump',         lower:false, color:'#3B9EFF'},
-  {id:'vert', name:'Skyhook Approach Jump',lower:false,color:'#2ECC71'},
-  {id:'fly510',name:'5-10 Fly',          lower:true,  color:'#F5A623'},
-  {id:'rsi42', name:'4/2 RSI',           lower:false, color:'#A855F7'},
+  {id:'fly',  name:'10-10 Fly',         lower:true,  color:'#ffffff'},
+  {id:'broad',name:'Broad Jump',         lower:false, color:'#ffffff'},
+  {id:'vert', name:'Skyhook Approach Jump',lower:false,color:'#ffffff'},
+  {id:'fly510',name:'5-10 Fly',          lower:true,  color:'#ffffff'},
+  {id:'rsi42', name:'4/2 RSI',           lower:false, color:'#ffffff'},
 ];
 
 function fmt(id,v){
@@ -437,7 +437,7 @@ function updateOverlay(){
     // Render value with styled unit suffix for time-based exercises
     if((storyExId==='fly'||storyExId==='fly510')&&d.val&&d.val.endsWith('s')){
       const numPart=d.val.slice(0,-1);
-      valEl.innerHTML=numPart+'<span style="font-family:&quot;Barlow Condensed&quot;,sans-serif;font-size:0.52em;font-weight:700;font-style:normal;vertical-align:0.15em;letter-spacing:0">s</span>';
+      valEl.innerHTML=numPart+'<span style="font-family:&quot;Outfit&quot;,sans-serif;font-size:0.52em;font-weight:700;font-style:normal;vertical-align:0.15em;letter-spacing:0">s</span>';
     }else{
       valEl.textContent=d.val;
     }
@@ -446,7 +446,7 @@ function updateOverlay(){
     if(schoolEl) schoolEl.textContent = storyIncludeSchoolText ? _resolveSchool(d.ath) : '';
     if(prevEl){
       if((storyExId==='fly'||storyExId==='fly510')&&d.prev&&d.prev.includes('s')){
-        const fixed=d.prev.replace(/(\d)s(|$)/,'$1<span style="font-family:&quot;Barlow Condensed&quot;,sans-serif;font-size:0.8em;font-weight:700;font-style:normal">s</span>$2');
+        const fixed=d.prev.replace(/(\d)s(|$)/,'$1<span style="font-family:&quot;Outfit&quot;,sans-serif;font-size:0.8em;font-weight:700;font-style:normal">s</span>$2');
         prevEl.innerHTML=fixed;
       }else{
         prevEl.textContent=d.prev;
@@ -470,7 +470,7 @@ function renderStoryPreview(){
   const mediaWrap=document.getElementById('story-media-wrap');
   const fsWrap=document.getElementById('fs-media-wrap');
   if(!storyMediaUrl){
-    if(mediaWrap)mediaWrap.innerHTML=`<div class="story-placeholder"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span style="font-size:11px;letter-spacing:1px;font-family:'Barlow Condensed',sans-serif;color:var(--muted2)">UPLOAD MEDIA</span></div>`;
+    if(mediaWrap)mediaWrap.innerHTML=`<div class="story-placeholder"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span style="font-size:11px;letter-spacing:1px;font-family:'Outfit',sans-serif;color:var(--muted2)">UPLOAD MEDIA</span></div>`;
     if(fsWrap)fsWrap.innerHTML='';
     return;
   }
@@ -794,35 +794,35 @@ function _drawNamePlate(ctx, athleteName, boxX, boxY, boxW, boxH, extraLeftPad){
     // Two-line plate: name on top (slightly smaller to make room), school as a
     // small subheader underneath -- both centered as a block within the plate.
     var nameFontSize = Math.floor(boxH * 0.40);
-    ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+nameFontSize+'px "Outfit", sans-serif';
     while (ctx.measureText(nameStr).width > maxW && nameFontSize > 14) {
       nameFontSize -= 2;
-      ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
+      ctx.font = '900 '+nameFontSize+'px "Outfit", sans-serif';
     }
     var schoolStr = school.toUpperCase();
     var schoolFontSize = Math.max(10, Math.floor(boxH * 0.17));
-    ctx.font = '700 '+schoolFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.font = '700 '+schoolFontSize+'px "Outfit", sans-serif';
     while (ctx.measureText(schoolStr).width > maxW && schoolFontSize > 9) {
       schoolFontSize -= 1;
-      ctx.font = '700 '+schoolFontSize+'px "Barlow Condensed", sans-serif';
+      ctx.font = '700 '+schoolFontSize+'px "Outfit", sans-serif';
     }
     var gapY = Math.round(boxH*0.06);
     var blockH = nameFontSize + gapY + schoolFontSize;
     var nameY = boxY + (boxH-blockH)/2 + nameFontSize/2;
     var schoolY = nameY + nameFontSize/2 + gapY + schoolFontSize/2;
     ctx.fillStyle = '#0a0a0a';
-    ctx.font = 'italic 900 '+nameFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+nameFontSize+'px "Outfit", sans-serif';
     ctx.textBaseline = 'middle';
     ctx.fillText(nameStr, plateX + plateW/2, nameY);
     ctx.fillStyle = '#666666';
-    ctx.font = '700 '+schoolFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.font = '700 '+schoolFontSize+'px "Outfit", sans-serif';
     ctx.fillText(schoolStr, plateX + plateW/2, schoolY);
   } else {
     var nameFontSize2 = Math.floor(boxH * 0.52);
-    ctx.font = 'italic 900 '+nameFontSize2+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+nameFontSize2+'px "Outfit", sans-serif';
     while (ctx.measureText(nameStr).width > maxW && nameFontSize2 > 18) {
       nameFontSize2 -= 2;
-      ctx.font = 'italic 900 '+nameFontSize2+'px "Barlow Condensed", sans-serif';
+      ctx.font = '900 '+nameFontSize2+'px "Outfit", sans-serif';
     }
     ctx.fillStyle = '#0a0a0a';
     ctx.textBaseline = 'middle';
@@ -875,13 +875,13 @@ function buildTop5Canvas(exId, ranked) {
   ctx.textAlign = 'left';
   const titleLabel = 'TOP 5 ALL-TIME';
   let titleFont = 48;
-  ctx.font = 'italic 900 '+titleFont+'px "Barlow Condensed", sans-serif';
+  ctx.font = '900 '+titleFont+'px "Outfit", sans-serif';
   while (ctx.measureText(titleLabel).width > 444 && titleFont > 30) {
     titleFont -= 2;
-    ctx.font = 'italic 900 '+titleFont+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+titleFont+'px "Outfit", sans-serif';
   }
   ctx.fillText(titleLabel, 36, 80);
-  ctx.font = 'italic 700 32px "Barlow Condensed", sans-serif';
+  ctx.font = '700 32px "Outfit", sans-serif';
   ctx.fillText(exObj.name.toUpperCase(), 36, 118);
   ctx.restore();
 
@@ -892,7 +892,7 @@ function buildTop5Canvas(exId, ranked) {
 
     // Rank number
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'italic 900 '+Math.floor(nameBoxH*0.55)+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+Math.floor(nameBoxH*0.55)+'px "Outfit", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(i+1), 8, nameBoxY + nameBoxH/2);
@@ -904,11 +904,11 @@ function buildTop5Canvas(exId, ranked) {
   ctx.save();
   ctx.fillStyle = '#ffffff';
   let exFontSize = 80;
-  ctx.font = 'italic 900 '+exFontSize+'px "Barlow Condensed", sans-serif';
+  ctx.font = '900 '+exFontSize+'px "Outfit", sans-serif';
   const exName = exObj.name.toUpperCase();
   while (ctx.measureText(exName).width > 530 && exFontSize > 40) {
     exFontSize -= 4;
-    ctx.font = 'italic 900 '+exFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+exFontSize+'px "Outfit", sans-serif';
   }
   ctx.textAlign = 'left';
   ctx.fillText(exName, 510, 90);
@@ -927,11 +927,11 @@ function buildTop5Canvas(exId, ranked) {
     ctx.strokeRect(valBoxX+1.5, boxY+1.5, valBoxW-3, valBoxH-3);
     ctx.fillStyle = '#ffffff';
     let valFontSize = Math.floor(valBoxH * 0.56);
-    ctx.font = 'italic 900 '+valFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+valFontSize+'px "Outfit", sans-serif';
     const valStr = fmtMPRShort(exId, item.value);
     while (ctx.measureText(valStr).width > valBoxW-30 && valFontSize > 24) {
       valFontSize -= 2;
-      ctx.font = 'italic 900 '+valFontSize+'px "Barlow Condensed", sans-serif';
+      ctx.font = '900 '+valFontSize+'px "Outfit", sans-serif';
     }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -943,7 +943,7 @@ function buildTop5Canvas(exId, ranked) {
   // ── FPT logo area — bottom right ──
   ctx.save();
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'italic 900 96px "Barlow Condensed", sans-serif';
+  ctx.font = '900 96px "Outfit", sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
   try {
@@ -1004,14 +1004,14 @@ function buildMPRCanvas(ex, athletes, year, month) {
   ctx.textAlign = 'left';
   const monthLabel = MONTH_NAMES[month].toUpperCase()+' PRS';
   let titleFont = Math.floor(rowH*0.58);
-  ctx.font = 'italic 900 '+titleFont+'px "Barlow Condensed", sans-serif';
+  ctx.font = '900 '+titleFont+'px "Outfit", sans-serif';
   while (ctx.measureText(monthLabel).width > 444 && titleFont > 36) {
     titleFont -= 2;
-    ctx.font = 'italic 900 '+titleFont+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+titleFont+'px "Outfit", sans-serif';
   }
   const exLabel = exObj.name.toUpperCase();
   ctx.fillText(monthLabel, 36, 80);
-  ctx.font = 'italic 700 32px "Barlow Condensed", sans-serif';
+  ctx.font = '700 32px "Outfit", sans-serif';
   ctx.fillStyle = '#ffffff';
   ctx.fillText(exLabel, 36, 118);
   ctx.restore();
@@ -1030,11 +1030,11 @@ function buildMPRCanvas(ex, athletes, year, month) {
   ctx.save();
   ctx.fillStyle = '#ffffff';
   let exFontSize = 80;
-  ctx.font = 'italic 900 '+exFontSize+'px "Barlow Condensed", sans-serif';
+  ctx.font = '900 '+exFontSize+'px "Outfit", sans-serif';
   const exName = exObj.name.toUpperCase();
   while (ctx.measureText(exName).width > 530 && exFontSize > 40) {
     exFontSize -= 4;
-    ctx.font = 'italic 900 '+exFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+exFontSize+'px "Outfit", sans-serif';
   }
   ctx.textAlign = 'left';
   ctx.fillText(exName, 510, 90);
@@ -1055,11 +1055,11 @@ function buildMPRCanvas(ex, athletes, year, month) {
     ctx.fillRect(valColOld, boxY, valBoxW, valBoxH);
     ctx.fillStyle = '#888888';
     let valFontSize = Math.floor(valBoxH * 0.52);
-    ctx.font = 'italic 900 '+valFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+valFontSize+'px "Outfit", sans-serif';
     const oldStr = fmtMPRShort(ex, item.prior);
     while (ctx.measureText(oldStr).width > valBoxW-20 && valFontSize > 20) {
       valFontSize -= 2;
-      ctx.font = 'italic 900 '+valFontSize+'px "Barlow Condensed", sans-serif';
+      ctx.font = '900 '+valFontSize+'px "Outfit", sans-serif';
     }
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1073,11 +1073,11 @@ function buildMPRCanvas(ex, athletes, year, month) {
     ctx.strokeRect(valColNew+1.5, boxY+1.5, valBoxW-3, valBoxH-3);
     ctx.fillStyle = '#ffffff';
     let newFontSize = Math.floor(valBoxH * 0.56);
-    ctx.font = 'italic 900 '+newFontSize+'px "Barlow Condensed", sans-serif';
+    ctx.font = '900 '+newFontSize+'px "Outfit", sans-serif';
     const newStr = fmtMPRShort(ex, item.current);
     while (ctx.measureText(newStr).width > valBoxW-20 && newFontSize > 20) {
       newFontSize -= 2;
-      ctx.font = 'italic 900 '+newFontSize+'px "Barlow Condensed", sans-serif';
+      ctx.font = '900 '+newFontSize+'px "Outfit", sans-serif';
     }
     ctx.fillText(newStr, valColNew + valBoxW/2, boxY + valBoxH/2);
     ctx.textAlign = 'left';
@@ -1087,7 +1087,7 @@ function buildMPRCanvas(ex, athletes, year, month) {
   // ── FPT logo area — bottom right ──
   ctx.save();
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'italic 900 96px "Barlow Condensed", sans-serif';
+  ctx.font = '900 96px "Outfit", sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
   // Draw logo image; fallback to text if not loaded
@@ -1105,7 +1105,7 @@ function buildMPRCanvas(ex, athletes, year, month) {
   // ── Column headers ──
   ctx.save();
   ctx.fillStyle = '#ffffff';
-  ctx.font = '700 42px "Barlow Condensed", sans-serif';
+  ctx.font = '700 42px "Outfit", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.fillText('OLD PR', valColOld + valBoxW/2, startY - 16);
@@ -1210,13 +1210,13 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
   // Title — "<MONTH> CHALLENGE"
   ctx.fillStyle='#ffffff';ctx.textAlign='left';ctx.textBaseline='alphabetic';
   let titleStr=MONTH_NAMES[month].toUpperCase()+' CHALLENGE';
-  let tf=70;ctx.font='italic 900 '+tf+'px "Barlow Condensed", sans-serif';
-  while(ctx.measureText(titleStr).width>1000&&tf>40){tf-=2;ctx.font='italic 900 '+tf+'px "Barlow Condensed", sans-serif';}
+  let tf=70;ctx.font='900 '+tf+'px "Outfit", sans-serif';
+  while(ctx.measureText(titleStr).width>1000&&tf>40){tf-=2;ctx.font='900 '+tf+'px "Outfit", sans-serif';}
   ctx.fillText(titleStr,40,100);
   // Subtitle — challenge name + unit + direction
   let sub=ch.name.toUpperCase()+(ch.unit?'  ('+ch.unit.toUpperCase()+')':'')+'   \u00B7   '+(ch.betterDir==='higher'?'HIGHER IS BETTER':'LOWER IS BETTER');
-  let sf=34;ctx.fillStyle='#bbbbbb';ctx.font='italic 700 '+sf+'px "Barlow Condensed", sans-serif';
-  while(ctx.measureText(sub).width>1000&&sf>18){sf-=2;ctx.font='italic 700 '+sf+'px "Barlow Condensed", sans-serif';}
+  let sf=34;ctx.fillStyle='#bbbbbb';ctx.font='700 '+sf+'px "Outfit", sans-serif';
+  while(ctx.measureText(sub).width>1000&&sf>18){sf-=2;ctx.font='700 '+sf+'px "Outfit", sans-serif';}
   ctx.fillText(sub,40,142);
   // Accent divider under header
   ctx.fillStyle='#ffffff';ctx.fillRect(40,158,1000,3);
@@ -1247,7 +1247,7 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
   const nameMaxW = isTime ? 330 : (colBase-70-colAdultX);
 
   // Header row
-  ctx.fillStyle='#888888';ctx.font='700 28px "Barlow Condensed", sans-serif';
+  ctx.fillStyle='#888888';ctx.font='700 28px "Outfit", sans-serif';
   ctx.textAlign='left';ctx.textBaseline='alphabetic';
   ctx.fillText('#',44,tableTop+32);
   ctx.fillText('ADULT',colAdultX,tableTop+32);
@@ -1263,43 +1263,43 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
     const midY=y+rowH/2;
     ctx.textBaseline='middle';
     // rank
-    ctx.fillStyle='#5e5e5e';ctx.font='900 '+Math.floor(rowH*0.40)+'px "Barlow Condensed", sans-serif';
+    ctx.fillStyle='#5e5e5e';ctx.font='900 '+Math.floor(rowH*0.40)+'px "Outfit", sans-serif';
     ctx.textAlign='left';ctx.fillText(String(i+1),44,midY);
     // adult name
-    ctx.fillStyle='#ffffff';let nf=Math.floor(rowH*0.50);ctx.font='italic 900 '+nf+'px "Barlow Condensed", sans-serif';
+    ctx.fillStyle='#ffffff';let nf=Math.floor(rowH*0.50);ctx.font='900 '+nf+'px "Outfit", sans-serif';
     let nm=r.adult.toUpperCase();
     // Requires 20px of REAL margin before stopping, not just "no longer overflowing" --
     // the old check stopped the instant width dropped under budget, which with -2px
     // steps could leave as little as a few px of slack (enough to visually clash with
     // the Base number on a long name at the taller row heights introduced above).
-    while(ctx.measureText(nm).width>(nameMaxW-20)&&nf>16){nf-=2;ctx.font='italic 900 '+nf+'px "Barlow Condensed", sans-serif';}
+    while(ctx.measureText(nm).width>(nameMaxW-20)&&nf>16){nf-=2;ctx.font='900 '+nf+'px "Outfit", sans-serif';}
     ctx.fillText(nm,colAdultX,midY);
     // baseline -- time-formatted values get a slightly smaller font (0.386 vs 0.44 of
     // rowH) to buy extra breathing room against the wider mm:ss strings, on top of the
     // wider column spacing above; non-time challenges are completely unaffected.
-    ctx.textAlign='right';ctx.fillStyle='#8c8c8c';ctx.font='900 '+Math.floor(rowH*(isTime?0.386:0.44))+'px "Barlow Condensed", sans-serif';
+    ctx.textAlign='right';ctx.fillStyle='#8c8c8c';ctx.font='900 '+Math.floor(rowH*(isTime?0.386:0.44))+'px "Outfit", sans-serif';
     ctx.fillText(isTime?_fmtMMSS(r.baseline):String(_ch_round3(r.baseline)),colBase,midY);
     // latest
     ctx.fillStyle='#ffffff';
     ctx.fillText(r.latest!=null?(isTime?_fmtMMSS(r.latest):String(_ch_round3(r.latest))):'\u2014',colLatest,midY);
     // improvement
     const imp=r.improvement;
-    ctx.fillStyle=imp==null?'#4a4a4a':(imp>0?'#3ad07a':(imp<0?'#e0564b':'#9a9a9a'));
-    ctx.font='900 '+Math.floor(rowH*(isTime?0.41:0.46))+'px "Barlow Condensed", sans-serif';
+    ctx.fillStyle=imp==null?'#4a4a4a':(imp>0?'#ffffff':'#9a9a9a');
+    ctx.font='900 '+Math.floor(rowH*(isTime?0.41:0.46))+'px "Outfit", sans-serif';
     ctx.fillText(imp!=null?((imp>0?'+':'')+_ch_round3(imp)):'\u2014',colImp,midY);
     ctx.textBaseline='alphabetic';
   });
 
   // Page indicator
   if(pageCount&&pageCount>1){
-    ctx.fillStyle='#666666';ctx.font='700 26px "Barlow Condensed", sans-serif';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    ctx.fillStyle='#666666';ctx.font='700 26px "Outfit", sans-serif';ctx.textAlign='left';ctx.textBaseline='alphabetic';
     ctx.fillText('PAGE '+pageNum+' / '+pageCount,40,1052);
   }
   // Logo bottom-right
   try{
     const logoImg=document.querySelector('img.logo-img')||new Image();
     if(logoImg.complete&&logoImg.naturalWidth>0){const lh=116;const lw=lh*(logoImg.naturalWidth/logoImg.naturalHeight);ctx.drawImage(logoImg,1048-lw,1058-lh,lw,lh);}
-    else{ctx.fillStyle='#ffffff';ctx.font='italic 900 60px "Barlow Condensed", sans-serif';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText('FPT',1048,1056);}
+    else{ctx.fillStyle='#ffffff';ctx.font='900 60px "Outfit", sans-serif';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText('FPT',1048,1056);}
   }catch(e){}
   return canvas;
 }
@@ -1332,7 +1332,7 @@ function renderChallenge(){
     el.innerHTML='';
     pages.forEach((pageRows,pi)=>{
       const wrap=document.createElement('div');wrap.style.cssText='width:100%;margin-bottom:18px';
-      if(pages.length>1){const lbl=document.createElement('div');lbl.style.cssText="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--accent);margin-bottom:6px;text-align:center";lbl.textContent='Page '+(pi+1)+' of '+pages.length;wrap.appendChild(lbl);}
+      if(pages.length>1){const lbl=document.createElement('div');lbl.style.cssText="font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;color:var(--accent);margin-bottom:6px;text-align:center";lbl.textContent='Page '+(pi+1)+' of '+pages.length;wrap.appendChild(lbl);}
       const canvas=buildChallengeCanvas(challYear,challMonth,pageRows,ch,pi+1,pages.length);
       canvas.style.width='100%';canvas.style.borderRadius='8px';wrap.appendChild(canvas);
       const btn=document.createElement('button');btn.className='submit-btn';btn.style.cssText='margin-top:10px';
@@ -1344,10 +1344,10 @@ function renderChallenge(){
   const subtitle=ch?(ch.name+(ch.unit?' ('+ch.unit+')':'')):'No challenge set this month';
   return '<div class="panel">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    +'<button onclick="_chPrev()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700">\u2039 Prev</button>'
-    +'<div style="text-align:center"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:900;color:var(--accent)">'+monthLabel+'</div>'
+    +'<button onclick="_chPrev()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:\'Outfit\',sans-serif;font-size:16px;font-weight:700">\u2039 Prev</button>'
+    +'<div style="text-align:center"><div style="font-family:\'Outfit\',sans-serif;font-size:20px;font-weight:900;color:var(--accent)">'+monthLabel+'</div>'
     +'<div style="font-size:12px;color:var(--muted)">'+subtitle+'</div></div>'
-    +'<button onclick="_chNext()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700">Next \u203A</button>'
+    +'<button onclick="_chNext()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:\'Outfit\',sans-serif;font-size:16px;font-weight:700">Next \u203A</button>'
     +'</div>'
     +'<div id="ch-preview" style="min-height:200px;background:var(--surface2);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px"><div style="color:var(--muted);font-size:13px">Loading preview...</div></div>'
     +'</div>';
@@ -1391,7 +1391,7 @@ function renderTop5() {
 
   return `<div class="panel">
     <div style="text-align:center;margin-bottom:14px">
-      <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:var(--accent)">Top 5 All-Time</div>
+      <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:900;color:var(--accent)">Top 5 All-Time</div>
       <div style="font-size:12px;color:var(--muted)">Ranked by personal best · excludes athletes with fewer than 2 logged sessions</div>
     </div>
     <div class="toggle-group" style="margin-bottom:10px">${genderToggs}</div>
@@ -1441,7 +1441,7 @@ function renderMonthPR() {
       wrap.style.cssText = 'width:100%;margin-bottom:18px';
       if (pages.length > 1) {
         const lbl = document.createElement('div');
-        lbl.style.cssText = "font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:var(--accent);margin-bottom:6px;text-align:center";
+        lbl.style.cssText = "font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;color:var(--accent);margin-bottom:6px;text-align:center";
         lbl.textContent = 'Page '+(pi+1)+' of '+pages.length;
         wrap.appendChild(lbl);
       }
@@ -1467,12 +1467,12 @@ function renderMonthPR() {
 
   return `<div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <button onclick="_mprPrev()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">‹ Prev</button>
+      <button onclick="_mprPrev()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:16px;font-weight:700">‹ Prev</button>
       <div style="text-align:center">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:900;color:var(--accent)">${monthLabel}</div>
+        <div style="font-family:'Outfit',sans-serif;font-size:20px;font-weight:900;color:var(--accent)">${monthLabel}</div>
         <div style="font-size:12px;color:var(--muted)">${totalPRs} PR${totalPRs!==1?'s':''} across all exercises</div>
       </div>
-      <button onclick="_mprNext()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700">Next ›</button>
+      <button onclick="_mprNext()" style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 14px;cursor:pointer;font-family:'Outfit',sans-serif;font-size:16px;font-weight:700">Next ›</button>
     </div>
     <div class="toggle-group" style="margin-bottom:14px">${exToggs}</div>
     <div style="display:flex;gap:16px;margin-bottom:14px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${includeSchoolLogos?'checked':''} onchange="includeSchoolLogos=this.checked;render()"/>School logos</label><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${includeSchoolText?'checked':''} onchange="includeSchoolText=this.checked;render()"/>School name (subheader)</label></div>
@@ -1533,7 +1533,7 @@ function renderStory(){
           <div class="upload-sub">${storyMediaType==='video'?'Video loaded — use screen record for animated post':'Supports photos and videos (MP4, MOV)'}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <button class="btn btn-red" style="width:100%;font-size:14px;padding:12px" onclick="openFS()">⛶ Go Fullscreen for Screen Record</button>
+          <button class="btn btn-red" style="width:100%;font-size:14px;padding:12px" onclick="openFS()">📱 Go Fullscreen for Screen Record</button>
           <button class="btn btn-ghost" style="width:100%" onclick="downloadFrame()">↓ Save Frame as PNG</button>
           <button class="btn btn-ghost" style="width:100%;font-size:11px;color:var(--muted2)" onclick="openModal()">Screen Record Instructions (iPhone) →</button>
         </div>
@@ -1551,7 +1551,7 @@ function renderStory(){
       <div class="card-label" style="margin-bottom:8px">Story Preview (9:16)</div>
       <div class="story-stage" id="story-stage">
         <div id="story-media-wrap">
-          <div class="story-placeholder"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span style="font-size:11px;letter-spacing:1px;font-family:'Barlow Condensed',sans-serif">UPLOAD MEDIA</span></div>
+          <div class="story-placeholder"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span style="font-size:11px;letter-spacing:1px;font-family:'Outfit',sans-serif">UPLOAD MEDIA</span></div>
         </div>
         <div class="story-overlay">
           <div class="story-gradient"></div>
@@ -1560,10 +1560,10 @@ function renderStory(){
             
             <div class="story-badge" id="preview-badge">${d?d.badge:'—'}</div>
             <div class="story-ex" id="preview-ex">${d?d.ex:''}</div>
-            <div class="story-val" id="preview-val">${d?((storyExId==='fly'||storyExId==='fly510')&&d.val&&d.val.endsWith('s')?d.val.slice(0,-1)+'<span style="font-family:Barlow Condensed,sans-serif;font-size:0.52em;font-weight:700;font-style:normal;vertical-align:0.15em">s</span>':d.val):'—'}</div>
+            <div class="story-val" id="preview-val">${d?((storyExId==='fly'||storyExId==='fly510')&&d.val&&d.val.endsWith('s')?d.val.slice(0,-1)+'<span style="font-family:Outfit,sans-serif;font-size:0.52em;font-weight:700;font-style:normal;vertical-align:0.15em">s</span>':d.val):'—'}</div>
             <div class="story-ath" id="preview-ath">${d?d.ath:'Select options above'}</div>
             <div class="story-school" id="preview-school">${d&&storyIncludeSchoolText?_resolveSchool(d.ath):''}</div>
-            <div class="story-prev" id="preview-prev">${d?((storyExId==='fly'||storyExId==='fly510')&&d.prev&&d.prev.includes('s')?d.prev.replace(/(\d)s(\b|$)/,'$1<span style="font-family:Barlow Condensed,sans-serif;font-size:0.8em;font-weight:700;font-style:normal">s</span>$2'):d.prev):''}</div>
+            <div class="story-prev" id="preview-prev">${d?((storyExId==='fly'||storyExId==='fly510')&&d.prev&&d.prev.includes('s')?d.prev.replace(/(\d)s(\b|$)/,'$1<span style="font-family:Outfit,sans-serif;font-size:0.8em;font-weight:700;font-style:normal">s</span>$2'):d.prev):''}</div>
           </div>
         </div>
       </div>
@@ -1641,7 +1641,7 @@ function renderScatterChart(entries, ath, exId, color, chartH) {
   const xLabels = uniqueDates.map((d, i) => {
     if (i % step !== 0 && i !== n - 1) return '';
     const x = n > 1 ? i * xStep : w / 2;
-    return '<text x="' + x.toFixed(1) + '" y="' + (h + 14) + '" fill="#3a5060" font-size="7" text-anchor="middle" font-family="Barlow Condensed,sans-serif">' + labels[i] + '</text>';
+    return '<text x="' + x.toFixed(1) + '" y="' + (h + 14) + '" fill="#8a8a8a" font-size="7" text-anchor="middle" font-family="Outfit,sans-serif">' + labels[i] + '</text>';
   }).join('');
 
   // Y axis labels
@@ -1654,7 +1654,7 @@ function renderScatterChart(entries, ath, exId, color, chartH) {
     else if (exId === 'broad') { const f = Math.floor(v / 12); lbl = f + "'" + Math.round(v % 12) + '"'; }
     else if (exId === 'rsi42') lbl = v.toFixed(3);
     else lbl = v.toFixed(3) + '"';
-    return '<text x="-4" y="' + (y + 3) + '" fill="#3a5060" font-size="7" text-anchor="end" font-family="Barlow Condensed,sans-serif">' + lbl + '</text>';
+    return '<text x="-4" y="' + (y + 3) + '" fill="#8a8a8a" font-size="7" text-anchor="end" font-family="Outfit,sans-serif">' + lbl + '</text>';
   }).join('');
 
   return '<svg viewBox="0 -4 ' + (w + 40) + ' ' + (h + 26) + '" style="width:100%;height:100%;overflow:visible" transform="translate(30,0)">' +
@@ -1686,7 +1686,7 @@ function renderSpotlight(){
             <button onclick="spotAthlete='';spotPhotoUrl=null;render()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px">✕</button>
           </div>`
         :`<div style="position:relative">
-            <input id="spot-search" style="width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;outline:none" placeholder="Search athletes…" value="${spotQuery}" oninput="spotQuery=this.value;updateSpotDropdown()" onfocus="updateSpotDropdown()" onblur="setTimeout(()=>{spotDdOpen=false;const dd=document.getElementById('spot-dropdown');if(dd)dd.style.display='none';},150)" autocomplete="off"/>
+            <input id="spot-search" style="width:100%;background:var(--surface3);border:1.5px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:14px;outline:none" placeholder="Search athletes…" value="${spotQuery}" oninput="spotQuery=this.value;updateSpotDropdown()" onfocus="updateSpotDropdown()" onblur="setTimeout(()=>{spotDdOpen=false;const dd=document.getElementById('spot-dropdown');if(dd)dd.style.display='none';},150)" autocomplete="off"/>
             <div id="spot-dropdown" style="display:${spotDdOpen&&filt.length?'block':'none'};position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;z-index:50;max-height:180px;overflow-y:auto">
               ${filt.map(a=>`<div style="padding:9px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--border)" onmousedown="spotAthlete=a='${a.replace(/'/g,"\\'")}';spotQuery='';spotDdOpen=false;render()">${a}</div>`).join('')}
             </div>
@@ -1695,11 +1695,11 @@ function renderSpotlight(){
     </div>
     <div class="panel" style="min-width:180px">
       <div class="panel-title">Athlete Photo</div>
-      <label style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;padding:9px 16px;cursor:pointer;text-transform:uppercase;display:inline-block">
+      <label style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;letter-spacing:.5px;padding:9px 16px;cursor:pointer;text-transform:uppercase;display:inline-block">
         ${spotPhotoUrl?'✓ Photo Ready':'Upload Photo'}
         <input type="file" accept="image/*" style="display:none" onchange="const r=new FileReader();r.onload=e=>{spotPhotoUrl=e.target.result;render()};r.readAsDataURL(this.files[0])"/>
       </label>
-      ${spotPhotoUrl?`<button onclick="spotPhotoUrl=null;render()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--red);font-size:12px;padding:4px 10px;cursor:pointer;margin-left:6px">Remove</button>`:''}
+      ${spotPhotoUrl?`<button onclick="spotPhotoUrl=null;render()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;padding:4px 10px;cursor:pointer;margin-left:6px">Remove</button>`:''}
     </div>
     <div class="panel" style="min-width:200px">
       <div class="panel-title">Format</div>
@@ -1817,9 +1817,9 @@ function renderIGCards(athEntries,availEx){
     pr.broad!=null&&first.broad!=null&&{label:'Broad Jump',val:`${fmtS('broad',first.broad)} → ${fmtS('broad',pr.broad)}`},
     pr.vert!=null&&first.vert!=null&&{label:'Skyhook',val:`${fmtS('vert',first.vert)} → ${fmtS('vert',pr.vert)}`},
   ].filter(Boolean);
-  const coverHtml=`<div style="width:540px;height:540px;background:#050505;position:relative;overflow:hidden;font-family:'Barlow Condensed',sans-serif;flex-shrink:0;border-radius:4px">
+  const coverHtml=`<div style="width:540px;height:540px;background:#050505;position:relative;overflow:hidden;font-family:'Outfit',sans-serif;flex-shrink:0;border-radius:4px">
     <div style="position:absolute;top:13px;left:15px">
-      <span style="font-family:'Barlow Condensed',sans-serif;color:#fff;font-size:11px;font-weight:900;letter-spacing:2.5px;text-transform:uppercase;opacity:.85">FRYE PERFORMANCE TRAINING</span>
+      <span style="font-family:'Outfit',sans-serif;color:#fff;font-size:11px;font-weight:900;letter-spacing:2.5px;text-transform:uppercase;opacity:.85">FRYE PERFORMANCE TRAINING</span>
     </div>
     <div style="position:absolute;top:52px;left:14px;width:300px;display:grid;grid-template-columns:1fr 1fr;gap:5px">
       ${boxes.map(b=>`<div style="border:1.5px solid #fff;padding:7px 9px;background:rgba(0,0,0,.5)"><div style="color:#bbb;font-size:8px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px">${b.label}</div><div data-fitval style="color:#fff;font-size:28px;font-weight:900;line-height:1;letter-spacing:-1px">${b.val}</div></div>`).join('')}
@@ -1840,17 +1840,17 @@ function renderIGCards(athEntries,availEx){
     const prv=pr[ex.id];const impPct=first[ex.id]!=null&&prv!=null&&first[ex.id]!==0?(ex.lower?(first[ex.id]-prv)/first[ex.id]*100:(prv-first[ex.id])/first[ex.id]*100):null;
     cards.push({
       id:`chart-ig-${ex.id}`,label:`Card — ${ex.name}`,file:`FPT_${spotAthlete.replace(/ /g,'_')}_${ex.id.toUpperCase()}.png`,
-      html:`<div style="width:540px;height:540px;background:#060A10;position:relative;overflow:hidden;font-family:'Barlow Condensed',sans-serif;flex-shrink:0;border-radius:4px">
+      html:`<div style="width:540px;height:540px;background:#0a0a0a;position:relative;overflow:hidden;font-family:'Outfit',sans-serif;flex-shrink:0;border-radius:4px">
         <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#ffffff 40%,transparent)"></div>
         <div style="position:relative;padding:18px 22px 0;display:flex;justify-content:space-between;align-items:flex-start">
-          <div><div style="color:#273040;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:3px">Athlete Progress</div><div style="color:#fff;font-size:28px;font-weight:900;text-transform:uppercase;letter-spacing:.5px">${ex.name}</div><div style="color:#243040;font-size:11px;letter-spacing:1px;margin-top:3px;text-transform:uppercase">${spotAthlete}</div></div>
-          <div style="text-align:right"><div style="color:#273040;font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">Session PR Avg</div><div style="color:#ffffff;font-size:50px;font-weight:900;line-height:1;letter-spacing:-2px">${fmt(ex.id,prv)}</div>${impPct!=null?`<div style="margin-top:5px;display:inline-flex;align-items:center;gap:5px;background:#ffffff18;border:1px solid #ffffff44;border-radius:3px;padding:3px 10px"><span style="color:#ffffff;font-size:13px;font-weight:800">${ex.lower?'↓':'↑'} ${Math.abs(impPct).toFixed(1)}%</span><span style="color:#3a5060;font-size:10px">improvement</span></div>`:''}</div>
+          <div><div style="color:#7a7a7a;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:3px">Athlete Progress</div><div style="color:#fff;font-size:28px;font-weight:900;text-transform:uppercase;letter-spacing:.5px">${ex.name}</div><div style="color:#7a7a7a;font-size:11px;letter-spacing:1px;margin-top:3px;text-transform:uppercase">${spotAthlete}</div></div>
+          <div style="text-align:right"><div style="color:#7a7a7a;font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">Session PR Avg</div><div style="color:#ffffff;font-size:50px;font-weight:900;line-height:1;letter-spacing:-2px">${fmt(ex.id,prv)}</div>${impPct!=null?`<div style="margin-top:5px;display:inline-flex;align-items:center;gap:5px;background:#ffffff18;border:1px solid #ffffff44;border-radius:3px;padding:3px 10px"><span style="color:#ffffff;font-size:13px;font-weight:800">${ex.lower?'↓':'↑'} ${Math.abs(impPct).toFixed(1)}%</span><span style="color:#8a8a8a;font-size:10px">improvement</span></div>`:''}</div>
         </div>
         <div style="position:relative;height:330px;padding:8px 12px 4px;display:flex;align-items:flex-end;gap:2px">
           ${renderScatterChart(state.entries,spotAthlete,ex.id,ex.color,220)}
         </div>
-        <div style="position:absolute;bottom:0;left:0;right:0;padding:8px 22px 12px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #0d1420">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#2a4055">${spotAthlete}${_spotSchoolText(spotAthlete,spotTextOnProgress)?' &middot; '+_spotSchoolText(spotAthlete,spotTextOnProgress):''} &middot; ${data.length} sessions</div>
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:8px 22px 12px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #1a1a1a">
+          <div style="font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;color:#7a7a7a">${spotAthlete}${_spotSchoolText(spotAthlete,spotTextOnProgress)?' &middot; '+_spotSchoolText(spotAthlete,spotTextOnProgress):''} &middot; ${data.length} sessions</div>
           <div style="display:flex;align-items:center;gap:8px">
             ${_spotLogoUrl(spotAthlete,spotLogoOnProgress)?`<img src="${_spotLogoUrl(spotAthlete,spotLogoOnProgress)}" style="height:36px;width:36px;object-fit:contain;background:#fff;border-radius:3px;padding:2px"/>`:''}
             <img src="${LOGO}" style="height:52px;opacity:.7"/>
@@ -1872,7 +1872,7 @@ function renderXCards(athEntries,availEx){
     {id:'cover-x',label:'Cover Card (1200×675)',file:`FPT_${spotAthlete.replace(/ /g,'_')}_Cover_X.png`,
      html:`<div class="x-card"><div class="x-cover">
       <div class="x-cover-left">
-        <div style="font-family:'Barlow Condensed',sans-serif;color:#fff;font-size:8px;font-weight:900;letter-spacing:2px;text-transform:uppercase;opacity:.8;margin-bottom:6px">FRYE PERFORMANCE TRAINING</div>
+        <div style="font-family:'Outfit',sans-serif;color:#fff;font-size:8px;font-weight:900;letter-spacing:2px;text-transform:uppercase;opacity:.8;margin-bottom:6px">FRYE PERFORMANCE TRAINING</div>
         <div class="x-boxes" style="${boxes.length>6?'gap:2px;margin-top:4px':''}">${boxes.map(b=>`<div class="x-box" style="${boxes.length>6?'padding:2px 6px':''}"><div class="x-box-label" style="${boxes.length>6?'font-size:7px':''}">${b.label}</div><div class="x-box-val" data-fitval style="${boxes.length>6?'font-size:14px':''}">${b.val}</div></div>`).join('')}</div>
         <div style="display:flex;align-items:flex-end;gap:8px">
           <div class="x-cover-name" style="flex:1;min-width:0"><div data-xname="fn" style="white-space:nowrap">${fn}</div>${ln?`<div data-xname="ln" style="white-space:nowrap">${ln}</div>`:''}${_spotSchoolText(spotAthlete,spotTextOnCover)?`<div style="color:#fff;opacity:.75;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;white-space:nowrap">${_spotSchoolText(spotAthlete,spotTextOnCover)}</div>`:''}</div>
@@ -1892,8 +1892,8 @@ function renderXCards(athEntries,availEx){
       html:`<div class="x-chart-card">
         <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#ffffff 40%,transparent)"></div>
         <div class="x-chart-header">
-          <div><div style="color:#273040;font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">Progress</div><div class="x-chart-title">${ex.name}</div><div style="color:#243040;font-size:10px;text-transform:uppercase;letter-spacing:1px">${spotAthlete}${_spotSchoolText(spotAthlete,spotTextOnProgress)?' &middot; '+_spotSchoolText(spotAthlete,spotTextOnProgress):''}</div></div>
-          <div style="text-align:right"><div style="color:#273040;font-size:8px;letter-spacing:1.5px;text-transform:uppercase">Session PR Avg</div><div class="x-chart-pr" style="color:#ffffff">${fmt(ex.id,pv)}</div>${impPct!=null?`<div style="font-size:11px;color:#ffffff;font-weight:700">${ex.lower?'↓':'↑'} ${Math.abs(impPct).toFixed(1)}%</div>`:''}</div>
+          <div><div style="color:#7a7a7a;font-size:9px;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px">Progress</div><div class="x-chart-title">${ex.name}</div><div style="color:#7a7a7a;font-size:10px;text-transform:uppercase;letter-spacing:1px">${spotAthlete}${_spotSchoolText(spotAthlete,spotTextOnProgress)?' &middot; '+_spotSchoolText(spotAthlete,spotTextOnProgress):''}</div></div>
+          <div style="text-align:right"><div style="color:#7a7a7a;font-size:8px;letter-spacing:1.5px;text-transform:uppercase">Session PR Avg</div><div class="x-chart-pr" style="color:#ffffff">${fmt(ex.id,pv)}</div>${impPct!=null?`<div style="font-size:11px;color:#ffffff;font-weight:700">${ex.lower?'↓':'↑'} ${Math.abs(impPct).toFixed(1)}%</div>`:''}</div>
         </div>
         <div class="x-chart-body">
           <div style="display:flex;align-items:flex-end;gap:3px;height:100%">
