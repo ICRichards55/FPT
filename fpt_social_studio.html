@@ -1239,7 +1239,9 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
   // ~165px at this font size), so it still overlapped in practice. These numbers
   // are derived directly from worst-case rendered widths with real margin to spare;
   // non-time challenges (Miles, reps, etc.) keep today's exact original positions.
-  const isTime=_isTimeUnit(ch.unit);
+  // Always plain seconds (Oct 2026): mm:ss strings looked cramped on the graphic, so the
+  // social graphic shows decimal values for every challenge type. (_fmtMMSS is kept for reference.)
+  const isTime=false;
   const colAdultX=124;
   const colBase = isTime ? 660 : 712;
   const colLatest = isTime ? 855 : 872;
@@ -1286,7 +1288,16 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
     const imp=r.improvement;
     ctx.fillStyle=imp==null?'#4a4a4a':(imp>0?'#ffffff':'#9a9a9a');
     ctx.font='900 '+Math.floor(rowH*(isTime?0.41:0.46))+'px "Outfit", sans-serif';
-    ctx.fillText(imp!=null?((imp>0?'+':'')+_ch_round3(imp)):'\u2014',colImp,midY);
+    // Sign reflects the direction the NUMBER moved, not whether it's good: on a
+    // lower-is-better challenge (e.g. a timed run) an improvement is a drop, so it
+    // reads "-1.2" (still green) instead of "+1.2", which looked like everyone got slower.
+    // Color (above) still encodes good/bad. Higher-is-better challenges are unchanged.
+    let impTxt='\u2014';
+    if(imp!=null){
+      const moved=(ch.betterDir==='higher')?imp:-imp;
+      impTxt=(moved>0?'+':(moved<0?'-':''))+_ch_round3(Math.abs(imp));
+    }
+    ctx.fillText(impTxt,colImp,midY);
     ctx.textBaseline='alphabetic';
   });
 
