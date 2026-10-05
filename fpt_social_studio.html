@@ -1246,7 +1246,37 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
   const colBase = isTime ? 660 : 712;
   const colLatest = isTime ? 855 : 872;
   const colImp = 1040;
-  const nameMaxW = isTime ? 330 : (colBase-70-colAdultX);
+  let nameMaxW = isTime ? 330 : (colBase-70-colAdultX);
+  // Oct 2026: size the number columns and the name budget from MEASURED widths. With few
+  // rows the rows get tall (up to 150px) and the numbers grew until they collided with each
+  // other and with long names, so: (1) shrink the number font until the widest value in any
+  // numeric column fits its ~145px column spacing, then (2) keep names clear of the BASE column.
+  const _impText=(r)=>{
+    if(r.improvement==null)return '\u2014';
+    const moved=(ch.betterDir==='higher')?r.improvement:-r.improvement;
+    return (moved>0?'+':(moved<0?'-':''))+_ch_round3(Math.abs(r.improvement));
+  };
+  let numPx=Math.floor(rowH*0.46);
+  if(!isTime){
+    const _widest=(px)=>{
+      ctx.font='900 '+px+'px "Outfit", sans-serif';
+      let w=0;
+      rows.forEach(r=>{
+        [String(_ch_round3(r.baseline)),r.latest!=null?String(_ch_round3(r.latest)):'\u2014',_impText(r)]
+          .forEach(t=>{w=Math.max(w,ctx.measureText(t).width);});
+      });
+      return w;
+    };
+    while(_widest(numPx)>135&&numPx>18)numPx-=2;
+  }
+  const basePx=isTime?Math.floor(rowH*0.386):Math.min(Math.floor(rowH*0.44),numPx);
+  const impPx=isTime?Math.floor(rowH*0.41):numPx;
+  if(!isTime){
+    ctx.font='900 '+basePx+'px "Outfit", sans-serif';
+    let maxBaseW=0;
+    rows.forEach(r=>{maxBaseW=Math.max(maxBaseW,ctx.measureText(String(_ch_round3(r.baseline))).width);});
+    nameMaxW=Math.min(nameMaxW,(colBase-maxBaseW-40)-colAdultX);
+  }
 
   // Header row
   ctx.fillStyle='#888888';ctx.font='700 28px "Outfit", sans-serif';
@@ -1279,7 +1309,7 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
     // baseline -- time-formatted values get a slightly smaller font (0.386 vs 0.44 of
     // rowH) to buy extra breathing room against the wider mm:ss strings, on top of the
     // wider column spacing above; non-time challenges are completely unaffected.
-    ctx.textAlign='right';ctx.fillStyle='#8c8c8c';ctx.font='900 '+Math.floor(rowH*(isTime?0.386:0.44))+'px "Outfit", sans-serif';
+    ctx.textAlign='right';ctx.fillStyle='#8c8c8c';ctx.font='900 '+basePx+'px "Outfit", sans-serif';
     ctx.fillText(isTime?_fmtMMSS(r.baseline):String(_ch_round3(r.baseline)),colBase,midY);
     // latest
     ctx.fillStyle='#ffffff';
@@ -1287,16 +1317,9 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
     // improvement
     const imp=r.improvement;
     ctx.fillStyle=imp==null?'#4a4a4a':(imp>0?'#ffffff':'#9a9a9a');
-    ctx.font='900 '+Math.floor(rowH*(isTime?0.41:0.46))+'px "Outfit", sans-serif';
-    // Sign reflects the direction the NUMBER moved, not whether it's good: on a
-    // lower-is-better challenge (e.g. a timed run) an improvement is a drop, so it
-    // reads "-1.2" (still green) instead of "+1.2", which looked like everyone got slower.
-    // Color (above) still encodes good/bad. Higher-is-better challenges are unchanged.
-    let impTxt='\u2014';
-    if(imp!=null){
-      const moved=(ch.betterDir==='higher')?imp:-imp;
-      impTxt=(moved>0?'+':(moved<0?'-':''))+_ch_round3(Math.abs(imp));
-    }
+    ctx.font='900 '+impPx+'px "Outfit", sans-serif';
+    // Sign reflects the direction the NUMBER moved (see _impText), color encodes good/bad.
+    const impTxt=_impText(r);
     ctx.fillText(impTxt,colImp,midY);
     ctx.textBaseline='alphabetic';
   });
