@@ -32,6 +32,12 @@ body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;min-
 .header-title{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--team)}
 .team-badge{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--team);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
 .team-badge.none{color:var(--muted2)}
+/* Header org + team pickers (Oct 2026): native selects -- the old team badge was a plain div, so it couldn't be clicked */
+.hdr-right{display:flex;align-items:center;gap:6px;min-width:0}
+.hdr-sel{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--team);max-width:230px;min-width:0;cursor:pointer;text-overflow:ellipsis}
+.hdr-sel.none{color:var(--muted2)}
+.hdr-sel option,.hdr-sel optgroup{color:#111;background:#fff;text-transform:none}
+@media(max-width:600px){.header-title{display:none}.hdr-sel{max-width:44vw}}
 .tab-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
 .tab-bar::-webkit-scrollbar{display:none}
 .tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:12px 12px 10px;cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s}
@@ -123,7 +129,10 @@ canvas{max-width:100%;border-radius:8px;margin-top:8px}
       <img class="logo-img" src="/fpt_logo.webp" alt="FPT"/>
       <div class="header-title">FPT Teams</div>
     </a>
-    <div class="team-badge none" id="header-team-badge">No Team Selected</div>
+    <div class="hdr-right">
+      <select class="hdr-sel" id="header-org" aria-label="Organization"></select>
+      <select class="hdr-sel none" id="header-team" aria-label="Team"></select>
+    </div>
   </div>
   <div class="tab-bar">
     <button class="tab active" id="tab-log" data-tab="log">Log</button>
@@ -204,6 +213,8 @@ function _migrateTeamMeta(){
 }
 var currentTab = 'log';
 var currentTeam = '';
+var currentOrg = '';   // header org filter ('' = all organizations); remembered per device
+try{ currentOrg = localStorage.getItem('fpt_teams_org') || ''; }catch(e){}
 var TODAY = (function(){
   var d = new Date();
   var et = new Date(d.toLocaleString('en-US',{timeZone:'America/New_York'}));
@@ -379,12 +390,50 @@ function showToast(msg){
   setTimeout(function(){ t.classList.remove('show'); }, 2500);
 }
 
+function _attr(x){ return String(x).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// Active teams in the chosen organization (every organization when none is chosen).
+function _orgTeams(){ return _activeTeams().filter(function(t){ return !currentOrg || _meta(t).org===currentOrg; }); }
 function updateHeaderBadge(){
-  var el = document.getElementById('header-team-badge');
-  if(!el) return;
-  if(currentTeam){ el.textContent=currentTeam; el.className='team-badge'; }
-  else { el.textContent='No Team Selected'; el.className='team-badge none'; }
+  var os=document.getElementById('header-org'), ts=document.getElementById('header-team');
+  if(!os||!ts) return;
+  var orgs=_allOrgs();
+  if(currentOrg && orgs.indexOf(currentOrg)===-1) currentOrg='';
+  os.innerHTML='<option value="">All organizations</option>'+orgs.map(function(o){
+    return '<option value="'+_attr(o)+'"'+(o===currentOrg?' selected':'')+'>'+_attr(o)+'</option>'; }).join('');
+  os.className='hdr-sel'+(currentOrg?'':' none');
+  var vis=_orgTeams().slice();
+  if(currentTeam && vis.indexOf(currentTeam)===-1 && state.teams.indexOf(currentTeam)>-1) vis.push(currentTeam); // an opened archived team
+  vis.sort(function(x,y){ var a=_meta(x),b=_meta(y); return (a.org+'|'+a.grade+'|'+a.sport).localeCompare(b.org+'|'+b.grade+'|'+b.sport,undefined,{numeric:true}); });
+  var groups=[], byKey={};
+  vis.forEach(function(t){
+    var m=_meta(t);
+    var gk=m.grade?((currentOrg?'':m.org+' \u00b7 ')+m.grade):'';
+    var base=m.grade?m.sport:(currentOrg?(m.sport||_orgGradeSport(m)):_orgGradeSport(m));
+    var dup=vis.filter(function(x){ return _orgGradeSport(_meta(x))===_orgGradeSport(m); }).length>1;
+    var txt=base+(m.archived?' ('+(m.season?m.season+' ':'')+m.year+' \u00b7 archived)':(dup?' ('+(m.season?m.season+' ':'')+m.year+')':''));
+    if(!byKey[gk]){ byKey[gk]={label:gk,opts:[]}; groups.push(byKey[gk]); }
+    byKey[gk].opts.push('<option value="'+_attr(t)+'"'+(t===currentTeam?' selected':'')+'>'+_attr(txt)+'</option>');
+  });
+  var html='<option value="">'+(vis.length?'Select team\u2026':(state.teams.length?'No active teams':'No teams yet'))+'</option>';
+  groups.forEach(function(g){ html+= g.label ? '<optgroup label="'+_attr(g.label)+'">'+g.opts.join('')+'</optgroup>' : g.opts.join(''); });
+  ts.innerHTML=html;
+  ts.className='hdr-sel'+(currentTeam?'':' none');
 }
+function setOrg(v){
+  currentOrg=v||'';
+  try{ localStorage.setItem('fpt_teams_org',currentOrg); }catch(e){}
+  if(currentTeam && currentOrg && _meta(currentTeam).org!==currentOrg){ currentTeam=''; logAthlete=''; window._athQ=''; }
+  render();
+}
+// Header pickers are static elements (not rebuilt with #app), so direct listeners are safe on iOS.
+(function(){
+  var os=document.getElementById('header-org'), ts=document.getElementById('header-team');
+  if(os) os.addEventListener('change',function(){ setOrg(this.value); });
+  if(ts) ts.addEventListener('change',function(){
+    var v=this.value;
+    if(!v){ currentTeam=''; logAthlete=''; window._athQ=''; render(); } else selectTeam(v);
+  });
+})();
 
 // ── TAB / RENDER ──────────────────────────────────────────────────────────
 function setTab(t){
@@ -411,11 +460,12 @@ function renderTeamSelector(){
   if(!state.teams.length){
     return '<div class="team-selector-wrap"><div class="team-selector-label">Team</div><div style="color:var(--muted);font-size:13px">No teams yet — add one in Settings.</div></div>';
   }
-  var vis=_activeTeams().slice();
+  var vis=_orgTeams().slice();
   if(currentTeam && vis.indexOf(currentTeam)===-1 && state.teams.indexOf(currentTeam)>-1) vis.push(currentTeam); // opened archive
+  if(!vis.length) return '<div class="team-selector-wrap"><div class="team-selector-label">Team</div><div style="color:var(--muted);font-size:13px">No active teams'+(currentOrg?' in '+_attr(currentOrg):'')+'.</div></div>';
   var chips = vis.map(function(t){
     var m=_meta(t);
-    var label=_esc(_orgGradeSport(m))+(m.archived?' <span style="font-size:10px;opacity:.7">('+(m.season?m.season+' ':'')+m.year+' \u00b7 archived)</span>'
+    var label=_esc(currentOrg?[m.grade,m.sport].filter(Boolean).join(' \u00b7 '):_orgGradeSport(m))+(m.archived?' <span style="font-size:10px;opacity:.7">('+(m.season?m.season+' ':'')+m.year+' \u00b7 archived)</span>'
       : (vis.filter(function(x){return _orgGradeSport(_meta(x))===_orgGradeSport(m);}).length>1?' <span style="font-size:10px;opacity:.7">'+(m.season?m.season+' ':'')+m.year+'</span>':''));
     return '<button class="team-chip'+(t===currentTeam?' active':'')+'" onclick="selectTeam(\''+_esc(t)+'\')">'+label+'</button>';
   }).join('');
