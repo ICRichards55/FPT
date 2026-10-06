@@ -271,8 +271,16 @@ function tryLogin(){
 function _handleDelegatedClick(e, prevent){
   if(!e.target) return;
   var el = e.target, id = el.id;
+  var _ds = el.closest ? el.closest('button[data-studio]') : null;
+  if(_ds){ if(prevent)e.preventDefault(); _studioAction(_ds.getAttribute('data-studio'), _ds.getAttribute('data-val')); return; }
   if(id==='ach-save-edit-btn'){ if(prevent)e.preventDefault(); saveAchEdit(); }
   else if(id==='team-save-btn'){ if(prevent)e.preventDefault(); saveNewTeam(); }
+  else if(id==='orgboard-dl-btn'){ if(prevent)e.preventDefault(); _downloadOrgBoard(); }
+  else if(id==='orgboard-zip-btn'){ if(prevent)e.preventDefault(); _downloadOrgBoardZip(); }
+  else if(id==='roster-import-run'){ if(prevent)e.preventDefault(); _impRun('roster'); }
+  else if(id==='results-import-run'){ if(prevent)e.preventDefault(); _impRun('results'); }
+  else if(id==='import-retry-save-roster'){ if(prevent)e.preventDefault(); _impRetrySave('roster'); }
+  else if(id==='import-retry-save-results'){ if(prevent)e.preventDefault(); _impRetrySave('results'); }
   else if(id==='roster-import-dismiss'){ if(prevent)e.preventDefault(); dismissRosterImport(); }
   else if(id==='results-import-dismiss'){ if(prevent)e.preventDefault(); dismissResultsImport(); }
   else if(id==='team-athlete-add-btn'){ if(prevent)e.preventDefault(); addAthleteToTeam(); }
@@ -340,12 +348,12 @@ var parentOpts={broad:true,fly:true,vert:true,pacer:true,attendance:true};
 function toggleParentOpt(k,v){ parentOpts[k]=!!v; }
 var attSession='';
 function saveData(){
-  if(!_loadedOK){_setLoadWarning(true);try{showToast('Data has not loaded yet - refresh before making changes.');}catch(e){alert('Data has not loaded yet - refresh before making changes.');}return;}
+  if(!_loadedOK){_setLoadWarning(true);try{showToast('Data has not loaded yet - refresh before making changes.');}catch(e){alert('Data has not loaded yet - refresh before making changes.');}return Promise.resolve(false);}
   var payload = Object.assign({ type:'teams' }, state, { deletedTeamEntryIds:_pendingTeamDeletes.slice(), deletedAttendanceIds:_pendingAttDeletes.slice() });
-  fetch(API_URL, { method:'POST', body: JSON.stringify(payload) })
+  return fetch(API_URL, { method:'POST', body: JSON.stringify(payload) })
     .then(function(r){ return r.json(); })
-    .then(function(d){ if(d.ok){ _pendingTeamDeletes=[]; _pendingAttDeletes=[]; } else { console.error('Save failed', d); try{showToast('Save was rejected by the server - your change may not be stored.');}catch(e){} } })
-    .catch(function(e){ console.error('Save error', e); try{showToast('Save failed - check connection and retry.');}catch(e2){} });
+    .then(function(d){ if(d.ok){ _pendingTeamDeletes=[]; _pendingAttDeletes=[]; return true; } else { console.error('Save failed', d); try{showToast('Save was rejected by the server - your change may not be stored.');}catch(e){} return false; } })
+    .catch(function(e){ console.error('Save error', e); try{showToast('Save failed - check connection and retry.');}catch(e2){} return false; });
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────
@@ -966,6 +974,7 @@ function renderSettings(){
 }
 
 function renderSettingsBulkResults(){
+  _impSync();
   var seasons=['Winter','Spring','Summer','Fall'];
   var yrs=[]; var thisYr=new Date().getFullYear();
   for(var y=thisYr-1;y<=thisYr+1;y++) yrs.push(String(y));
@@ -973,14 +982,14 @@ function renderSettingsBulkResults(){
   html+='<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Upload test results for many students at once -- built for intake/retest days with a lot of students, like Chris\'s classes. One row per student, one column per exercise they were tested on that day. A student or team not already on the roster gets created automatically, same as Bulk Roster Import. <strong>This saves immediately on import.</strong></div>';
   html+='<div class="form-group"><div class="form-label">Organization / Season / Year</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-    '<input class="form-input" list="org-list" style="flex:2;min-width:160px" placeholder="Organization (e.g. Dutch Ridge)" value="'+resultsImportOrg.replace(/"/g,'&quot;')+'" oninput="resultsImportOrg=this.value"/>'+
-    '<select class="form-input" style="flex:1;min-width:90px" onchange="resultsImportSeason=this.value"><option value="">Season</option>'+seasons.map(function(s){return '<option'+(s===resultsImportSeason?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
-    '<select class="form-input" style="flex:1;min-width:80px" onchange="resultsImportYear=this.value"><option value="">Year</option>'+yrs.map(function(y){return '<option'+(y===resultsImportYear?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+    '<input class="form-input" list="org-list-imp" data-imp="org" style="flex:2;min-width:160px" placeholder="Organization (e.g. Dutch Ridge)" value="'+resultsImportOrg.replace(/"/g,'&quot;')+'"/>'+
+    '<select class="form-input" style="flex:1;min-width:90px" data-imp="season"><option value="">Season</option>'+seasons.map(function(s){return '<option'+(s===resultsImportSeason?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
+    '<select class="form-input" style="flex:1;min-width:80px" data-imp="year"><option value="">Year</option>'+yrs.map(function(y){return '<option'+(y===resultsImportYear?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
     '</div></div>';
   html+='<div class="form-group"><div class="form-label">Test Date (applies to every row in this file)</div>'+
-    '<input type="date" class="form-input" style="max-width:200px" value="'+resultsImportDate+'" onchange="resultsImportDate=this.value"/></div>';
+    '<input type="date" class="form-input" style="max-width:200px" value="'+resultsImportDate+'" data-imp="date"/></div>';
   html+='<div class="form-group"><div class="form-label">Results File (CSV)</div>'+
-    '<input type="file" accept=".csv" style="font-size:13px;color:var(--fg)" onchange="_resultsImportFile(this)"/></div>';
+    '<input type="file" accept=".csv" style="font-size:13px;color:var(--fg)" data-imp="file-results"/></div>'+_impControls('results');
   if(resultsImportReport){
     var rep=resultsImportReport;
     var totalEntries=rep.entriesByExercise.fly+rep.entriesByExercise.broad+rep.entriesByExercise.vert+rep.entriesByExercise.pacer;
@@ -998,6 +1007,7 @@ function renderSettingsBulkResults(){
     if(rep.errors.length){
       html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:10px 0 4px">Skipped Rows</div><div style="font-size:12px;color:var(--muted)">'+rep.errors.join('<br>')+'</div>';
     }
+    html+=_impSaveStatus('results');
     html+='<button class="btn btn-ghost" id="results-import-dismiss" style="margin-top:10px">Dismiss</button>';
     html+='</div>';
   }
@@ -1006,6 +1016,7 @@ function renderSettingsBulkResults(){
 }
 
 function renderSettingsBulkRoster(){
+  _impSync();
   var seasons=['Winter','Spring','Summer','Fall'];
   var yrs=[]; var thisYr=new Date().getFullYear();
   for(var y=thisYr-1;y<=thisYr+1;y++) yrs.push(String(y));
@@ -1013,12 +1024,12 @@ function renderSettingsBulkRoster(){
   html+='<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Upload a spreadsheet of students to create teams and fill their rosters in one pass -- built for organizations with many small teams (like a school\'s grade-level groups) where adding students one at a time isn\'t practical. Any team in the file that doesn\'t exist yet gets created automatically. <strong>This saves immediately on import</strong> -- there\'s no separate review step, so double-check the file before uploading.</div>';
   html+='<div class="form-group"><div class="form-label">Organization / Season / Year for this import</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-    '<input class="form-input" list="org-list" style="flex:2;min-width:160px" placeholder="Organization (e.g. Dutch Ridge)" value="'+rosterImportOrg.replace(/"/g,'&quot;')+'" oninput="rosterImportOrg=this.value"/>'+
-    '<select class="form-input" style="flex:1;min-width:90px" onchange="rosterImportSeason=this.value"><option value="">Season</option>'+seasons.map(function(s){return '<option'+(s===rosterImportSeason?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
-    '<select class="form-input" style="flex:1;min-width:80px" onchange="rosterImportYear=this.value"><option value="">Year</option>'+yrs.map(function(y){return '<option'+(y===rosterImportYear?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
+    '<input class="form-input" list="org-list-imp" data-imp="org" style="flex:2;min-width:160px" placeholder="Organization (e.g. Dutch Ridge)" value="'+rosterImportOrg.replace(/"/g,'&quot;')+'"/>'+
+    '<select class="form-input" style="flex:1;min-width:90px" data-imp="season"><option value="">Season</option>'+seasons.map(function(s){return '<option'+(s===rosterImportSeason?' selected':'')+'>'+s+'</option>';}).join('')+'</select>'+
+    '<select class="form-input" style="flex:1;min-width:80px" data-imp="year"><option value="">Year</option>'+yrs.map(function(y){return '<option'+(y===rosterImportYear?' selected':'')+'>'+y+'</option>';}).join('')+'</select>'+
     '</div></div>';
   html+='<div class="form-group"><div class="form-label">Roster File (CSV)</div>'+
-    '<input type="file" accept=".csv" style="font-size:13px;color:var(--fg)" onchange="_rosterImportFile(this)"/></div>';
+    '<input type="file" accept=".csv" style="font-size:13px;color:var(--fg)" data-imp="file-roster"/></div>'+_impControls('roster');
   if(rosterImportReport){
     var rep=rosterImportReport;
     var totalAdded=Object.keys(rep.addedByTeam).reduce(function(s,k){return s+rep.addedByTeam[k].length;},0);
@@ -1039,6 +1050,7 @@ function renderSettingsBulkRoster(){
     if(rep.errors.length){
       html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:10px 0 4px">Skipped Rows</div><div style="font-size:12px;color:var(--muted)">'+rep.errors.join('<br>')+'</div>';
     }
+    html+=_impSaveStatus('roster');
     html+='<button class="btn btn-ghost" id="roster-import-dismiss" style="margin-top:10px">Dismiss</button>';
     html+='</div>';
   }
@@ -1208,7 +1220,7 @@ function saveNewTeam(){
   if(!state.athletes[key]) state.athletes[key] = [];
   // same organization already here? offer to copy its branding (colors + logo)
   var sib=(state.teams||[]).filter(function(t){ return t!==key && _meta(t).org===org && state.branding && state.branding[t]; });
-  if(sib.length && confirm('Copy branding (colors + logo) from '+_teamDisplay(sib[sib.length-1])+'?')){
+  if(!(state.branding && state.branding['org:'+org]) && sib.length && confirm('Copy branding (colors + logo) from '+_teamDisplay(sib[sib.length-1])+'?')){
     state.branding[key]=JSON.parse(JSON.stringify(state.branding[sib[sib.length-1]]));
   }
   newTeamOrg=''; newTeamGrade=''; newTeamSport=''; newTeamSeason=''; newTeamYear='';
@@ -1225,8 +1237,11 @@ function deleteTeam(name){
 // ── Studio ────────────────────────────────────────────────────────────────
 var studioAthlete = '', studioGraphic = 'spotlight', studioMode = 'photo', studioPhoto = '', studioTeamPhoto = '';
 
+function _brandFor(team){   // team override first, then the organization's branding
+  var br=state.branding||{}; return br[team] || br['org:'+_meta(team).org] || null;
+}
 function _teamBrand(){
-  var b = (state.branding && state.branding[currentTeam]) || {};
+  var b = (currentTeam && _brandFor(currentTeam)) || {};
   return {
     logoUrl: b.logoUrl || '',
     palette: b.palette || { accent:'#C8102E', text:'#F2F2F2', background:'#0A0A0A' }
@@ -1958,7 +1973,237 @@ async function _downloadReport(){
   } catch(e){ cleanup(); if(_w)try{_w.close();}catch(_x){} console.error(e); alert('Could not generate the image.'); }
 }
 
+
+// ── ORGANIZATION STUDIO (Oct 2026) ───────────────────────────────────────────
+// Top-5 leaderboard graphics across a whole organization: one board per grade per test
+// (e.g. "3rd Grade - Pacer Test - Top 5"), best result per student, ties share a rank.
+var studioScope = 'team', studioOrgGrade = null, studioOrgEx = '';
+// Card options (per device): FPT logo is OFF by default (Chris uses this for his school job); theme dark|light.
+var orgCardOpts = {fpt:false, theme:'dark'};
+try{ var _oc=JSON.parse(localStorage.getItem('fpt_orgcard_opts')||'null'); if(_oc) orgCardOpts=Object.assign(orgCardOpts,_oc); }catch(e){}
+function _saveOrgOpts(){ try{ localStorage.setItem('fpt_orgcard_opts',JSON.stringify(orgCardOpts)); }catch(e){} }
+// Organization logo lives in state.branding under an "org:<name>" key (saved with the rest of the portal data).
+function _orgLogo(org){ var b=state.branding && state.branding['org:'+org]; return (b && b.logoUrl) || ''; }
+function _orgLogoUpload(input, org){
+  var f=input.files && input.files[0]; if(!f||!org) return;
+  var rd=new FileReader();
+  rd.onload=function(ev){
+    var img=new Image();
+    img.onload=function(){
+      // downscale so the saved data URL stays small (max 500px on the long side), keeping transparency
+      var k=Math.min(1, 500/Math.max(img.naturalWidth||1,img.naturalHeight||1));
+      var c=document.createElement('canvas'); c.width=Math.max(1,Math.round(img.naturalWidth*k)); c.height=Math.max(1,Math.round(img.naturalHeight*k));
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      if(!state.branding) state.branding={};
+      state.branding['org:'+org]=Object.assign({}, state.branding['org:'+org]||{}, {logoUrl:c.toDataURL('image/png')});   // keep any saved palette
+      saveData(); showToast('Logo saved for '+org); render();
+    };
+    img.onerror=function(){ showToast('Could not read that image.'); };
+    img.src=ev.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+function _orgLogoRemove(org){
+  var _b=state.branding && state.branding['org:'+org];
+  if(_b){ if(_b.palette){ delete _b.logoUrl; } else { delete state.branding['org:'+org]; } saveData(); showToast('Logo removed.'); }
+  render();
+}
+var ORG_EX_ORDER = ['fly','broad','pacer','vert'];
+var ORG_EXN = {fly:'10-10 Fly', broad:'Broad Jump', pacer:'Pacer Test', vert:'Skyhook'};
+
+function _orgForStudio(){
+  if(currentOrg) return currentOrg;
+  var o=_allOrgs(); return o.length===1 ? o[0] : '';
+}
+function _orgGradeList(org){
+  var g={}; _activeTeams().forEach(function(t){ var m=_meta(t); if(m.org===org && m.grade) g[m.grade]=1; });
+  return Object.keys(g).sort(function(a,b){ return a.localeCompare(b,undefined,{numeric:true}); });
+}
+function _orgDisplayName(n){ return String(n||'').replace(/\s*\([^)]*\)\s*$/,''); }   // drop the "(Team)" tag added to duplicate names
+function _orgBoard(org, grade, ex){
+  var rows=[];
+  _activeTeams().forEach(function(t){
+    var m=_meta(t); if(m.org!==org) return;
+    if(grade && m.grade!==grade) return;
+    (state.athletes[t]||[]).forEach(function(a){
+      var v=getPR(a,ex); if(v==null||isNaN(v)) return;
+      rows.push({name:a, team:m.sport||'', v:v});
+    });
+  });
+  var lower=(ex==='fly');
+  rows.sort(function(a,b){ return lower ? a.v-b.v : b.v-a.v; });
+  var rank=0, prev=null;
+  rows.forEach(function(r,i){ if(prev===null || r.v!==prev){ rank=i+1; prev=r.v; } r.rank=rank; });
+  var top=rows.filter(function(r){ return r.rank<=5; });
+  return {rows:top.slice(0,8), total:rows.length, clipped:Math.max(0,top.length-8)};
+}
+function _orgExercisesWithData(org){
+  return ORG_EX_ORDER.filter(function(ex){ return _orgBoard(org,'',ex).total>0; });
+}
+function _orgFmt(ex,v){
+  if(ex==='fly') return v.toFixed(2)+'s';
+  if(ex==='broad') return Math.floor(v/12)+"'"+Math.round(v%12)+'"';
+  if(ex==='pacer') return Math.round(v)+' laps';
+  return parseFloat(v.toFixed(1))+'"';
+}
+function _orgSeasonLabel(org){
+  var t=_activeTeams().filter(function(k){ return _meta(k).org===org; })[0];
+  var m=t?_meta(t):{}; return ((m.season?m.season+' ':'')+(m.year||'')).trim();
+}
+function _orgBoardCardHtml(org, grade, ex){
+  var B=_orgBoard(org,grade,ex), n=B.rows.length;
+  var light=(orgCardOpts.theme==='light');
+  var bg=light?'#ffffff':'#0a0a0a', acc=light?'#b8920a':'#e8c84a', txt=light?'#111111':'#f0f2f5';
+  var muted=light?'rgba(17,17,17,.55)':'rgba(240,242,245,.55)', line=light?'rgba(17,17,17,.14)':'rgba(240,242,245,.14)';
+  var logos=[], orgLogo=_orgLogo(org);
+  if(orgLogo) logos.push(orgLogo);
+  if(orgCardOpts.fpt) logos.push(light?'/fpt_logo_dark.png':'/fpt_logo.webp');
+  var logoH=logos.length>1?46:58;
+  var logoHtml=logos.length?'<div style="display:flex;align-items:center;gap:12px;flex-shrink:0">'+logos.map(function(u){
+    return '<img src="'+_attr(u)+'" alt="" style="height:'+logoH+'px;max-width:130px;object-fit:contain"/>'; }).join('')+'</div>':'';
+  var title=grade||'All Grades';
+  var rowH=Math.min(62, Math.floor(318/Math.max(n,1)));
+  var rowsHtml='';
+  if(!n) rowsHtml='<div style="color:'+muted+';font-size:20px;padding-top:24px">No results yet</div>';
+  B.rows.forEach(function(r,i){
+    var first=(r.rank===1);
+    rowsHtml+='<div style="display:flex;align-items:center;gap:14px;height:'+rowH+'px;border-bottom:1px solid '+line+';'+(first?'background:'+_hexA(acc,0.10)+';margin:0 -10px;padding:0 10px;':'')+'">'+
+      '<div style="width:34px;flex-shrink:0;text-align:center;color:'+(first?acc:muted)+';font-size:'+Math.round(rowH*0.62)+'px;font-weight:900;line-height:1">'+r.rank+'</div>'+
+      '<div style="flex:1;min-width:0;line-height:1.05">'+
+        '<div style="color:'+txt+';font-size:'+Math.min(30,Math.round(rowH*0.52))+'px;font-weight:800;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_attr(_orgDisplayName(r.name))+'</div>'+
+        '<div style="color:'+muted+';font-size:'+Math.max(11,Math.round(rowH*0.26))+'px;font-weight:700;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_attr(r.team)+'</div>'+
+      '</div>'+
+      '<div style="color:'+(first?acc:txt)+';font-size:'+Math.min(34,Math.round(rowH*0.58))+'px;font-weight:900;flex-shrink:0">'+_orgFmt(ex,r.v)+'</div>'+
+    '</div>';
+  });
+  var foot=[org,_orgSeasonLabel(org),'best result per student'].filter(Boolean).join(' · ');
+  return '<div id="orgboard-card" style="width:540px;height:540px;background:'+bg+';color:'+txt+';font-family:\'Barlow Condensed\',sans-serif;position:relative;overflow:hidden;padding:24px 28px 18px;display:flex;flex-direction:column">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'+
+      '<div style="min-width:0">'+
+        '<div style="color:'+acc+';font-size:15px;font-weight:800;letter-spacing:3px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_attr(org)+'</div>'+
+        '<div style="font-size:'+(title.length>12?44:56)+'px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:.95;margin-top:2px">'+_attr(title)+'</div>'+
+        '<div style="color:'+muted+';font-size:21px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:4px">'+ORG_EXN[ex]+' · Top 5</div>'+
+      '</div>'+
+      logoHtml+
+    '</div>'+
+    '<div style="height:3px;background:'+txt+';margin:12px 0 4px"></div>'+
+    '<div style="flex:1;min-height:0">'+rowsHtml+(B.clipped?'<div style="color:'+muted+';font-size:12px;padding-top:4px">+'+B.clipped+' more tied</div>':'')+'</div>'+
+    '<div style="color:'+muted+';font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_attr(foot)+'</div>'+
+  '</div>';
+}
+function _renderOrgStudio(){
+  var org=_orgForStudio();
+  var head='<div class="panel"><div class="panel-title">Organization Studio</div>';
+  if(!org) return head+'<div class="empty" style="padding:16px 0">Pick an organization in the top bar first.</div></div>';
+  var grades=_orgGradeList(org), exs=_orgExercisesWithData(org);
+  if(!exs.length) return head+'<div class="empty" style="padding:16px 0">No test results for '+_attr(org)+' yet.</div></div>';
+  if(studioOrgGrade===null) studioOrgGrade=grades[0]||'';
+  if(studioOrgGrade && grades.indexOf(studioOrgGrade)<0) studioOrgGrade=grades[0]||'';
+  if(exs.indexOf(studioOrgEx)<0) studioOrgEx=exs[0];
+  var html=head+'<div style="font-size:13px;color:var(--muted);margin-bottom:12px">Top 5 across every team in <b style="color:var(--text)">'+_attr(org)+'</b> — each student’s best result, ties share a rank.</div>';
+  html+='<div class="form-group"><div class="form-label">Grade</div><select class="form-input" data-studio="orggrade">'+
+    grades.map(function(g){ return '<option value="'+_attr(g)+'"'+(g===studioOrgGrade?' selected':'')+'>'+_attr(g)+'</option>'; }).join('')+
+    '<option value=""'+(studioOrgGrade===''?' selected':'')+'>All grades</option></select></div>';
+  html+='<div class="form-group"><div class="form-label">Test</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+
+    exs.map(function(ex){ return '<button class="btn'+(ex===studioOrgEx?' btn-team':'')+'" style="flex:1;min-width:90px" data-studio="orgex" data-val="'+ex+'">'+ORG_EXN[ex]+'</button>'; }).join('')+'</div></div>';
+  var _ol=_orgLogo(org);
+  html+='<div class="form-group"><div class="form-label">Card style</div><div style="display:flex;gap:8px">'+
+    '<button class="btn'+(orgCardOpts.theme!=='light'?' btn-team':'')+'" style="flex:1" data-studio="orgtheme" data-val="dark">Dark</button>'+
+    '<button class="btn'+(orgCardOpts.theme==='light'?' btn-team':'')+'" style="flex:1" data-studio="orgtheme" data-val="light">Light</button></div></div>';
+  html+='<div class="form-group"><div class="form-label">Logos</div>'+
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
+        (_ol?'<img src="'+_attr(_ol)+'" alt="" style="height:40px;max-width:90px;object-fit:contain;background:#888;border-radius:4px;padding:3px"/>':'<div style="width:40px;height:40px;border:1px dashed var(--border);border-radius:4px"></div>')+
+        '<div style="flex:1;min-width:0;font-size:13px"><b>'+_attr(org)+' logo</b><div style="color:var(--muted);font-size:12px">'+(_ol?'Shown on every graphic for this organization.':'None yet — upload one to put it on the graphics.')+'</div></div>'+
+        (_ol?'<button class="btn btn-ghost" style="padding:6px 10px" data-studio="orglogo-remove">Remove</button>':'')+
+      '</div>'+
+      '<input type="file" accept="image/*" data-studio="orglogo" style="width:100%;font-size:12px"/>'+
+      '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;font-weight:700;cursor:pointer"><input type="checkbox" data-studio="orgfpt"'+(orgCardOpts.fpt?' checked':'')+'/> Also show the FPT logo</label>'+
+    '</div></div>';
+  html+='<div class="form-label">Preview</div>'+
+    '<div id="spot-stage-wrap" style="width:100%;overflow:hidden;margin:6px 0 14px">'+
+      '<div id="spot-stage-scale" style="transform-origin:top left;width:540px">'+_orgBoardCardHtml(org,studioOrgGrade,studioOrgEx)+'</div>'+
+    '</div>';
+  html+='<button class="btn btn-team" id="orgboard-dl-btn" style="width:100%">Download This Graphic (1080×1080)</button>';
+  html+='<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">'+
+    '<div style="font-weight:800;font-size:13px;margin-bottom:6px">All Grades × All Tests (.zip)</div>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">One graphic for every grade and every test that has results ('+(grades.length*exs.length)+' images).</div>'+
+    '<button class="btn" id="orgboard-zip-btn" style="width:100%">Download Everything (.zip)</button></div>';
+  html+='</div>';
+  _scheduleStudioFit();
+  return html;
+}
 function renderStudio(){
+  var tog='<div class="panel" style="padding:12px"><div style="display:flex;gap:8px">'+
+    '<button class="btn'+(studioScope==='team'?' btn-team':'')+'" style="flex:1" data-studio="scope" data-val="team">This team</button>'+
+    '<button class="btn'+(studioScope==='org'?' btn-team':'')+'" style="flex:1" data-studio="scope" data-val="org">Whole organization</button></div></div>';
+  return tog + (studioScope==='org' ? _renderOrgStudio() : _renderTeamStudio());
+}
+function _studioAction(kind,val){
+  if(kind==='scope'){ studioScope=val; render(); }
+  else if(kind==='orgex'){ studioOrgEx=val; render(); }
+  else if(kind==='orgtheme'){ orgCardOpts.theme=(val==='light'?'light':'dark'); _saveOrgOpts(); render(); }
+  else if(kind==='orglogo-remove'){ _orgLogoRemove(_orgForStudio()); }
+}
+async function _orgBoardCanvas(org,grade,ex){
+  var holder=document.createElement('div');
+  holder.style.cssText='position:fixed;left:-10000px;top:0;width:540px;height:540px';
+  holder.innerHTML=_orgBoardCardHtml(org,grade,ex);
+  document.body.appendChild(holder);
+  try{
+    await Promise.all(Array.prototype.map.call(holder.querySelectorAll('img'),function(img){
+      return (img.complete&&img.naturalWidth>0)?null:new Promise(function(r){ img.onload=r; img.onerror=r; setTimeout(r,3000); });
+    }));
+    return await window.html2canvas(holder.firstElementChild,{scale:2,useCORS:true,backgroundColor:null,logging:false});
+  } finally { if(holder.parentNode) document.body.removeChild(holder); }
+}
+function _orgFileBits(org,grade,ex){
+  var c=function(x){ return String(x||'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,''); };
+  return 'FPT_'+c(org)+'_'+(grade?c(grade):'All_Grades')+'_'+c(ORG_EXN[ex])+'_Top5';
+}
+async function _downloadOrgBoard(){
+  if(!window.html2canvas){ alert('Still loading — try again in a moment.'); return; }
+  var org=_orgForStudio(); if(!org) return;
+  var _w=_saveWinPreOpen();
+  try{
+    var canvas=await _orgBoardCanvas(org,studioOrgGrade,studioOrgEx);
+    _savePng(canvas.toDataURL('image/png'), _orgFileBits(org,studioOrgGrade,studioOrgEx)+'.png', _w);
+  }catch(e){ if(_w)try{_w.close();}catch(_x){} console.error(e); alert('Could not generate the image.'); }
+}
+async function _downloadOrgBoardZip(){
+  if(!window.html2canvas || !window.JSZip){ alert('Still loading libraries — try again in a moment.'); return; }
+  var org=_orgForStudio(); if(!org) return;
+  var grades=_orgGradeList(org), exs=_orgExercisesWithData(org), jobs=[];
+  grades.forEach(function(g){ exs.forEach(function(ex){ if(_orgBoard(org,g,ex).total>0) jobs.push({g:g,ex:ex}); }); });
+  if(!jobs.length){ alert('No results to export.'); return; }
+  var btn=document.getElementById('orgboard-zip-btn'), orig=btn?btn.textContent:'';
+  var zip=new JSZip();
+  try{
+    for(var i=0;i<jobs.length;i++){
+      if(btn) btn.textContent='Rendering '+(i+1)+'/'+jobs.length+'…';
+      var canvas=await _orgBoardCanvas(org,jobs[i].g,jobs[i].ex);
+      var blob=await new Promise(function(r){ canvas.toBlob(r,'image/png'); });
+      zip.file(_orgFileBits(org,jobs[i].g,jobs[i].ex)+'.png', blob);
+    }
+    if(btn) btn.textContent='Building zip…';
+    var zb=await zip.generateAsync({type:'blob'});
+    var url=URL.createObjectURL(zb), a=document.createElement('a');
+    a.href=url; a.download='FPT_'+org.replace(/[^A-Za-z0-9]+/g,'_')+'_Top5_Boards.zip'; a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); },10000);
+    showToast(jobs.length+' graphics zipped.');
+  }catch(e){ console.error(e); alert('Bulk render failed partway — try again.'); }
+  finally{ if(btn) btn.textContent=orig; }
+}
+document.addEventListener('change', function(e){
+  var el=e.target; if(!el||!el.getAttribute) return;
+  var k=el.getAttribute('data-studio');
+  if(el.getAttribute('data-brand')==='select'){ _selectBrandingTeam(el.value); return; }
+  if(k==='orggrade'){ studioOrgGrade=el.value; render(); }
+  else if(k==='orgfpt'){ orgCardOpts.fpt=!!el.checked; _saveOrgOpts(); render(); }
+  else if(k==='orglogo'){ _orgLogoUpload(el,_orgForStudio()); }
+});
+
+function _renderTeamStudio(){
   if(!currentTeam){
     return '<div class="panel"><div class="panel-title">Studio</div><div class="empty" style="padding:16px 0">Select a team first (top of screen).</div></div>';
   }
@@ -1967,8 +2212,8 @@ function renderStudio(){
   var esc=function(s){ return String(s||'').replace(/"/g,'&quot;'); };
   var html='<div class="panel"><div class="panel-title">Studio</div>';
 
-  if(!(state.branding && state.branding[currentTeam])){
-    html += '<div style="background:#241a13;border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:12px;font-size:13px;color:var(--muted)">Tip: set this team\'s logo + colors in <b style="color:var(--text)">Settings → Branding</b> to theme these graphics. Using defaults for now.</div>';
+  if(!_brandFor(currentTeam)){
+    html += '<div style="background:#241a13;border:1px solid var(--border);border-radius:8px;padding:10px 13px;margin-bottom:12px;font-size:13px;color:var(--muted)">Tip: set your organization\'s logo + colors once in <b style="color:var(--text)">Settings → Branding</b> to theme these graphics. Using defaults for now.</div>';
   }
 
   html += '<div class="form-group"><div class="form-label">Graphic</div>'+
@@ -2145,7 +2390,7 @@ function _assignRole(role, color){
 }
 
 function _saveBranding(){
-  if(!brandingTeam){ alert('Pick a team.'); return; }
+  if(!brandingTeam){ alert('Pick an organization or team.'); return; }
   if(!(brandingDraft.logoUrl||'').trim()){ alert('Enter a logo URL.'); return; }
   if(!brandingDraft.palette){ alert('Pull a palette first.'); return; }
   if(!state.branding) state.branding = {};
@@ -2153,30 +2398,40 @@ function _saveBranding(){
     logoUrl: brandingDraft.logoUrl.trim(),
     palette: { accent: brandingDraft.palette.accent, text: brandingDraft.palette.text, background: brandingDraft.palette.background }
   };
-  saveData(); showToast('Branding saved for '+brandingTeam); render();
+  saveData(); showToast('Branding saved for '+_brandLabel(brandingTeam)); render();
 }
 
+function _brandKeyValid(k){ return k && (k.indexOf('org:')===0 ? _allOrgs().indexOf(k.slice(4))>-1 : state.teams.indexOf(k)>-1); }
+function _brandLabel(k){ return k.indexOf('org:')===0 ? k.slice(4)+' (all teams)' : k; }
 function renderSettingsBranding(){
   if(!state.teams.length){
-    return '<div class="panel"><div class="panel-title">Team Branding</div><div class="empty" style="padding:16px 0">Add a team first (Teams tab).</div></div>';
+    return '<div class="panel"><div class="panel-title">Branding</div><div class="empty" style="padding:16px 0">Add a team first (Teams tab).</div></div>';
   }
-  if(!brandingTeam || state.teams.indexOf(brandingTeam) < 0){
-    brandingTeam = (currentTeam && state.teams.indexOf(currentTeam) > -1) ? currentTeam : state.teams[0];
+  if(!_brandKeyValid(brandingTeam)){
+    var _o0=currentOrg || (currentTeam?_meta(currentTeam).org:'') || _allOrgs()[0];
+    brandingTeam = 'org:'+_o0;
     var b0 = (state.branding && state.branding[brandingTeam]) || {};
     brandingDraft = { logoUrl: b0.logoUrl||'', palette: b0.palette ? Object.assign({}, b0.palette) : null };
   }
   var esc = function(s){ return String(s||'').replace(/"/g,'&quot;'); };
-  var html = '<div class="panel"><div class="panel-title">Team Branding</div>';
+  var html = '<div class="panel"><div class="panel-title">Branding</div>';
 
-  html += '<div class="form-group"><div class="form-label">Team</div>'+
-    '<select class="form-input" onchange="_selectBrandingTeam(this.value)">';
+  html += '<div style="font-size:13px;color:var(--muted);margin-bottom:12px">Set the logo and colors <b style="color:var(--text)">once for the whole organization</b> \u2014 every team in it uses them automatically. Pick a single team below only if one team needs its own look.</div>';
+  html += '<div class="form-group"><div class="form-label">Apply to</div>'+
+    '<select class="form-input" data-brand="select">'+
+    '<optgroup label="Organization (all teams)">';
+  _allOrgs().forEach(function(o){
+    var k='org:'+o, done=(state.branding && state.branding[k]) ? '  \u2713' : '';
+    html += '<option value="'+esc(k)+'"'+(k===brandingTeam?' selected':'')+'>'+o+' (all teams)'+done+'</option>';
+  });
+  html += '</optgroup><optgroup label="Single team override">';
   state.teams.forEach(function(t){
     var done = (state.branding && state.branding[t]) ? '  \u2713' : '';
-    html += '<option value="'+esc(t)+'"'+(t===brandingTeam?' selected':'')+'>'+t+done+'</option>';
+    html += '<option value="'+esc(t)+'"'+(t===brandingTeam?' selected':'')+'>'+_teamDisplay(t)+done+'</option>';
   });
-  html += '</select></div>';
+  html += '</optgroup></select></div>';
 
-  html += '<div class="form-group"><div class="form-label">Team logo</div>'+
+  html += '<div class="form-group"><div class="form-label">Logo</div>'+
     '<input type="file" accept="image/*" style="width:100%;font-size:12px" onchange="_onBrandingLogoFile(this)"/>'+
     '<div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4">Uploading the image file is the reliable option — it always shows and downloads. Or paste a direct image URL below.</div></div>';
   var _isData=(brandingDraft.logoUrl||'').indexOf('data:')===0;
@@ -2267,6 +2522,132 @@ function renderSettingsAthletes(){
   return html;
 }
 
+
+// ── Import UI (Oct 2026) ─────────────────────────────────────────────────────
+// Picking a file no longer runs the import. Flow is: choose file -> see a preview
+// (rows / teams / students / results) -> press the Import button -> report + a live
+// "saved to server" status. Errors show inline instead of pop-ups. Fields and buttons
+// use delegated listeners (iOS Safari drops inline handlers on rebuilt HTML).
+var impFile = {roster:null, results:null};   // {name,text,dataRows,teams,students,ok,fly,broad,vert,pacer}
+var impMsg  = {roster:'', results:''};
+var impSave = {roster:'', results:''};       // '' | 'saving' | 'saved' | 'failed'
+var impRunning = false;
+
+function _impSync(){
+  // Organization / Season / Year are shared by both importers so roster + results always land on the same teams.
+  if(!rosterImportOrg && !resultsImportOrg && currentOrg){ rosterImportOrg=resultsImportOrg=currentOrg; }
+  if(!resultsImportOrg) resultsImportOrg=rosterImportOrg; if(!rosterImportOrg) rosterImportOrg=resultsImportOrg;
+  if(!resultsImportSeason) resultsImportSeason=rosterImportSeason; if(!rosterImportSeason) rosterImportSeason=resultsImportSeason;
+  if(!resultsImportYear) resultsImportYear=rosterImportYear; if(!rosterImportYear) rosterImportYear=resultsImportYear;
+}
+function _impAlert(kind,msg){ impMsg[kind]=msg; impRunning=false; render(); }
+
+function _impRowName(row, cols){
+  return cols.full>-1 ? (row[cols.full]||'').trim()
+       : cols.last>-1 && (row[cols.last]||'').trim() ? ((row[cols.first]||'').trim()+' '+(row[cols.last]||'').trim()).trim()
+       : (cols.first>-1 ? (row[cols.first]||'').trim() : '');
+}
+function _impCols(kind, headerRow){
+  var f=headerRow.map(kind==='roster'?_mapRosterHeader:_mapResultsHeader);
+  return {grade:f.indexOf('grade'), team:f.indexOf('team'), first:f.indexOf('first'), last:f.indexOf('last'), full:f.indexOf('fullname'),
+          fly:f.indexOf('fly'), bft:f.indexOf('broadFt'), bin:f.indexOf('broadIn'), vert:f.indexOf('vert'), pacer:f.indexOf('pacer')};
+}
+function _impPreview(kind, name, text){
+  var rows=_parseRosterCsv(text), out={name:name, text:text, dataRows:0, teams:0, students:0, ok:false, fly:0, broad:0, vert:0, pacer:0};
+  if(rows.length<2) return out;
+  var c=_impCols(kind, rows[0]);
+  out.ok = c.team>-1 && (c.full>-1 || c.first>-1);
+  var teams={}, studs={};
+  function has(row,i){ return i>-1 && (row[i]||'').trim()!==''; }
+  for(var r=1;r<rows.length;r++){
+    var row=rows[r]; if(!row.some(function(x){return x&&x.trim();})) continue;
+    var team=(row[c.team]||'').trim(), nm=_impRowName(row,c), grade=c.grade>-1?(row[c.grade]||'').trim():'';
+    if(!team||!nm) continue;
+    out.dataRows++; teams[grade+'|'+team]=1; studs[grade+'|'+team+'|'+nm]=1;
+    if(has(row,c.fly)) out.fly++;
+    if(has(row,c.vert)) out.vert++;
+    if(has(row,c.pacer)) out.pacer++;
+    if(has(row,c.bft)||has(row,c.bin)) out.broad++;
+  }
+  out.teams=Object.keys(teams).length; out.students=Object.keys(studs).length;
+  return out;
+}
+function _impReadFile(kind, input){
+  var f=input.files&&input.files[0]; if(!f) return;
+  var rd=new FileReader();
+  rd.onload=function(ev){
+    impFile[kind]=_impPreview(kind, f.name, String(ev.target.result||''));
+    impMsg[kind]=''; impSave[kind]='';
+    if(kind==='roster') rosterImportReport=null; else resultsImportReport=null;
+    render();
+  };
+  rd.onerror=function(){ impMsg[kind]='Could not read that file.'; render(); };
+  rd.readAsText(f);
+}
+function _impControls(kind){
+  var f=impFile[kind], h='<datalist id="org-list-imp">'+_allOrgs().map(function(o){return '<option value="'+_attr(o)+'"></option>';}).join('')+'</datalist>';
+  if(impMsg[kind]) h+='<div style="color:#e74c3c;font-size:13px;font-weight:700;margin:8px 0">'+_attr(impMsg[kind])+'</div>';
+  if(!f) return h;
+  h+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin:10px 0">'+
+     '<div style="font-size:13px;font-weight:700;word-break:break-all">'+_attr(f.name)+'</div>'+
+     '<div style="font-size:12px;color:var(--muted);margin-top:4px">'+f.dataRows+' rows · '+f.teams+' teams · '+f.students+' students'+
+       (kind==='results'?'<br>Results in file: Fly '+f.fly+' · Broad Jump '+f.broad+' · Skyhook '+f.vert+' · Pacer '+f.pacer:'')+'</div>'+
+     (f.ok?'':'<div style="color:#e74c3c;font-size:12px;margin-top:6px">This file needs a Team column and a Name (or First Name) column.</div>')+
+     '</div>';
+  if(f.ok) h+='<button class="btn btn-team" id="'+kind+'-import-run" style="width:100%">Import '+f.students+' students'+(kind==='results'?' + results':'')+'</button>';
+  return h;
+}
+function _impSaveStatus(kind){
+  var st=impSave[kind];
+  if(st==='saving') return '<div style="font-size:13px;color:var(--muted);margin-top:10px">Saving to server…</div>';
+  if(st==='saved')  return '<div style="font-size:13px;color:#2ecc71;font-weight:700;margin-top:10px">✓ Saved to server</div>';
+  if(st==='failed') return '<div style="font-size:13px;color:#e74c3c;font-weight:700;margin-top:10px">⚠ NOT saved to server. Do not reload this page yet.</div>'+
+                           '<button class="btn" id="import-retry-save-'+kind+'" style="margin-top:8px">Retry save</button>';
+  return '';
+}
+function _impFinish(kind){
+  impFile[kind]=null; impSave[kind]='saving'; render();
+  Promise.resolve(saveData()).then(function(ok){ impSave[kind]=ok?'saved':'failed'; impRunning=false; render(); });
+}
+function _impRetrySave(kind){
+  impSave[kind]='saving'; render();
+  Promise.resolve(saveData()).then(function(ok){ impSave[kind]=ok?'saved':'failed'; render(); });
+}
+function _impRun(kind){
+  if(impRunning) return;
+  var f=impFile[kind];
+  if(!f){ impMsg[kind]='Choose a CSV file first.'; render(); return; }
+  if(!f.ok){ impMsg[kind]='That file needs a Team column and a Name (or First Name) column.'; render(); return; }
+  var org=(kind==='roster'?rosterImportOrg:resultsImportOrg).trim(), season=kind==='roster'?rosterImportSeason:resultsImportSeason, year=kind==='roster'?rosterImportYear:resultsImportYear;
+  if(!org){ impMsg[kind]='Enter an Organization for this import first.'; render(); return; }
+  if(!season||!year){ impMsg[kind]='Pick a Season and Year for this import first.'; render(); return; }
+  if(kind==='results' && !resultsImportDate){ impMsg[kind]='Pick the test date for this import first.'; render(); return; }
+  // Duplicate-results guard: warn if these students already have results logged on the chosen date.
+  if(kind==='results'){
+    var rows=_parseRosterCsv(f.text), c=_impCols('results',rows[0]), names={};
+    for(var r=1;r<rows.length;r++){ var nm=_impRowName(rows[r],c); if(nm) names[nm]=1; }
+    var existing=state.entries.filter(function(e){ return names[e.athlete] && e.date===resultsImportDate; }).length;
+    if(existing && !confirm(existing+' results for these students are already logged on '+resultsImportDate+'. Importing this file again will add them a second time. Continue anyway?')) return;
+  }
+  var msg='Import '+f.students+' students into '+org+' · '+season+' '+year+(kind==='results'?' (test date '+resultsImportDate+')':'')+'?\n\nThis saves immediately.';
+  if(!confirm(msg)) return;
+  impRunning=true; impMsg[kind]='';
+  try{ if(kind==='roster') runRosterImport(f.text); else runResultsImport(f.text); }
+  catch(err){ console.error(err); impRunning=false; impMsg[kind]='Import failed: '+(err&&err.message?err.message:err); render(); }
+}
+function _impHandle(e){
+  var el=e.target; if(!el||!el.getAttribute) return;
+  var k=el.getAttribute('data-imp'); if(!k) return;
+  if(k==='org'){ rosterImportOrg=resultsImportOrg=el.value; }
+  else if(k==='season'){ rosterImportSeason=resultsImportSeason=el.value; }
+  else if(k==='year'){ rosterImportYear=resultsImportYear=el.value; }
+  else if(k==='date'){ resultsImportDate=el.value; }
+  else if(k==='file-roster' && e.type==='change'){ _impReadFile('roster',el); }
+  else if(k==='file-results' && e.type==='change'){ _impReadFile('results',el); }
+}
+document.addEventListener('input', _impHandle);
+document.addEventListener('change', _impHandle);
+
 // ── Bulk Roster Import (Aug 2026) ────────────────────────────────────────────
 // Built for the classroom use case (a teacher with dozens of "teams" -- e.g.
 // Dutch Ridge's 5 grades x 5 groups each) where one-at-a-time Add Athlete is
@@ -2336,29 +2717,23 @@ function _mapResultsHeader(h){
   for(var i=0;i<RESULTS_COL_PATTERNS.length;i++){ if(RESULTS_COL_PATTERNS[i][0].test(norm)) return RESULTS_COL_PATTERNS[i][1]; }
   return null;
 }
-function _resultsImportFile(input){
-  if(!input.files||!input.files[0])return;
-  var reader=new FileReader();
-  reader.onload=function(e){ runResultsImport(e.target.result); };
-  reader.readAsText(input.files[0]);
-}
 function dismissResultsImport(){ resultsImportReport=null; render(); }
 function runResultsImport(csvText){
-  if(!resultsImportOrg.trim()){ alert('Enter an Organization for this import first.'); return; }
-  if(!resultsImportSeason||!resultsImportYear){ alert('Pick a Season and Year for this import first.'); return; }
-  if(!resultsImportDate){ alert('Pick the test date for this import first.'); return; }
+  if(!resultsImportOrg.trim()){ _impAlert('results','Enter an Organization for this import first.'); return; }
+  if(!resultsImportSeason||!resultsImportYear){ _impAlert('results','Pick a Season and Year for this import first.'); return; }
+  if(!resultsImportDate){ _impAlert('results','Pick the test date for this import first.'); return; }
   var rows=_parseRosterCsv(csvText);
-  if(rows.length<2){ alert('No data rows found in that file.'); return; }
+  if(rows.length<2){ _impAlert('results','No data rows found in that file.'); return; }
   var fieldFor=rows[0].map(_mapResultsHeader);
   var gradeCol=fieldFor.indexOf('grade'), teamCol=fieldFor.indexOf('team');
   var firstCol=fieldFor.indexOf('first'), lastCol=fieldFor.indexOf('last'), fullCol=fieldFor.indexOf('fullname');
   var flyCol=fieldFor.indexOf('fly'), broadFtCol=fieldFor.indexOf('broadFt'), broadInCol=fieldFor.indexOf('broadIn');
   var vertCol=fieldFor.indexOf('vert'), pacerCol=fieldFor.indexOf('pacer');
-  if(teamCol===-1){ alert('Could not find a "Team" column in the header row.'); return; }
+  if(teamCol===-1){ _impAlert('results','Could not find a "Team" column in the header row.'); return; }
   // Last Name is optional (Sept 2026, student privacy) -- a First Name column
   // alone is enough, and can contain a full "First L." style entry if that's
   // all the org wants to share. Last, if present, still combines in when given.
-  if(fullCol===-1 && firstCol===-1){ alert('Could not find a "Student Name" column (or a "First Name" column).'); return; }
+  if(fullCol===-1 && firstCol===-1){ _impAlert('results','Could not find a "Student Name" column (or a "First Name" column).'); return; }
 
   var org=resultsImportOrg.trim(), season=resultsImportSeason, year=resultsImportYear, date=resultsImportDate;
   var createdTeams=[], addedToRoster=[], entriesByExercise={fly:0,broad:0,vert:0,pacer:0}, errors=[];
@@ -2414,31 +2789,24 @@ function runResultsImport(csvText){
   }
 
   resultsImportReport={createdTeams:createdTeams, addedToRoster:addedToRoster, entriesByExercise:entriesByExercise, errors:errors};
-  saveData();
-  render();
+  _impFinish('results');
 }
 
-function _rosterImportFile(input){
-  if(!input.files||!input.files[0])return;
-  var reader=new FileReader();
-  reader.onload=function(e){ runRosterImport(e.target.result); };
-  reader.readAsText(input.files[0]);
-}
 function dismissRosterImport(){ rosterImportReport=null; render(); }
 function runRosterImport(csvText){
-  if(!rosterImportOrg.trim()){ alert('Enter an Organization for this import first.'); return; }
-  if(!rosterImportSeason||!rosterImportYear){ alert('Pick a Season and Year for this import first.'); return; }
+  if(!rosterImportOrg.trim()){ _impAlert('roster','Enter an Organization for this import first.'); return; }
+  if(!rosterImportSeason||!rosterImportYear){ _impAlert('roster','Pick a Season and Year for this import first.'); return; }
   var rows=_parseRosterCsv(csvText);
-  if(rows.length<2){ alert('No data rows found in that file.'); return; }
+  if(rows.length<2){ _impAlert('roster','No data rows found in that file.'); return; }
   var fieldFor=rows[0].map(_mapRosterHeader);
   var gradeCol=fieldFor.indexOf('grade'), teamCol=fieldFor.indexOf('team');
   var firstCol=fieldFor.indexOf('first'), lastCol=fieldFor.indexOf('last'), fullCol=fieldFor.indexOf('fullname');
   var genderCol=fieldFor.indexOf('gender');
-  if(teamCol===-1){ alert('Could not find a "Team" column in the header row.'); return; }
+  if(teamCol===-1){ _impAlert('roster','Could not find a "Team" column in the header row.'); return; }
   // Last Name is optional (Sept 2026, student privacy) -- a First Name column
   // alone is enough, and can contain a full "First L." style entry if that's
   // all the org wants to share. Last, if present, still combines in when given.
-  if(fullCol===-1 && firstCol===-1){ alert('Could not find a "Student Name" column (or a "First Name" column).'); return; }
+  if(fullCol===-1 && firstCol===-1){ _impAlert('roster','Could not find a "Student Name" column (or a "First Name" column).'); return; }
 
   var org=rosterImportOrg.trim(), season=rosterImportSeason, year=rosterImportYear;
   var createdTeams=[], addedByTeam={}, skipped=[], errors=[];
@@ -2479,8 +2847,7 @@ function runRosterImport(csvText){
   }
 
   rosterImportReport={createdTeams:createdTeams, addedByTeam:addedByTeam, skipped:skipped, errors:errors, org:org, season:season, year:year};
-  saveData();
-  render();
+  _impFinish('roster');
 }
 
 function addAthleteToTeam(){
