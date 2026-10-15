@@ -121,9 +121,14 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .ch-cols-2 .ch-rank{font-size:clamp(20px,50cqh,68px);min-width:clamp(38px,3.4vw,60px)}
 .ch-cols-2 .ch-name{font-size:clamp(15px,min(7.5cqw,32cqh),55px)}
 .ch-cols-2 .ch-score{font-size:clamp(17px,44cqh,63px)}
-.ch-cols-3 .ch-rank{font-size:clamp(17px,47cqh,52px);min-width:clamp(30px,2.4vw,44px)}
-.ch-cols-3 .ch-name{font-size:clamp(13px,min(6cqw,30cqh),42px)}
-.ch-cols-3 .ch-score{font-size:clamp(14px,42cqh,47px)}
+.ch-body,.ch-res{display:contents}   /* 1-2 column layouts: wrappers are invisible, rows lay out exactly as before */
+/* 3 columns (Oct 2026): name stacked above baseline -> current, so the type can roughly triple. */
+.ch-cols-3 .ch-row{gap:1.2vw}
+.ch-cols-3 .ch-body{display:flex;flex-direction:column;justify-content:center;flex:1;min-width:0;gap:.6cqh}
+.ch-cols-3 .ch-res{display:flex;align-items:baseline;gap:1.1cqw;white-space:nowrap}
+.ch-cols-3 .ch-rank{font-size:clamp(24px,min(58cqh,13cqw),170px);min-width:clamp(56px,13cqw,150px)}
+.ch-cols-3 .ch-name{flex:none;font-size:clamp(18px,min(8.6cqw,41cqh),130px);line-height:1.05}
+.ch-cols-3 .ch-score{font-size:clamp(16px,min(7.4cqw,35cqh),110px)}
 /* 2nd-test display: baseline -> colored arrow -> current (green = improved, red = worse,
    gray = even; direction-aware for lower/higher-better challenges). Both values render
    identically via .ch-score. One-result adults show only their single number, no arrow. */
@@ -133,7 +138,7 @@ svg.brush{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .ch-arrow.flat{color:#999}
 .ch-cols-1 .ch-arrow{font-size:clamp(16px,44cqh,72px)}
 .ch-cols-2 .ch-arrow{font-size:clamp(13px,34cqh,48px)}
-.ch-cols-3 .ch-arrow{font-size:clamp(12px,32cqh,36px)}
+.ch-cols-3 .ch-arrow{font-size:clamp(14px,min(5cqw,24cqh),64px)}
 </style>
 </head>
 <body>
@@ -811,17 +816,17 @@ function buildChallengeSlideForMonth(mm, monName){
       }
       return '<div class="ch-row" style="height:'+rowHeightPct+'%">'
         +'<div class="ch-rank">'+rankStr(x.rank)+'</div>'
-        +'<div class="ch-name">'+(dispLabels[x.r.adult]||x.r.adult)+'</div>'
-        +resultCells
+        +'<div class="ch-body"><div class="ch-name">'+(dispLabels[x.r.adult]||x.r.adult)+'</div>'
+        +'<div class="ch-res">'+resultCells+'</div></div>'
         +'</div>';
     }).join('');
     return '<div class="ch-rows-wrap">'+rowsHtml+'</div>';
   }).join('');
 
   return '<div class="slide slide-light">'+blackBrush()
-    +'<img class="slide-logo" src="'+LOGO+'" alt="FPT" style="height:clamp(84px,26vw,500px)"/>'
+    +'<img class="slide-logo" src="'+LOGO+'" alt="FPT" style="height:'+(nCols===3?'clamp(70px,13vw,260px)':'clamp(84px,26vw,500px)')+'"/>'
     +'<div class="lb-body">'
-    +'<div class="lb-ex-name">'+monName+'<br>Challenge</div>'
+    +'<div class="lb-ex-name"'+(nCols===3?' style="font-size:clamp(40px,5.2vw,130px)"':'')+'>'+monName+'<br>Challenge</div>'
     +'<div class="lb-col-head" style="font-size:clamp(16px,2.6vw,42px);margin-top:1.5vh">'+ch.name+(ch.unit?' &mdash; '+ch.unit:'')+'</div>'
     +'<div class="lb-columns ch-cols-'+nCols+'" style="grid-template-columns:repeat('+nCols+',1fr)">'
     +colsHtml
