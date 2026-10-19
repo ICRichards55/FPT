@@ -281,6 +281,8 @@ function _handleDelegatedClick(e, prevent){
   else if(id==='results-import-run'){ if(prevent)e.preventDefault(); _impRun('results'); }
   else if(id==='import-retry-save-roster'){ if(prevent)e.preventDefault(); _impRetrySave('roster'); }
   else if(id==='import-retry-save-results'){ if(prevent)e.preventDefault(); _impRetrySave('results'); }
+  else if(id==='flyunit-mph'){ if(prevent)e.preventDefault(); _setFlyUnit(true); }
+  else if(id==='flyunit-sec'){ if(prevent)e.preventDefault(); _setFlyUnit(false); }
   else if(id==='roster-import-dismiss'){ if(prevent)e.preventDefault(); dismissRosterImport(); }
   else if(id==='results-import-dismiss'){ if(prevent)e.preventDefault(); dismissResultsImport(); }
   else if(id==='team-athlete-add-btn'){ if(prevent)e.preventDefault(); addAthleteToTeam(); }
@@ -358,7 +360,12 @@ function saveData(){
 
 // ── HELPERS ───────────────────────────────────────────────────────────────
 function _esc(s){ return String(s).replace(/'/g,"\\'"); }
-function fmtFly(v){ return v!=null ? v.toFixed(2)+'s' : '--'; }
+var _flyCtxOrg = '';   // set while building org-wide boards; otherwise the current team's organization decides
+function _orgFlyMph(org){ return !!org && (state.teams||[]).some(function(t){ var m=(state.teamMeta||{})[t]; return m && m.org===org && m.flyUnit==='mph'; }); }
+function _flyIsMph(){ var o=_flyCtxOrg || (currentTeam?_meta(currentTeam).org:''); return _orgFlyMph(o); }
+function _flyLow(id){ return id==='fly' && !_flyIsMph(); }   // true when LOWER is better (seconds)
+function _flyMphStr(v){ return String(Math.round(v*100)/100); }
+function fmtFly(v){ return v!=null ? (_flyIsMph() ? _flyMphStr(v)+' mph' : v.toFixed(2)+'s') : '--'; }
 function fmtBroad(v){ if(v==null) return '--'; return Math.floor(v/12)+"' "+Math.round(v%12)+'"'; }
 function fmtVert(v){ return v!=null ? v.toFixed(3)+'"' : '--'; }
 function fmtPacer(v){ return v!=null ? Math.round(v)+' laps' : '--'; }
@@ -378,7 +385,7 @@ function getPR(ath, id){
     .map(function(e){ return id==='broad'?e.total:e.value; })
     .filter(function(v){ return v!=null && !isNaN(v); });
   if(!vals.length) return null;
-  var lower = id==='fly';
+  var lower = _flyLow(id);
   return lower ? Math.min.apply(null,vals) : Math.max.apply(null,vals);
 }
 
@@ -386,7 +393,7 @@ function getPRWithDate(ath, id){
   var best=null, bestDate=null;
   state.entries.filter(function(e){ return e.athlete===ath && e.exercise===id; }).forEach(function(e){
     var v = id==='broad'?e.total:e.value; if(v==null||isNaN(v)) return;
-    if(best==null||(id==='fly'?v<best:v>best)){ best=v; bestDate=e.date; }
+    if(best==null||(_flyLow(id)?v<best:v>best)){ best=v; bestDate=e.date; }
   });
   return { pr:best, date:bestDate };
 }
@@ -524,7 +531,7 @@ function renderLog(){
   } else if(logEx==='pacer'){
     resultHtml = '<input class="result-field" id="res-val" type="number" step="1" min="0" placeholder="8" oninput="checkPRLive()" style="width:100%"/>';
   } else {
-    resultHtml = '<input class="result-field" id="res-val" type="number" step="0.01" min="0" placeholder="'+(logEx==='fly'?'1.25':'20.0')+'" oninput="checkPRLive()" style="width:100%"/>';
+    resultHtml = '<input class="result-field" id="res-val" type="number" step="0.01" min="0" placeholder="'+(logEx==='fly'?(_flyIsMph()?'14.0':'1.25'):'20.0')+'" oninput="checkPRLive()" style="width:100%"/>';
   }
 
   return teamSel +
@@ -577,9 +584,9 @@ function checkPRLive(){
   if(current==null){
     ind.innerHTML='<span style="color:var(--green)">✓ First entry for this exercise</span>';
   } else {
-    var isPR = logEx==='fly' ? newVal<current : newVal>current;
+    var isPR = _flyLow(logEx) ? newVal<current : newVal>current;
     if(isPR){
-      var diff = logEx==='fly' ? (current-newVal).toFixed(2)+'s' : logEx==='broad' ? (newVal-current).toFixed(1)+' in' : logEx==='pacer' ? Math.round(newVal-current)+' laps' : (newVal-current).toFixed(3)+'"';
+      var diff = logEx==='fly' ? (_flyIsMph() ? (newVal-current).toFixed(1)+' mph' : (current-newVal).toFixed(2)+'s') : logEx==='broad' ? (newVal-current).toFixed(1)+' in' : logEx==='pacer' ? Math.round(newVal-current)+' laps' : (newVal-current).toFixed(3)+'"';
       ind.innerHTML='<span style="color:var(--green)">🏆 NEW PR! +'+diff+' improvement</span>';
     } else {
       ind.innerHTML='<span style="color:var(--muted)">Current PR: '+fmtPR(logEx,current)+'</span>';
@@ -812,7 +819,7 @@ function openReport(name){
     var exEntries = entries.filter(function(e){ return e.exercise===ex.id; });
     if(!exEntries.length) return;
     var vals = exEntries.map(function(e){ return ex.id==='broad'?e.total:e.value; }).filter(function(v){ return v!=null&&!isNaN(v); });
-    var lower = ex.id==='fly';
+    var lower = _flyLow(ex.id);
     var best = lower?Math.min.apply(null,vals):Math.max.apply(null,vals);
     var avg = vals.reduce(function(a,b){return a+b;},0)/vals.length;
     var sorted = exEntries.slice().sort(function(a,b){ return a.date.localeCompare(b.date); });
@@ -955,10 +962,38 @@ function endNowAch(id){
   a.archived=true; saveData(); showToast('Achievement ended.'); render();
 }
 
+// ── FLY UNIT (Oct 2026) ───────────────────────────────────────────────────
+// Some organizations record the 10-10 Fly as MPH (higher = faster) instead of seconds (lower = faster).
+// This is a per-organization display setting: results are stored exactly as entered, and an MPH
+// organization shows "14.5 mph" and ranks higher-is-better everywhere. Flag lives on each team's meta.
+var flyUnitOrg = '', flyUnitSave = '';
+function renderSettingsFlyUnit(){
+  var orgs=_allOrgs();
+  if(!flyUnitOrg || orgs.indexOf(flyUnitOrg)<0) flyUnitOrg = (currentOrg && orgs.indexOf(currentOrg)>-1) ? currentOrg : (orgs[0]||'');
+  var mph=_orgFlyMph(flyUnitOrg);
+  var html='<div class="panel"><div class="panel-title">10-10 Fly Unit</div>';
+  html+='<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Choose how an organization\'s 10-10 Fly results are recorded. <strong>Miles per hour</strong> shows the numbers as entered (e.g. 14.5 mph) and ranks the highest speed first. <strong>Seconds</strong> is the default (lowest time first). Nothing stored is changed, only how it is shown and ranked. Applies to every team in the organization, including ones added later.</div>';
+  html+='<div class="form-group"><div class="form-label">Organization</div><select class="form-input" data-fix="org">'+orgs.map(function(o){return '<option value="'+_attr(o)+'"'+(o===flyUnitOrg?' selected':'')+'>'+_attr(o)+(_orgFlyMph(o)?'  (mph)':'')+'</option>';}).join('')+'</select></div>';
+  html+='<div style="display:flex;gap:8px"><button class="btn'+(mph?'':' btn-team')+'" style="flex:1" id="flyunit-sec">Seconds</button><button class="btn'+(mph?' btn-team':'')+'" style="flex:1" id="flyunit-mph">Miles per hour</button></div>';
+  if(flyUnitSave==='saving') html+='<div style="font-size:13px;color:var(--muted);margin-top:10px">Saving to server…</div>';
+  if(flyUnitSave==='saved') html+='<div style="font-size:13px;color:#2ecc71;font-weight:700;margin-top:10px">✓ Saved to server</div>';
+  if(flyUnitSave==='failed') html+='<div style="font-size:13px;color:#e74c3c;font-weight:700;margin-top:10px">⚠ NOT saved to server. Do not reload this page yet.</div>';
+  return html+'</div>';
+}
+function _setFlyUnit(mph){
+  if(!flyUnitOrg) return;
+  (state.teams||[]).forEach(function(t){
+    var m=state.teamMeta[t]; if(!m || m.org!==flyUnitOrg) return;
+    if(mph) m.flyUnit='mph'; else delete m.flyUnit;
+  });
+  flyUnitSave='saving'; render();
+  Promise.resolve(saveData()).then(function(ok){ flyUnitSave=ok?'saved':'failed'; render(); });
+}
+
 // ── SETTINGS TAB ──────────────────────────────────────────────────────────
 function renderSettings(){
-  var sections = ['teams','bulkroster','bulkresults','athletes','branding','copytogym','backup'];
-  var labels   = ['Teams','Bulk Roster Import','Bulk Results Import','Athletes','Branding','Copy to Gym','Backup'];
+  var sections = ['teams','bulkroster','bulkresults','athletes','branding','copytogym','flyunit','backup'];
+  var labels   = ['Teams','Bulk Roster Import','Bulk Results Import','Athletes','Branding','Copy to Gym','Fly Unit','Backup'];
   var nav = sections.map(function(s,i){
     return '<button class="sn-btn'+(settingsSection===s?' on':'')+'" onclick="settingsSection=\''+s+'\';render()">'+labels[i]+'</button>';
   }).join('');
@@ -969,6 +1004,7 @@ function renderSettings(){
   else if(settingsSection==='athletes') content = renderSettingsAthletes();
   else if(settingsSection==='branding') content = renderSettingsBranding();
   else if(settingsSection==='copytogym') content = renderSettingsCopyToGym();
+  else if(settingsSection==='flyunit') content = renderSettingsFlyUnit();
   else if(settingsSection==='backup') content = renderSettingsBackup();
   return '<div class="sn-nav">'+nav+'</div>'+content;
 }
@@ -1037,6 +1073,7 @@ function renderSettingsBulkRoster(){
     html+='<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px">'+
       '<div><div style="font-size:22px;font-weight:700">'+rep.createdTeams.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Teams Created</div></div>'+
       '<div><div style="font-size:22px;font-weight:700">'+totalAdded+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Students Added</div></div>'+
+      (rep.genderSet&&rep.genderSet.length?'<div><div style="font-size:22px;font-weight:700">'+rep.genderSet.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Genders Set</div></div>':'')+
       (rep.skipped.length?'<div><div style="font-size:22px;font-weight:700">'+rep.skipped.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Already on Team</div></div>':'')+
       (rep.errors.length?'<div><div style="font-size:22px;font-weight:700;color:#e74c3c">'+rep.errors.length+'</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Rows Skipped</div></div>':'')+
       '</div>';
@@ -1270,7 +1307,7 @@ function getIntakeBest(ath, id){
                  .map(function(e){ return id==='broad'?e.total:e.value; })
                  .filter(function(v){ return v!=null && !isNaN(v); });
   if(!vals.length) return null;
-  return id==='fly' ? Math.min.apply(null,vals) : Math.max.apply(null,vals);
+  return _flyLow(id) ? Math.min.apply(null,vals) : Math.max.apply(null,vals);
 }
 // ── Two-session comparison (Aug 2026, per Chris's feedback) ─────────────────
 // Compares the intake SESSION to the retest SESSION (earliest vs latest test date
@@ -1290,12 +1327,12 @@ function getSessionComparison(ath, id){
   var dates = Object.keys(byDate).sort();
   if(dates.length < 2) return null;
   function stats(vals){
-    var best = (id==='fly') ? Math.min.apply(null,vals) : Math.max.apply(null,vals);
+    var best = _flyLow(id) ? Math.min.apply(null,vals) : Math.max.apply(null,vals);
     var avg = vals.reduce(function(s,v){return s+v;},0)/vals.length;
     return {best:best, avg:avg};
   }
   var t1 = stats(byDate[dates[0]]), t2 = stats(byDate[dates[dates.length-1]]);
-  function impPct(a,b){ if(!a) return 0; return (id==='fly' ? (a-b)/a : (b-a)/a)*100; }
+  function impPct(a,b){ if(!a) return 0; return (_flyLow(id) ? (a-b)/a : (b-a)/a)*100; }
   return {
     intakeBest:t1.best, retestBest:t2.best, bestImpPct:impPct(t1.best,t2.best),
     intakeAvg:t1.avg,  retestAvg:t2.avg,  avgImpPct:impPct(t1.avg,t2.avg),
@@ -1305,12 +1342,12 @@ function getSessionComparison(ath, id){
 function getImprovementPct(ath, id){
   var intake = getIntakeBest(ath,id), best = getPR(ath,id);
   if(intake==null || best==null || intake===0) return null;
-  return id==='fly' ? (intake-best)/intake*100 : (best-intake)/intake*100;
+  return _flyLow(id) ? (intake-best)/intake*100 : (best-intake)/intake*100;
 }
 function _spotVal(id, v){
   if(v==null || isNaN(v)) return '--';
   if(id==='broad') return Math.floor(v/12)+"'"+Math.round(v%12);
-  if(id==='fly')   return v.toFixed(2);
+  if(id==='fly')   return _flyIsMph() ? _flyMphStr(v) : v.toFixed(2);
   if(id==='pacer') return String(Math.round(v));
   return String(parseFloat(v.toFixed(1)));
 }
@@ -1849,7 +1886,7 @@ function _reportDates(){
 }
 function _fmtDelta(id, d){
   var mag = (id==='broad') ? Math.round(Math.abs(d))+'\u2033'
-    : (id==='fly') ? Math.abs(d).toFixed(2)+'s'
+    : (id==='fly') ? (_flyIsMph() ? Math.abs(d).toFixed(1)+' mph' : Math.abs(d).toFixed(2)+'s')
     : (id==='pacer') ? Math.round(Math.abs(d))+' laps'
     : Math.abs(d).toFixed(1)+'\u2033';
   return (d>=0?'+':'\u2212')+mag;
@@ -1908,9 +1945,9 @@ function _teamReportCardHtml(){
     });
     if(!d.top5.length) rows='<div style="color:'+muted+';font-size:12px;padding-top:3px">No retest data yet</div>';
     var delta = d.teamAvgT2-d.teamAvgT1;
-    var better = (id==='fly') ? delta<0 : delta>0;
+    var better = _flyLow(id) ? delta<0 : delta>0;
     var arrowColor = better ? '#22c55e' : (delta===0 ? muted : '#ef4444');
-    var impDisp = (id==='fly') ? -delta : delta;   // improvement-signed for the label
+    var impDisp = _flyLow(id) ? -delta : delta;   // improvement-signed for the label
     return '<div style="display:flex;gap:18px;padding:7px 0;'+(last?'':'border-bottom:1px solid '+line)+'">'+
       '<div style="width:165px;flex-shrink:0">'+
         '<div style="color:'+P.text+';font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:-.3px">'+EXN[id]+'</div>'+
@@ -2021,7 +2058,8 @@ function _orgGradeList(org){
 }
 function _orgDisplayName(n){ return String(n||'').replace(/\s*\([^)]*\)\s*$/,''); }   // drop the "(Team)" tag added to duplicate names
 function _orgBoard(org, grade, ex){
-  var rows=[];
+  var rows=[], _prevCtx=_flyCtxOrg; _flyCtxOrg=org;   // getPR ranks fly by THIS organization's unit
+  try{
   _activeTeams().forEach(function(t){
     var m=_meta(t); if(m.org!==org) return;
     if(grade && m.grade!==grade) return;
@@ -2030,7 +2068,8 @@ function _orgBoard(org, grade, ex){
       rows.push({name:a, team:m.sport||'', v:v});
     });
   });
-  var lower=(ex==='fly');
+  }finally{ _flyCtxOrg=_prevCtx; }
+  var lower=(ex==='fly' && !_orgFlyMph(org));
   rows.sort(function(a,b){ return lower ? a.v-b.v : b.v-a.v; });
   var rank=0, prev=null;
   rows.forEach(function(r,i){ if(prev===null || r.v!==prev){ rank=i+1; prev=r.v; } r.rank=rank; });
@@ -2040,8 +2079,8 @@ function _orgBoard(org, grade, ex){
 function _orgExercisesWithData(org){
   return ORG_EX_ORDER.filter(function(ex){ return _orgBoard(org,'',ex).total>0; });
 }
-function _orgFmt(ex,v){
-  if(ex==='fly') return v.toFixed(2)+'s';
+function _orgFmt(ex,v,org){
+  if(ex==='fly') return _orgFlyMph(org) ? _flyMphStr(v)+' mph' : v.toFixed(2)+'s';
   if(ex==='broad') return Math.floor(v/12)+"'"+Math.round(v%12)+'"';
   if(ex==='pacer') return Math.round(v)+' laps';
   return parseFloat(v.toFixed(1))+'"';
@@ -2073,7 +2112,7 @@ function _orgBoardCardHtml(org, grade, ex){
         '<div style="color:'+txt+';font-size:'+Math.min(30,Math.round(rowH*0.52))+'px;font-weight:800;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_attr(_orgDisplayName(r.name))+'</div>'+
         '<div style="color:'+muted+';font-size:'+Math.max(11,Math.round(rowH*0.26))+'px;font-weight:700;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_attr(r.team)+'</div>'+
       '</div>'+
-      '<div style="color:'+(first?acc:txt)+';font-size:'+Math.min(34,Math.round(rowH*0.58))+'px;font-weight:900;flex-shrink:0">'+_orgFmt(ex,r.v)+'</div>'+
+      '<div style="color:'+(first?acc:txt)+';font-size:'+Math.min(34,Math.round(rowH*0.58))+'px;font-weight:900;flex-shrink:0">'+_orgFmt(ex,r.v,org)+'</div>'+
     '</div>';
   });
   var foot=[org,_orgSeasonLabel(org),'best result per student'].filter(Boolean).join(' · ');
@@ -2645,6 +2684,11 @@ function _impHandle(e){
   else if(k==='file-roster' && e.type==='change'){ _impReadFile('roster',el); }
   else if(k==='file-results' && e.type==='change'){ _impReadFile('results',el); }
 }
+document.addEventListener('change', function(e){
+  var el=e.target; if(!el||!el.getAttribute) return; var k=el.getAttribute('data-fix'); if(!k) return;
+  if(k==='org') flyUnitOrg=el.value;
+  flyUnitSave=''; render();
+});
 document.addEventListener('input', _impHandle);
 document.addEventListener('change', _impHandle);
 
@@ -2809,7 +2853,7 @@ function runRosterImport(csvText){
   if(fullCol===-1 && firstCol===-1){ _impAlert('roster','Could not find a "Student Name" column (or a "First Name" column).'); return; }
 
   var org=rosterImportOrg.trim(), season=rosterImportSeason, year=rosterImportYear;
-  var createdTeams=[], addedByTeam={}, skipped=[], errors=[];
+  var createdTeams=[], addedByTeam={}, skipped=[], errors=[], genderSet=[];
   var seenThisRun={};   // team|studentName -> true, catches duplicate rows within the same file
 
   for(var r=1;r<rows.length;r++){
@@ -2836,6 +2880,9 @@ function runRosterImport(csvText){
       state.required[key]=2;
       createdTeams.push(key);
     }
+    // Oct 2026: a Gender in the file now applies to students already on the roster too, so a re-upload can fill in
+    // genders without touching results. A blank Gender cell never erases an existing value.
+    if(gender){ if(!state.profiles[name]) state.profiles[name]={}; if(state.profiles[name].gender!==gender){ state.profiles[name].gender=gender; genderSet.push(name); } }
     if(state.athletes[key].indexOf(name)>-1){
       skipped.push(name+' (already on '+_teamDisplay(key)+')');
       continue;
@@ -2846,7 +2893,7 @@ function runRosterImport(csvText){
     (addedByTeam[key]=addedByTeam[key]||[]).push(name);
   }
 
-  rosterImportReport={createdTeams:createdTeams, addedByTeam:addedByTeam, skipped:skipped, errors:errors, org:org, season:season, year:year};
+  rosterImportReport={createdTeams:createdTeams, addedByTeam:addedByTeam, skipped:skipped, errors:errors, genderSet:genderSet, org:org, season:season, year:year};
   _impFinish('roster');
 }
 
