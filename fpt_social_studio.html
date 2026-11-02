@@ -595,6 +595,47 @@ function getTop5AllTime(exId, gender){
   ranked.sort((a,b)=> lower ? a.value-b.value : b.value-a.value);
   return ranked.slice(0,5);
 }
+// ── Manual baseline overrides (Nov 2026) ────────────────────────────────────
+// For an athlete whose first test of the month was really an earlier-month baseline (e.g. a September
+// test logged in October), the Month PR logic can't see any "prior" result and drops them. Listing them
+// here for a month treats their EARLIEST testing day that month as the baseline, so later tests that
+// beat it count as PRs. The first-month exclusion is also skipped for them. Keyed by 'YYYY-MM'.
+// Seeded below; more can be added from the Month PRs tab (kept on this device).
+const MPR_BASELINE_SEED = {'2026-10':['Owen Maher','Jackson Prose']};
+function _mprOverrideMap(){
+  let saved={}; try{ saved=JSON.parse(localStorage.getItem('fpt_mpr_baseline')||'{}')||{}; }catch(e){}
+  const out={};
+  Object.keys(MPR_BASELINE_SEED).forEach(k=>{ out[k]=MPR_BASELINE_SEED[k].slice(); });
+  Object.keys(saved).forEach(k=>{ out[k]=(out[k]||[]).concat((saved[k]||[]).filter(n=>!(out[k]||[]).some(x=>_nameEq(x,n)))); });
+  return out;
+}
+function _mprOverridesFor(monthStr){ return _mprOverrideMap()[monthStr]||[]; }
+function _mprAddOverride(name){
+  if(!name) return; const mm=mprYear+'-'+String(mprMonth+1).padStart(2,'0');
+  if(_mprActiveOverrides(mm).some(x=>_nameEq(x,name))) return;
+  let saved={}; try{ saved=JSON.parse(localStorage.getItem('fpt_mpr_baseline')||'{}')||{}; }catch(e){}
+  (saved[mm]=saved[mm]||[]).push(name);
+  try{ localStorage.setItem('fpt_mpr_baseline',JSON.stringify(saved)); }catch(e){}
+  let off={}; try{ off=JSON.parse(localStorage.getItem('fpt_mpr_baseline_off')||'{}')||{}; }catch(e){}
+  off[mm]=(off[mm]||[]).filter(x=>!_nameEq(x,name));
+  try{ localStorage.setItem('fpt_mpr_baseline_off',JSON.stringify(off)); }catch(e){}
+  render();
+}
+function _mprRemoveOverride(name){
+  const mm=mprYear+'-'+String(mprMonth+1).padStart(2,'0');
+  let saved={}; try{ saved=JSON.parse(localStorage.getItem('fpt_mpr_baseline')||'{}')||{}; }catch(e){}
+  saved[mm]=(saved[mm]||[]).filter(x=>!_nameEq(x,name));
+  try{ localStorage.setItem('fpt_mpr_baseline',JSON.stringify(saved)); }catch(e){}
+  // a seeded name can't be removed from the saved list; track an explicit exclusion instead
+  let ex={}; try{ ex=JSON.parse(localStorage.getItem('fpt_mpr_baseline_off')||'{}')||{}; }catch(e){}
+  (ex[mm]=ex[mm]||[]).push(name);
+  try{ localStorage.setItem('fpt_mpr_baseline_off',JSON.stringify(ex)); }catch(e){}
+  render();
+}
+function _mprActiveOverrides(monthStr){
+  let off={}; try{ off=JSON.parse(localStorage.getItem('fpt_mpr_baseline_off')||'{}')||{}; }catch(e){}
+  return _mprOverridesFor(monthStr).filter(n=>!(off[monthStr]||[]).some(x=>_nameEq(x,n)));
+}
 function getMonthPRs(year, month) {
   // month is 0-indexed
   const pad = n => String(n).padStart(2,'0');
@@ -607,23 +648,27 @@ function getMonthPRs(year, month) {
   const athletes = [...new Set(monthEntries.map(e => e.athlete))];
 
   const results = {fly:[], broad:[], vert:[], fly510:[], rsi42:[]};
+  const manualBase = _mprActiveOverrides(monthStr);
 
   athletes.forEach(ath => {
     const prof = profiles[ath] || {};
+    const isManual = manualBase.some(n => _nameEq(n, ath));
+    // manual baseline: their earliest test day this month counts as the prior baseline
+    const manualDay = isManual ? monthEntries.filter(e => _nameEq(e.athlete, ath)).map(e => e.date).sort()[0] : null;
     // Exclude first month — fptYear and fptMonth match target month
     const startYear = parseInt(prof.fptYear);
     const startMonth = parseInt(prof.fptMonth) - 1; // 0-indexed
-    if (!isNaN(startYear) && !isNaN(startMonth) &&
+    if (!isManual && !isNaN(startYear) && !isNaN(startMonth) &&
         startYear === year && startMonth === month) return;
 
     ['fly','broad','vert','fly510','rsi42'].forEach(ex => {
       const lower = ex === 'fly' || ex === 'fly510';
       // Prior best — any entry before this month
       const prior = allEntries.filter(e =>
-        _nameEq(e.athlete, ath) && e.exercise === ex && e.date < monthStr+'-01'
+        _nameEq(e.athlete, ath) && e.exercise === ex && (e.date < monthStr+'-01' || (isManual && e.date === manualDay))
       );
       const monthEx = monthEntries.filter(e =>
-        _nameEq(e.athlete, ath) && e.exercise === ex
+        _nameEq(e.athlete, ath) && e.exercise === ex && !(isManual && e.date === manualDay)
       );
       if (!prior.length || !monthEx.length) return;
 
@@ -1436,6 +1481,18 @@ function renderTop5() {
     </div>
   </div>`;
 }
+function _mprOverridePanel(){
+  const mm=mprYear+'-'+String(mprMonth+1).padStart(2,'0');
+  const act=_mprActiveOverrides(mm);
+  const opts=(state.athletes||[]).slice().sort().filter(a=>!act.some(n=>_nameEq(n,a))).map(a=>`<option value="${a}">${a}</option>`).join('');
+  const chips=act.map(n=>`<span style="display:inline-flex;align-items:center;gap:6px;background:var(--surface3);border:1px solid var(--border);border-radius:14px;padding:4px 10px;font-size:13px">${n}<button onclick="_mprRemoveOverride(${JSON.stringify(n).replace(/"/g,'&quot;')})" style="background:none;border:0;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:0">×</button></span>`).join('');
+  return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+    <div style="font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">Manual baseline</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">For athletes whose first test this month was really last month's baseline: their earliest test day counts as the prior result, so later tests that beat it show as PRs.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:${act.length?'8':'0'}px">${chips}</div>
+    <select class="form-select" onchange="_mprAddOverride(this.value)" style="min-width:200px"><option value="">Add athlete…</option>${opts}</select>
+  </div>`;
+}
 function renderMonthPR() {
   const prData = getMonthPRs(mprYear, mprMonth);
   const exObj = EX[mprExIdx];
@@ -1510,6 +1567,7 @@ function renderMonthPR() {
     </div>
     <div class="toggle-group" style="margin-bottom:14px">${exToggs}</div>
     <div style="display:flex;gap:16px;margin-bottom:14px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${includeSchoolLogos?'checked':''} onchange="includeSchoolLogos=this.checked;render()"/>School logos</label><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer"><input type="checkbox" ${includeSchoolText?'checked':''} onchange="includeSchoolText=this.checked;render()"/>School name (subheader)</label></div>
+    ${_mprOverridePanel()}
     <div id="mpr-preview" style="min-height:200px;background:var(--surface2);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px">
       <div style="color:var(--muted);font-size:13px">Loading preview...</div>
     </div>
