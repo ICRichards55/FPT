@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FPT — Export Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Barlow:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#07090B;--surface:#0F1215;--surface2:#171B20;--border:#252B33;--red:#FF5C35;--green:#2ECC71;--text:#F0F2F5;--muted:#7A8694}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;padding:24px 16px 60px}
+.wrap{max-width:760px;margin:0 auto}
+a.back{color:var(--muted);text-decoration:none;font-size:13px}
+h1{font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:900;margin:10px 0 4px}
+.sub{color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:22px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+.ptitle{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+label.opt{display:flex;gap:10px;align-items:flex-start;padding:7px 0;cursor:pointer;font-size:14px;line-height:1.35}
+label.opt input{margin-top:3px;accent-color:var(--red)}
+label.opt small{display:block;color:var(--muted);font-size:12px}
+button{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:18px;letter-spacing:1px;text-transform:uppercase;border:0;border-radius:10px;padding:14px 22px;cursor:pointer;background:var(--red);color:#fff;width:100%}
+button:disabled{opacity:.5;cursor:default}
+button.alt{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:15px;padding:10px 16px;width:auto}
+#log{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:260px;overflow:auto;line-height:1.5}
+#log .ok{color:var(--green)} #log .warn{color:#e8c84a} #log .err{color:var(--red)}
+.bar{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin:12px 0 0}
+.bar i{display:block;height:100%;width:0;background:var(--green);transition:width .2s}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.stat{background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted)}
+.stat b{display:block;font-size:18px;color:var(--text);font-family:'Barlow Condensed',sans-serif}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">‹ Home</a>
+  <h1>Export Center</h1>
+  <div class="sub">Download a complete copy of everything in the platform — gym roster, team rosters, results, achievements and the school logo library — as one ZIP of CSV and JSON files plus the logo image files. Read-only: nothing here changes your data.</div>
+
+  <button id="all" style="margin-bottom:14px;background:var(--green);color:#07090B">Export everything (one click)</button>
+  <div class="panel">
+    <div class="ptitle">Or choose what to include</div>
+    <label class="opt"><input type="checkbox" id="o-gym" checked/><span>Gym (Coaching Portal)<small>Athletes with full profiles, adults/coaches, every result, achievements, guests, challenges</small></span></label>
+    <label class="opt"><input type="checkbox" id="o-adults" checked/><span>Adults &amp; coaches<small>Adult roster with profiles, monthly challenges with ranked results, adult achievements, and a folder per adult</small></span></label>
+    <label class="opt"><input type="checkbox" id="o-teams" checked/><span>Teams (Team Portal)<small>Every team/season, rosters, profiles, results, attendance, sessions, achievements</small></span></label>
+    <label class="opt"><input type="checkbox" id="o-logos" checked/><span>Logo library &amp; team branding<small>School logos and team/org logos downloaded as image files, with a CSV index</small></span></label>
+    <label class="opt"><input type="checkbox" id="o-ind" checked/><span>Per-person files<small>One folder per gym athlete and per team athlete with their profile and full results history</small></span></label>
+    <label class="opt"><input type="checkbox" id="o-per" checked/><span>Per-team folders<small>One folder per team with its own roster and results CSVs</small></span></label>
+    <label class="opt"><input type="checkbox" id="o-src" checked/><span>App source code + data guide<small>Code.gs and the app pages from GitHub, plus a DATA_GUIDE.md explaining every file and the platform's rules — ideal for pointing Claude Code at the folder</small></span></label>
+    <label class="opt"><input type="checkbox" id="o-json" checked/><span>Raw JSON dumps<small>Untouched copy of the full database — best for importing into the new system</small></span></label>
+  </div>
+
+  <button id="go">Build export ZIP</button>
+  <div class="bar"><i id="bar"></i></div>
+
+  <div class="panel" style="margin-top:14px">
+    <div class="ptitle">Progress</div>
+    <div id="log">Ready.</div>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div id="dl" style="display:none"><button class="alt" id="again">Download again</button></div>
+</div>
+
+<script>
+
+var DATA_GUIDE=[
+'# FPT Data Export — Guide',
+'Frye Performance Training (FPT), built by Richards Sports Analytics. This folder is a full snapshot of the platform.',
+'',
+'## Layout',
+'- `gym/` — Coaching Portal: athletes.csv (profile fields merged in), results.csv, achievements.csv, guests.csv, gym_raw.json',
+'- `adults/` — adult roster, adult_results, adult_achievements, challenges (definitions), challenge_results_all, challenge_leaderboards',
+'- `teams/` — Team Portal (offsite teams): teams_index, rosters_all, results_all, attendance, sessions, required_tests, branding, teams_raw.json; `teams/by_team/<team>/` per team',
+'- `individuals/{gym,team,adults}/<name>/` — per-person profile.json, results.csv (adults also challenge files)',
+'- `logos/` — school_library/ and team_and_org/ images + logo_index.csv',
+'- `source/` — Code.gs (Google Apps Script backend) and the app HTML files from GitHub main',
+'- `*_raw.json` — untouched database copies; the authoritative source if a CSV looks lossy',
+'',
+'## Data model and rules',
+'- Backend today: Google Apps Script + Drive JSON (fpt_live.json, fpt_historical.json, fpt_teams_live.json, fpt_teams_historical.json). Gym and teams are separate datasets.',
+'- People are identified by NAME ONLY (no stable id). Results link to people via the `athlete` name string. Entry `id`s are unique per result.',
+'- Gym `athletes` is a list of names; `profiles` is keyed by name. Adults live in `adults` (keyed by name, `isCoach` flag) and their regular results are in the same `entries` list as athletes.',
+'- Team data: `teams` is a list of team keys (one key = one organization + grade + sport + season/year). `athletes` is {teamKey: [names]}; `teamMeta[teamKey]` holds org, grade, sport, season, year, archived, includeInTV, flyUnit.',
+'- A person can be on several teams across seasons; results are not stored per team — they are matched to teams through the roster name.',
+'- Monthly adult challenges: `challenges[YYYY-MM]` = {name, unit, betterDir: lower|higher}; `challengeEntries` = {id, month, adult, value, date}. Rank uses best value per adult; intake = first test.',
+'- Exercises include fly (10-yd fly), broad (jump), vert, pacer, skyhook, and others. Broad/vert may use valueFt/valueIn/total.',
+'- Fly is SECONDS (lower is better) unless the org has teamMeta.flyUnit = "mph" (higher is better; Dutch Ridge). Values are stored as recorded, never converted.',
+'- Month PRs (Social Studio) need a prior best from before the month and skip an athlete\'s first month; a manual baseline override exists in fpt_social_studio.html.',
+'- schoolLogos is {schoolName: imageUrl}. Team/org logos are in teams branding (`org:<Org>` keys).',
+'- Dates are YYYY-MM-DD. CSVs are UTF-8 with BOM; JSON is the safest format for programmatic import.',
+'',
+'## Importing into a new system',
+'Start from `gym/gym_raw.json` and `teams/teams_raw.json`. Create real person ids by de-duplicating on name (watch same-name collisions and renamed people), then re-link results. Keep `flyUnit` per organization.'
+].join('\n');
+var API_URL='https://script.google.com/macros/s/AKfycbwirWQw0-hVSwIwVl6RCWcclgRNKia7awlfUzImilUiKjNKtSapuCueOaTwWgTlJ6Uk/exec';
+var $=function(i){return document.getElementById(i)};
+var lastBlob=null,lastName='';
+function log(m,c){var d=document.createElement('div');if(c)d.className=c;d.textContent=m;$('log').appendChild(d);$('log').scrollTop=1e9}
+function prog(p){$('bar').style.width=Math.round(p*100)+'%'}
+
+// ── CSV helpers ─────────────────────────────────────────────
+function cell(v){if(v==null)return '';if(typeof v==='object')v=JSON.stringify(v);v=String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function toCSV(rows,preferred){
+  rows=rows||[];var keys=[];var seen={};
+  (preferred||[]).forEach(function(k){if(!seen[k]){seen[k]=1;keys.push(k)}});
+  rows.forEach(function(r){Object.keys(r).forEach(function(k){if(!seen[k]){seen[k]=1;keys.push(k)}})});
+  var out=[keys.map(cell).join(',')];
+  rows.forEach(function(r){out.push(keys.map(function(k){return cell(r[k])}).join(','))});
+  return '﻿'+out.join('\r\n')+'\r\n';
+}
+function safe(s){return String(s||'unnamed').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').trim().slice(0,80)||'unnamed'}
+function isLogoStr(u){return typeof u==='string'&&(/^https?:\/\//i.test(u)||/^data:image\//i.test(u))}
+
+// ── Logo fetching ───────────────────────────────────────────
+var EXT={'image/png':'png','image/jpeg':'jpg','image/jpg':'jpg','image/webp':'webp','image/gif':'gif','image/svg+xml':'svg'};
+async function getImage(u){
+  if(/^data:/i.test(u)){
+    var m=u.match(/^data:([^;,]+)(;base64)?,(.*)$/s);if(!m)throw new Error('bad data url');
+    var bin=m[2]?atob(m[3]):decodeURIComponent(m[3]);var a=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);
+    return {data:a,ext:EXT[m[1]]||'png'};
+  }
+  var r=await fetch(u);if(!r.ok)throw new Error('HTTP '+r.status);
+  var b=await r.blob();var ext=EXT[b.type]||((u.split('?')[0].match(/\.(png|jpe?g|webp|gif|svg)$/i)||[])[1]||'png').toLowerCase();
+  return {data:b,ext:ext};
+}
+
+// ── Load data ───────────────────────────────────────────────
+async function load(type){
+  var r=await fetch(API_URL+(type==='teams'?'?type=teams':''));
+  var j=await r.json();if(!j.ok||!j.data)throw new Error('backend returned no data');return j.data;
+}
+var NAMEKEYS=['athlete','name'];
+
+async function build(){
+  $('go').disabled=true;$('all').disabled=true;$('log').innerHTML='';$('stats').innerHTML='';$('dl').style.display='none';prog(0);
+  var want={src:$('o-src').checked,adults:$('o-adults').checked,gym:$('o-gym').checked,teams:$('o-teams').checked,logos:$('o-logos').checked,ind:$('o-ind').checked,per:$('o-per').checked,json:$('o-json').checked};
+  var zip=new JSZip(),counts={},now=new Date();
+  var stamp=now.toISOString().slice(0,10);
+  var root=zip.folder('FPT_Export_'+stamp);
+  var logoIndex=[],gym=null,teams=null;
+  function stat(k,n){counts[k]=n}
+  try{
+    if(want.gym||want.adults){log('Loading gym data…');gym=await load('gym');log('Gym data loaded','ok');}
+    prog(.1);
+    if(want.teams){log('Loading team data…');teams=await load('teams');log('Team data loaded','ok');}
+    prog(.2);
+
+    // ── GYM ──
+    if(gym&&want.gym){
+      var g=root.folder('gym');var profs=gym.profiles||{};
+      var athletes=(gym.athletes||[]).map(function(n){var p=profs[n]||{};return Object.assign({name:n},p)});
+      g.file('athletes.csv',toCSV(athletes,['name','gender','dob','level','highSchool','hsGradYear','college','collegeGradYear','sports','positions','email','parent1Email','parent2Email','instagram','fptMonth','fptYear','status']));
+      var adults=Object.keys(gym.adults||{}).map(function(n){return Object.assign({name:n},gym.adults[n])});
+      g.file('adults_coaches.csv',toCSV(adults,['name']));
+      g.file('results.csv',toCSV(gym.entries||[],['id','athlete','exercise','date','value','valueFt','valueIn','total']));
+      g.file('achievements.csv',toCSV(gym.achievements||[],['athlete','achievement','dateAdded']));
+      g.file('guests.csv',toCSV(gym.guests||[]));
+      var chal=Object.keys(gym.challenges||{}).map(function(k){return Object.assign({key:k},gym.challenges[k])});
+      g.file('challenges.csv',toCSV(chal,['key']));
+      g.file('challenge_results.csv',toCSV(gym.challengeEntries||[]));
+      stat('Gym athletes',athletes.length);stat('Gym results',(gym.entries||[]).length);
+      log('Gym CSVs written: '+athletes.length+' athletes, '+(gym.entries||[]).length+' results','ok');
+      if(want.ind){
+        var byAth={};(gym.entries||[]).forEach(function(e){(byAth[e.athlete]=byAth[e.athlete]||[]).push(e)});
+        var ach={};(gym.achievements||[]).forEach(function(a){(ach[a.athlete]=ach[a.athlete]||[]).push(a)});
+        var names=(gym.athletes||[]).concat(want.adults?[]:Object.keys(gym.adults||{}));var seenN={};
+        names.forEach(function(n){if(seenN[n])return;seenN[n]=1;
+          var f=root.folder('individuals/gym/'+safe(n));
+          f.file('profile.json',JSON.stringify({name:n,profile:profs[n]||{},adult:(gym.adults||{})[n]||null},null,2));
+          f.file('results.csv',toCSV((byAth[n]||[]).slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date))}),['date','exercise','value','valueFt','valueIn','total']));
+          if(ach[n])f.file('achievements.csv',toCSV(ach[n]));
+        });
+        log('Per-person gym folders: '+Object.keys(seenN).length,'ok');
+      }
+      if(want.logos){
+        Object.keys(gym.schoolLogos||{}).forEach(function(s){logoIndex.push({scope:'school library',name:s,source:(gym.schoolLogos[s]||'').slice(0,300),file:''})});
+        gym._logoMap=gym.schoolLogos||{};
+      }
+      if(want.json){var gj=Object.assign({},gym);delete gj._logoMap;g.file('gym_raw.json',JSON.stringify(gj))}
+    }
+
+    // ── ADULTS ──
+    if(gym&&want.adults){
+      var A=root.folder('adults');var ad=gym.adults||{},aprof=gym.profiles||{};
+      var aNames=Object.keys(ad);var aSet={};aNames.forEach(function(n){aSet[n]=1});
+      var aRows=aNames.map(function(n){return Object.assign({name:n},aprof[n]||{},ad[n])});
+      A.file('adult_roster.csv',toCSV(aRows,['name','firstName','lastName','isCoach','dob','gender','email','instagram','status']));
+      var aRes=(gym.entries||[]).filter(function(e){return aSet[e.athlete]});
+      A.file('adult_results.csv',toCSV(aRes,['date','athlete','exercise','value','valueFt','valueIn','total']));
+      var aAch=(gym.achievements||[]).filter(function(a){return aSet[a.athlete]});
+      A.file('adult_achievements.csv',toCSV(aAch,['athlete','achievement','dateAdded','durationWeeks','archived']));
+      var ch=gym.challenges||{};
+      A.file('challenges.csv',toCSV(Object.keys(ch).sort().map(function(k){return Object.assign({month:k},ch[k])}),['month','name','unit','betterDir']));
+      // results with challenge context + rank (best per adult per month; lower/higher per betterDir) + intake (first) vs final (best)
+      var byM={};(gym.challengeEntries||[]).forEach(function(e){(byM[e.month]=byM[e.month]||[]).push(e)});
+      var cRows=[],cSummary=[],perAdultCh={};
+      Object.keys(byM).sort().forEach(function(m){
+        var def=ch[m]||{},low=(def.betterDir||'lower')==='lower';var by={};
+        byM[m].slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date))}).forEach(function(e){(by[e.adult]=by[e.adult]||[]).push(e);
+          cRows.push({month:m,challenge:def.name||'',unit:def.unit||'',betterDir:def.betterDir||'lower',adult:e.adult,date:e.date,value:e.value,id:e.id})});
+        var sums=Object.keys(by).map(function(n){var v=by[n].map(function(e){return Number(e.value)});
+          var best=low?Math.min.apply(null,v):Math.max.apply(null,v);var first=v[0],last=v[v.length-1];
+          return {month:m,challenge:def.name||'',unit:def.unit||'',adult:n,tests:v.length,intake_first:first,latest:last,best:best,change_first_to_best:Math.round((best-first)*1000)/1000}});
+        sums.sort(function(a,b){return low?a.best-b.best:b.best-a.best});
+        sums.forEach(function(r,i){r.rank=i+1;cSummary.push(r);(perAdultCh[r.adult]=perAdultCh[r.adult]||[]).push(r)});
+      });
+      A.file('challenge_results_all.csv',toCSV(cRows,['month','challenge','unit','betterDir','adult','date','value','id']));
+      A.file('challenge_leaderboards.csv',toCSV(cSummary,['month','challenge','unit','rank','adult','tests','intake_first','latest','best','change_first_to_best']));
+      if(want.ind){
+        var rByA={},aByA={};aRes.forEach(function(e){(rByA[e.athlete]=rByA[e.athlete]||[]).push(e)});aAch.forEach(function(a){(aByA[a.athlete]=aByA[a.athlete]||[]).push(a)});
+        var chRaw={};cRows.forEach(function(r){(chRaw[r.adult]=chRaw[r.adult]||[]).push(r)});
+        var allA=aNames.slice();Object.keys(chRaw).forEach(function(n){if(allA.indexOf(n)<0)allA.push(n)});
+        allA.forEach(function(n){var f=root.folder('individuals/adults/'+safe(n));
+          f.file('profile.json',JSON.stringify({name:n,adult:ad[n]||null,profile:aprof[n]||{}},null,2));
+          f.file('challenges.csv',toCSV(perAdultCh[n]||[],['month','challenge','unit','rank','tests','intake_first','latest','best','change_first_to_best']));
+          f.file('challenge_tests.csv',toCSV(chRaw[n]||[],['month','challenge','date','value','unit']));
+          f.file('results.csv',toCSV((rByA[n]||[]).slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date))}),['date','exercise','value','valueFt','valueIn','total']));
+          if(aByA[n])f.file('achievements.csv',toCSV(aByA[n]));
+        });
+        log('Per-adult folders: '+allA.length,'ok');
+      }
+      stat('Adults',aNames.length);stat('Challenge months',Object.keys(ch).length);stat('Challenge tests',cRows.length);stat('Adult achievements',aAch.length);
+      log('Adult files written: '+aNames.length+' adults, '+Object.keys(ch).length+' challenges, '+cRows.length+' challenge tests','ok');
+      if(want.json&&!want.gym)A.file('adults_raw.json',JSON.stringify({adults:ad,challenges:ch,challengeEntries:gym.challengeEntries||[],achievements:aAch}));
+    }
+    prog(.35);
+    prog(.4);
+
+    // ── TEAMS ──
+    if(teams){
+      var t=root.folder('teams');var tm=teams.teamMeta||{},tp=teams.profiles||{};
+      var keys=(teams.teams||[]).slice();Object.keys(teams.athletes||{}).forEach(function(k){if(keys.indexOf(k)<0)keys.push(k)});
+      var teamRows=keys.map(function(k){var m=tm[k]||{};return Object.assign({teamKey:k,athleteCount:((teams.athletes||{})[k]||[]).length},m)});
+      t.file('teams_index.csv',toCSV(teamRows,['teamKey','org','grade','sport','season','year','archived','athleteCount']));
+      var rosterAll=[];
+      keys.forEach(function(k){((teams.athletes||{})[k]||[]).forEach(function(n){
+        var m=tm[k]||{};rosterAll.push(Object.assign({teamKey:k,org:m.org||'',grade:m.grade||'',sport:m.sport||'',season:m.season||'',year:m.year||'',name:n},tp[n]||{}));
+      })});
+      t.file('rosters_all.csv',toCSV(rosterAll,['teamKey','org','grade','sport','season','year','name','gender','dob']));
+      // map athlete -> teams for result tagging
+      var athTeams={};keys.forEach(function(k){((teams.athletes||{})[k]||[]).forEach(function(n){(athTeams[n]=athTeams[n]||[]).push(k)})});
+      var tEntries=(teams.entries||[]).map(function(e){var tk=athTeams[e.athlete]||[];return Object.assign({teams:tk.join(' | ')},e)});
+      t.file('results_all.csv',toCSV(tEntries,['teams','athlete','exercise','date','value','valueFt','valueIn','total']));
+      t.file('achievements.csv',toCSV(teams.achievements||[]));
+      t.file('attendance.csv',toCSV(teams.attendance||[]));
+      var sess=[];Object.keys(teams.sessions||{}).forEach(function(k){var v=teams.sessions[k];(Array.isArray(v)?v:[v]).forEach(function(s){sess.push(Object.assign({teamKey:k},typeof s==='object'?s:{value:s}))})});
+      t.file('sessions.csv',toCSV(sess,['teamKey']));
+      var req=Object.keys(teams.required||{}).map(function(k){return {teamKey:k,required:teams.required[k]}});
+      t.file('required_tests.csv',toCSV(req));
+      stat('Teams / seasons',keys.length);stat('Team athletes',Object.keys(athTeams).length);stat('Team results',(teams.entries||[]).length);
+      log('Team CSVs written: '+keys.length+' teams, '+(teams.entries||[]).length+' results','ok');
+
+      if(want.per){
+        keys.forEach(function(k){var m=tm[k]||{};var f=root.folder('teams/by_team/'+safe(k));
+          var names=(teams.athletes||{})[k]||[];var set={};names.forEach(function(n){set[n]=1});
+          f.file('team_info.json',JSON.stringify(Object.assign({teamKey:k},m,{branding:(teams.branding||{})[k]?Object.assign({},teams.branding[k],{logoUrl:undefined}):null}),null,2));
+          f.file('roster.csv',toCSV(names.map(function(n){return Object.assign({name:n},tp[n]||{})}),['name','gender','dob']));
+          f.file('results.csv',toCSV((teams.entries||[]).filter(function(e){return set[e.athlete]}).sort(function(a,b){return String(a.date).localeCompare(String(b.date))}),['date','athlete','exercise','value','valueFt','valueIn','total']));
+          f.file('attendance.csv',toCSV((teams.attendance||[]).filter(function(a){return a.team===k||a.teamKey===k||(a.athlete&&set[a.athlete])})));
+        });
+        log('Per-team folders: '+keys.length,'ok');
+      }
+      if(want.ind){
+        var tByAth={};(teams.entries||[]).forEach(function(e){(tByAth[e.athlete]=tByAth[e.athlete]||[]).push(e)});
+        Object.keys(athTeams).forEach(function(n){var f=root.folder('individuals/team/'+safe(n));
+          f.file('profile.json',JSON.stringify({name:n,teams:athTeams[n],profile:tp[n]||{}},null,2));
+          f.file('results.csv',toCSV((tByAth[n]||[]).slice().sort(function(a,b){return String(a.date).localeCompare(String(b.date))}),['date','exercise','value','valueFt','valueIn','total']));
+        });
+        log('Per-person team folders: '+Object.keys(athTeams).length,'ok');
+      }
+      if(want.logos){
+        var br=teams.branding||{};
+        Object.keys(br).forEach(function(k){var b=br[k]||{};
+          if(b.logoUrl){logoIndex.push({scope:k.indexOf('org:')===0?'org logo':'team logo',name:k.replace(/^org:/,''),source:b.logoUrl.slice(0,300),file:'',_u:b.logoUrl})}
+        });
+      }
+      if(want.json){var tj=JSON.parse(JSON.stringify(teams));t.file('teams_raw.json',JSON.stringify(tj))}
+      // branding colors without huge logo blobs
+      var brRows=Object.keys(teams.branding||{}).map(function(k){var b=Object.assign({},teams.branding[k]);if(b.logoUrl&&/^data:/.test(b.logoUrl))b.logoUrl='(embedded — see logos folder)';return Object.assign({key:k},b)});
+      t.file('branding.csv',toCSV(brRows,['key']));
+    }
+
+    // ── SOURCE + GUIDE ──
+    if(want.src){
+      var sf=root.folder('source');var base='https://raw.githubusercontent.com/ICRichards55/FPT/main/';var ok=0;
+      var files=['Code.gs','fpt_dopost_update.gs','index.html','fpt_data_entry_v7.html','fpt_teams.html','fpt_tv_display.html','fpt_social_studio.html','intake.html','fpt_export.html'];
+      for(var q=0;q<files.length;q++){try{var rr=await fetch(base+files[q]);if(!rr.ok)throw 0;sf.file(files[q],await rr.text());ok++}catch(e){log('Could not fetch source: '+files[q],'warn')}}
+      log('Source files saved: '+ok+'/'+files.length,ok?'ok':'warn');
+      root.file('DATA_GUIDE.md',DATA_GUIDE);
+    }
+    prog(.5);
+    prog(.55);
+
+    // ── LOGOS ──
+    if(want.logos){
+      var lf=root.folder('logos');var jobs=[];
+      logoIndex.forEach(function(r){
+        var u=r._u;if(!u&&gym&&gym._logoMap&&r.scope==='school library')u=gym._logoMap[r.name];
+        if(isLogoStr(u))jobs.push({r:r,u:u});else r.file='(not a usable image URL)';
+      });
+      var done=0,fail=0;
+      for(var i=0;i<jobs.length;i++){
+        var j=jobs[i];
+        try{var img=await getImage(j.u);var sub=j.r.scope==='school library'?'school_library':'team_and_org';
+          var fn=sub+'/'+safe(j.r.name)+'.'+img.ext;lf.file(fn,img.data);j.r.file='logos/'+fn;done++;
+        }catch(e){fail++;j.r.file='(download failed: '+e.message+') — URL kept in source column'}
+        prog(.55+.35*((i+1)/Math.max(jobs.length,1)));
+      }
+      logoIndex.forEach(function(r){delete r._u});
+      lf.file('logo_index.csv',toCSV(logoIndex.map(function(r){return {scope:r.scope,name:r.name,file:r.file,source:r.source}}),['scope','name','file','source']));
+      stat('Logos saved',done);
+      log('Logos: '+done+' saved'+(fail?', '+fail+' could not be downloaded (URLs are in logo_index.csv — often a blocked hotlink)':''),fail?'warn':'ok');
+    }
+
+    root.file('README.txt',
+      'FPT Export — '+now.toString()+'\r\n\r\n'+
+      Object.keys(counts).map(function(k){return k+': '+counts[k]}).join('\r\n')+'\r\n\r\n'+
+      'adults/   adult roster, challenge definitions/results/leaderboards, adult achievements\r\n'+
+      'gym/      Coaching Portal data (athletes.csv has profile fields merged in)\r\n'+
+      'teams/    Team Portal data; teams/by_team/<team>/ has each team\'s own roster + results\r\n'+
+      'individuals/  one folder per person with profile.json + results.csv\r\n'+
+      'logos/    school library + team/org logos, with logo_index.csv\r\n'+
+      '*_raw.json  untouched database copies for programmatic import\r\n\r\n'+
+      'Notes: "value" is as recorded. Fly is seconds unless the organization was set to mph in Settings → Fly Unit (see teams/branding/teams_raw.json teamMeta.flyUnit).\r\n');
+
+    log('Compressing…');prog(.92);
+    lastBlob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}},function(m){prog(.92+.08*(m.percent/100))});
+    lastName='FPT_Export_'+stamp+'.zip';
+    log('Done — '+(lastBlob.size/1048576).toFixed(1)+' MB','ok');prog(1);
+    $('stats').innerHTML=Object.keys(counts).map(function(k){return '<div class="stat"><b>'+counts[k]+'</b>'+k+'</div>'}).join('');
+    save();$('dl').style.display='block';
+  }catch(e){log('Failed: '+e.message,'err');log('Check your connection and try again. Nothing was changed.','warn')}
+  $('go').disabled=false;$('all').disabled=false;
+}
+function save(){if(!lastBlob)return;var a=document.createElement('a');a.href=URL.createObjectURL(lastBlob);a.download=lastName;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},4000)}
+$('go').onclick=build;$('all').onclick=function(){['o-gym','o-adults','o-teams','o-logos','o-ind','o-per','o-src','o-json'].forEach(function(i){$(i).checked=true});build()};$('again').onclick=save;
+</script>
+</body>
+</html>
