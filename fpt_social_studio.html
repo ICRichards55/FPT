@@ -1246,10 +1246,10 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
   const ctx=canvas.getContext('2d');
   // Background
   ctx.fillStyle='#0a0a0a';ctx.fillRect(0,0,1080,1080);
-  // Subtle halftone band along the bottom for texture (brand-consistent)
+  // Subtle halftone texture in the footer strip (left of the logo zone only)
   ctx.save();
   ctx.fillStyle='#1a1a1a';
-  for(let dy=1012;dy<1080;dy+=18){for(let dx=20;dx<1080;dx+=18){ctx.beginPath();ctx.arc(dx,dy,2.4,0,Math.PI*2);ctx.fill();}}
+  for(let dy=1012;dy<1080;dy+=18){for(let dx=20;dx<800;dx+=18){ctx.beginPath();ctx.arc(dx,dy,2.4,0,Math.PI*2);ctx.fill();}}
   ctx.restore();
 
   // Title — "<MONTH> CHALLENGE"
@@ -1267,7 +1267,9 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
   ctx.fillStyle='#ffffff';ctx.fillRect(40,158,1000,3);
 
   // Table geometry
-  const tableTop=200, tableBottom=1000, headH=48;
+  // Footer strip (y>=FOOT_Y) is reserved for the logo so rows can never run under it.
+  const FOOT_Y=948;
+  const tableTop=200, tableBottom=FOOT_Y-14, headH=48;
   const n=rows.length;
   // Raised from a flat 60px cap (Aug 2026): with few entries the table only ever used
   // a fraction of the available space, leaving a large dead black area below the last
@@ -1369,16 +1371,21 @@ function buildChallengeCanvas(year, month, rows, ch, pageNum, pageCount){
     ctx.textBaseline='alphabetic';
   });
 
-  // Page indicator
+  // Footer strip: divider + defined logo zone (right) and page indicator (left)
+  ctx.fillStyle='#333333';ctx.fillRect(40,948,1000,2);
   if(pageCount&&pageCount>1){
     ctx.fillStyle='#666666';ctx.font='700 26px "Outfit", sans-serif';ctx.textAlign='left';ctx.textBaseline='alphabetic';
-    ctx.fillText('PAGE '+pageNum+' / '+pageCount,40,1052);
+    ctx.fillText('PAGE '+pageNum+' / '+pageCount,40,1022);
   }
-  // Logo bottom-right
   try{
     const logoImg=document.querySelector('img.logo-img')||new Image();
-    if(logoImg.complete&&logoImg.naturalWidth>0){const lh=116;const lw=lh*(logoImg.naturalWidth/logoImg.naturalHeight);ctx.drawImage(logoImg,1048-lw,1058-lh,lw,lh);}
-    else{ctx.fillStyle='#ffffff';ctx.font='900 60px "Outfit", sans-serif';ctx.textAlign='right';ctx.textBaseline='bottom';ctx.fillText('FPT',1048,1056);}
+    const zoneTop=958, zoneBot=1072, zoneRight=1040, zoneMaxW=300;
+    if(logoImg.complete&&logoImg.naturalWidth>0){
+      let lh=zoneBot-zoneTop; let lw=lh*(logoImg.naturalWidth/logoImg.naturalHeight);
+      if(lw>zoneMaxW){lw=zoneMaxW;lh=lw*(logoImg.naturalHeight/logoImg.naturalWidth);}
+      ctx.drawImage(logoImg,zoneRight-lw,zoneTop+((zoneBot-zoneTop)-lh)/2,lw,lh);
+    }
+    else{ctx.fillStyle='#ffffff';ctx.font='900 60px "Outfit", sans-serif';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText('FPT',zoneRight,(zoneTop+zoneBot)/2);}
   }catch(e){}
   return canvas;
 }
