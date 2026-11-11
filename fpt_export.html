@@ -284,7 +284,7 @@ async function build(){
     // ── SOURCE + GUIDE ──
     if(want.src){
       var sf=root.folder('source');var base='https://raw.githubusercontent.com/ICRichards55/FPT/main/';var ok=0;
-      var files=['Code.gs','fpt_dopost_update.gs','index.html','fpt_data_entry_v7.html','fpt_teams.html','fpt_tv_display.html','fpt_social_studio.html','intake.html','fpt_export.html'];
+      var files=['Code.gs','fpt_dopost_update.gs','index.html','fpt_data_entry_v7.html','fpt_teams.html','fpt_social_studio.html','intake.html','fpt_export.html'];
       for(var q=0;q<files.length;q++){try{var rr=await fetch(base+files[q]);if(!rr.ok)throw 0;sf.file(files[q],await rr.text());ok++}catch(e){log('Could not fetch source: '+files[q],'warn')}}
       log('Source files saved: '+ok+'/'+files.length,ok?'ok':'warn');
       root.file('DATA_GUIDE.md',DATA_GUIDE);
